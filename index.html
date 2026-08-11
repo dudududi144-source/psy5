@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PSY6 · STANDALONE GROOVEBOX — POOLED ENGINE</title>
+<style>
+:root{--bg:#0a0c0f;--panel:#14171d;--panel2:#1a1e26;--line:#262c38;--txt:#dfe5ee;--dim:#7c8698;--acc:#ffb454;--acc2:#4fd6c0;--red:#ff5d5d;--grn:#5dd27a;--blu:#6aa9ff;--pur:#c58cff;--yel:#e8d44d;--mono:ui-monospace,monospace;--sans:system-ui,-apple-system,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:13px;user-select:none}
+button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:6px;padding:5px 10px;font-size:12px}
+button:hover{background:#232936}
+button.on{background:var(--acc);color:#1a1204;border-color:var(--acc);font-weight:600}
+button.rec.on{background:var(--red);border-color:var(--red);color:#fff}
+select,input[type=number]{background:#0f1216;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 5px;font-family:var(--mono);font-size:12px}
+input[type=range]{accent-color:var(--acc);width:100%}
+label{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:1px}
+h3{font-size:10px;text-transform:uppercase;letter-spacing:.13em;color:var(--dim);margin:0 0 7px}
+.mono{font-family:var(--mono)}.note{color:var(--dim);font-size:11px;line-height:1.5}
+table{border-collapse:collapse;width:100%;font-size:11px}
+th,td{border:1px solid var(--line);padding:3px 7px;text-align:left;vertical-align:top}
+th{background:#11151b;color:var(--dim);text-transform:uppercase;font-size:8px;letter-spacing:.08em}
+.tag{display:inline-block;font-family:var(--mono);font-size:8px;padding:1px 7px;border-radius:10px;border:1px solid;white-space:nowrap}
+.t-V{color:var(--grn);border-color:var(--grn)}.t-F{color:var(--red);border-color:var(--red)}
+header{display:flex;align-items:center;gap:6px;padding:7px 10px;background:linear-gradient(#171b22,#11141a);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:60}
+.brand{font-family:var(--mono);font-weight:700;letter-spacing:.14em;font-size:14px;color:var(--acc)}
+.brand small{display:block;font-size:7px;color:var(--dim);letter-spacing:.2em}
+.tg{display:flex;align-items:center;gap:5px;padding:0 8px;border-left:1px solid var(--line);flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+.chip.st{color:var(--acc2);border-color:#2a4a44}
+nav{display:flex;gap:2px;background:#0d1015;border-bottom:1px solid var(--line);padding:0 8px;flex-wrap:wrap}
+nav button{border:none;border-radius:0;background:transparent;color:var(--dim);padding:8px 12px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid transparent}
+nav button.on{color:var(--acc);border-bottom-color:var(--acc)}
+main{padding:10px}.tab{display:none}.tab.on{display:block}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
+.cols{display:grid;grid-template-columns:minmax(430px,1.4fr) 380px;gap:10px}
+@media(max-width:980px){.cols{grid-template-columns:1fr}}
+#pads{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pad{aspect-ratio:1/.72;border-radius:8px;background:linear-gradient(160deg,#222836,#171c25);border:1px solid #2c3442;position:relative;touch-action:none}
+.pad.hit{background:linear-gradient(160deg,var(--acc),#9c6212);border-color:var(--acc)}
+.pad .lb{position:absolute;top:3px;left:5px;font-size:9px;color:#fffa;font-family:var(--mono)}
+.pad .tg2{position:absolute;bottom:2px;right:4px;font-size:8px;color:#fff6;font-family:var(--mono)}
+#scenes{display:flex;gap:5px;flex-wrap:wrap}
+.scene{min-width:92px;text-align:left;padding:5px 8px}
+.scene.active{border-color:var(--acc2);box-shadow:0 0 0 1px var(--acc2) inset}
+.scene.pending{border-color:var(--acc);animation:pulse .5s infinite alternate}
+@keyframes pulse{from{opacity:.55}to{opacity:1}}
+#stepGrid{display:grid;gap:3px;margin-top:6px}
+.cell{height:34px;border-radius:4px;background:#171c25;border:1px solid #232a36;cursor:pointer;position:relative}
+.cell:hover{border-color:#3d485c}
+.cell.on{background:linear-gradient(180deg,var(--acc),#8a5a15);border-color:var(--acc)}
+.cell.syn.on{background:linear-gradient(180deg,var(--acc2),#1c6a5c);border-color:var(--acc2)}
+.cell.beat{box-shadow:inset 0 2px 0 #ffffff22}
+.cell.play{outline:2px solid #fff;outline-offset:-2px}
+.cell.lock::after{content:"";position:absolute;bottom:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--blu)}
+.trk{display:flex;align-items:center;gap:6px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;margin-bottom:4px;background:var(--panel2)}
+.trk.sel{border-color:var(--acc2)}
+.trk .nm{width:62px;font-family:var(--mono);font-size:10px;white-space:nowrap;overflow:hidden}
+.trk .ps{flex:1;font-size:9px;color:var(--dim);white-space:nowrap;overflow:hidden}
+.ms button{padding:1px 6px;font-size:9px}
+.ms button.mute.on{background:var(--red);border-color:var(--red);color:#fff}
+.ms button.solo.on{background:var(--yel);border-color:var(--yel);color:#000}
+.macros{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.macro{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px}
+.macro .mn{font-family:var(--mono);font-size:9px;color:var(--acc2)}
+.lib{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;margin-bottom:3px;background:var(--panel2);cursor:pointer}
+.lib:hover{border-color:#3d485c}.lib.assigned{border-color:var(--acc2)}
+.lib .ln{font-size:11px;font-weight:600}.lib .lm{font-size:9px;color:var(--dim);font-family:var(--mono)}
+#log{background:#000;border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:10px;padding:9px;max-height:320px;overflow:auto;white-space:pre-wrap}
+#log .fail{color:var(--red)}#log .info{color:#8ab4ff}#log .warn{color:var(--acc)}
+#meter{background:#000;border:1px solid var(--line);border-radius:4px}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#000d;border:1px solid var(--acc);color:var(--acc);font-family:var(--mono);font-size:11px;padding:7px 15px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;text-align:center;white-space:pre-line}
+#toast.show{opacity:1}
+#power{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 35%,#141a23,#060709);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:100;padding:20px}
+#power h1{font-family:var(--mono);letter-spacing:.3em;color:var(--acc);font-size:26px}
+#power .styles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#power .styles button{padding:16px 24px;font-size:13px;letter-spacing:.08em}
+.app{display:none}
+</style></head><body>
+<div id="power">
+<h1>PSY6</h1>
+<div class="mono" style="color:var(--dim);font-size:10px;letter-spacing:.2em">STANDALONE GROOVEBOX · POOLED ENGINE · NO GC DROPOUTS</div>
+<div class="note" style="max-width:560px;text-align:center">Pooled voices + worker-timed scheduler. Add layers without memory blowups. Choose a genre — it plays instantly.</div>
+<div class="styles" id="stylePicker"></div>
+<button id="resumeBtn" style="display:none;border-color:var(--acc2);color:var(--acc2);padding:12px 20px">RESUME LAST SESSION</button>
+</div>
+<div class="app" id="app">
+<header>
+<div class="brand">PSY6<small>POOLED ENGINE</small></div>
+<div class="tg"><button id="bPlay">▶ PLAY</button><button id="bStop">■ STOP</button><button id="bRec" class="rec">● REC</button><button id="bPanic">PANIC</button></div>
+<div class="tg">
+<div><label>BPM</label><input id="bpm" type="number" min="40" max="300" style="width:56px"></div>
+<div style="width:80px"><label>Swing <span id="swV" class="mono"></span></label><input id="swing" type="range" min="0" max="66"></div>
+<div style="width:80px"><label>Velocity</label><input id="padVel" type="range" min="10" max="100" value="90"></div>
+</div>
+<div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><canvas id="meter" width="90" height="26"></canvas></div>
+<div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><input type="file" id="impF" accept=".json" style="display:none"></div>
+</header>
+<nav>
+<button data-t="perform" class="on">Perform</button><button data-t="seq">Sequencer</button>
+<button data-t="sound">Sound</button><button data-t="mix">Mixer</button>
+<button data-t="tests">Self-Gate</button>
+</nav>
+<main>
+<section class="tab on" id="tab-perform"><div class="cols"><div>
+<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Scenes — click=launch(quantized) shift=assign alt=instant</h3><button id="bChain">CHAIN OFF</button></div><div id="scenes" style="margin-top:6px"></div></div>
+<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Pads</h3><div id="padModes" style="display:flex;gap:4px"></div></div><div id="pads" style="margin-top:7px"></div>
+<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap"><button id="bFill">⚡ FILL</button><button id="bVar">🎲 VARIATION</button><span class="note">DRUM=trigger drums · SCALE=key-locked notes · CHORD=diatonic triads.</span></div></div>
+<div class="panel"><h3>Macros — resolve to REAL engine state</h3><div class="macros" id="macros"></div></div>
+</div><div>
+<div class="panel"><h3>Layers</h3><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px" id="layers"></div></div>
+<div class="panel"><h3>Tracks</h3><div id="tracks"></div></div>
+</div></div></section>
+<section class="tab" id="tab-seq"><div class="panel">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><h3 style="margin:0" id="seqT">Step Sequencer</h3>
+<div style="display:flex;gap:6px;align-items:center"><select id="seqTrack"></select><select id="lenSel"></select><button id="bClr">CLEAR</button><button id="bDup">DUP</button></div></div>
+<div id="stepGrid"></div>
+<div class="note" style="margin-top:6px">click=toggle · shift+click=step editor (vel/prob/micro/lock). Blue dot=parameter lock.</div>
+</div></section>
+<section class="tab" id="tab-sound"><div class="cols">
+<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><h3 style="margin:0">Factory library — real engine state</h3>
+<div style="display:flex;gap:5px"><select id="libCat"></select><select id="libGenre"></select><button id="bAud">AUDITION</button><button id="bAssign">ASSIGN</button></div></div>
+<div class="mono" style="font-size:10px;color:var(--dim);margin:5px 0" id="libMeta"></div><div id="libList" style="max-height:420px;overflow:auto"></div></div>
+<div class="panel"><h3>Synth editor — selected track</h3><div id="synthEd" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div></div>
+</div></section>
+<section class="tab" id="tab-mix"><div class="panel"><h3>Mixer</h3><div id="strips" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"></div></div></section>
+<section class="tab" id="tab-tests"><div class="panel">
+<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Self-Gate — pooled engine, no device needed</h3><button id="bGate">RUN SELF-GATE</button></div>
+<div id="log"></div>
+<table id="gateTab" style="margin-top:8px;display:none"><thead><tr><th>ID</th><th>Claim</th><th>Result</th><th>Evidence</th></tr></thead><tbody></tbody></table>
+</div></section>
+</main></div><div id="toast"></div>
+<script>
+"use strict";
+/* ============ worker-based scheduler timer (jitter-resistant) ============ */
+const WORKER_TIMER_SRC = "let iv=null;self.onmessage=function(e){const d=e.data;if(d.cmd==='start'){if(iv)clearInterval(iv);iv=setInterval(()=>self.postMessage('tick'),d.ms)}else if(d.cmd==='stop'){if(iv)clearInterval(iv);iv=null}};";
+function makeTimerWorker(ms,onTick){
+try{
+const blob=new Blob([WORKER_TIMER_SRC],{type:'application/javascript'});
+const w=new Worker(URL.createObjectURL(blob));
+w.onmessage=onTick;
+w.postMessage({cmd:'start',ms});
+return {stop:()=>{w.postMessage({cmd:'stop'});w.terminate()},worker:true};
+}catch(e){
+const iv=setInterval(onTick,ms);
+return {stop:()=>clearInterval(iv),worker:false};
+}
+}
+/* ============ core constants + model ============ */
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const deep=o=>JSON.parse(JSON.stringify(o));
+function mulberry32(s){let a=s>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function fnv(str){let h=0xcbf29ce484222325n;for(let i=0;i<str.length;i++){h^=BigInt(str.charCodeAt(i));h=(h*0x100000001b3n)&0xFFFFFFFFFFFFFFFFn}return h.toString(16)}
+const $=id=>document.getElementById(id);
+function toast(m,ms){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),ms||2200)}
+const MAX_TRACKS=8,MAX_STEPS=32,MAX_SCENES=8;
+/* GLOBAL VOICE CAPS — pre-allocated pools. The memory/latency budget knobs. */
+const SYNTH_VOICES=20,DRUM_VOICES=24;
+const SCALES={minor:[0,2,3,5,7,8,10],major:[0,2,4,5,7,9,11],dorian:[0,2,3,5,7,9,10],phrygian:[0,1,3,5,7,8,10]};
+const M_ENERGY=0,M_DRIVE=1,M_SPACE=2,M_MOVE=3;
+function gcd(a,b){while(b){const t=a%b;a=b;b=t}return a}
+function mkStep(on){return {on:on?1:0,vel:0.9,prob:1,micro:0,note:48,lock:{}}}
+function mkPattern(name,nt){const d={};for(let t=0;t<nt;t++)d[t]={len:16,steps:Array.from({length:16},()=>mkStep(false))};return {name,data:d}}
+function mkProject(){return {version:3,bpm:125,swing:0,root:33,scale:'minor',recQ:1,chain:false,
+activeScene:0,currentPattern:'A',selTrack:4,macroVals:[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],
+tracks:[],patterns:{},scenes:[],lanes:[]}}
+function loopLen(p){const pat=p.patterns[p.currentPattern];let L=1;if(!pat)return 16;
+for(let t=0;t<MAX_TRACKS;t++){const l=(pat.data[t]&&pat.data[t].len)||16;L=L/gcd(L,l)*l}return Math.min(L,96)}
+function laneEval(ln,step){const pts=ln.pts;if(!pts.length)return 0;
+if(step<=pts[0][0])return pts[0][1];
+for(let i=0;i<pts.length-1;i++){const s0=pts[i][0],v0=pts[i][1],s1=pts[i+1][0],v1=pts[i+1][1];
+if(step>=s0&&step<=s1){const f=s1>s0?(step-s0)/(s1-s0):0;return v0+(v1-v0)*f}}
+return pts[pts.length-1][1]}
+function stepEvents(p,s,rng){
+const pat=p.patterns[p.currentPattern],evs=[],sd=60/p.bpm/4;
+const sw=(s%2===1)?(p.swing/100)*sd*0.75:0;
+for(let t=0;t<MAX_TRACKS;t++){
+const d=pat.data[t];if(!d)continue;
+const len=d.len,idx=s%len,st=d.steps[idx];
+if(!st||!st.on)continue;
+if(st.prob<1&&rng()>st.prob)continue;
+const lock=Object.assign({},st.lock);
+for(let li=0;li<p.lanes.length;li++){const ln=p.lanes[li];
+if(ln.track===t&&lock[ln.param]===undefined)lock[ln.param]=laneEval(ln,s)}
+evs.push({track:t,off:sw+(st.micro/100)*sd*0.45,vel:clamp(st.vel,0.05,1),note:st.note,lock});
+}
+return evs;
+}
+</script>
+</body>
+</html>
