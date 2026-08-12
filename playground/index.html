@@ -316,6 +316,19 @@ footer a:hover{color:var(--cyan)}
 <span class="badge">open source</span>
 </div>
 </header>
+<!-- Status Bar -->
+<div id="statusBar" style="background:rgba(20,10,40,.9);border-bottom:1px solid var(--panel-brd);padding:8px 20px;display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);font-size:11px;color:var(--dim)">
+<div style="display:flex;gap:16px">
+<span>🎵 <span id="statusBPM">145</span> BPM</span>
+<span>🎹 <span id="statusPreset">Rolling Bass</span></span>
+<span>🎛️ <span id="statusVariant">A</span></span>
+</div>
+<div style="display:flex;gap:16px">
+<span>🎹 MIDI: <span id="statusMIDI">Off</span></span>
+<span>🧠 Learning: <span id="statusLearning">0</span> feedbacks</span>
+</div>
+</div>
+
 <main>
 <div class="grid">
 <div class="panel transport">
@@ -1273,4 +1286,18 @@ $("peRandomBtn").addEventListener("click",()=>{
   toast("🎲 Pattern randomized");
 });
 renderPEGrid();
+
+/* ── Status Bar ───────────────────────────────────────────── */
+function updateStatusBar(){
+  const preset=activePreset();
+  if(preset){
+    $("statusBPM").textContent=preset.bpm;
+    $("statusPreset").textContent=preset.name;
+    $("statusVariant").textContent=activeVariant;
+  }
+  $("statusMIDI").textContent=midiInputs&&midiInputs.length>0?"On ("+midiInputs.length+")":"Off";
+  $("statusLearning").textContent=LEARNING.feedbackHistory.length;
+}
+setInterval(updateStatusBar,1000);
+updateStatusBar();
 >
