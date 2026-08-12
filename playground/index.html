@@ -361,6 +361,11 @@ pointer-events:none;
 <span>🎵 <span id="statusBPM">145</span> BPM</span>
 <span>🎹 <span id="statusPreset">Rolling Bass</span></span>
 <span>🎛️ <span id="statusVariant">A</span></span>
+
+<div style="display:flex;gap:8px">
+<button id="aboutBtn" style="padding:4px 8px;font-size:10px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:4px;color:var(--dim);cursor:pointer">ℹ️ About</button>
+<button id="helpBtn" style="padding:4px 8px;font-size:10px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:4px;color:var(--dim);cursor:pointer">❓ Help</button>
+</div>
 </div>
 <div style="display:flex;gap:16px">
 <span>🎹 MIDI: <span id="statusMIDI">Off</span></span>
@@ -984,6 +989,48 @@ buildPresets(); buildSteps(); buildPads(); refreshMeta(); paintStats(); sizeScop
 <span>🎼 Pattern Editor</span>
 </div>
 </footer>
+<!-- About Modal -->
+<div id="aboutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
+<h2 style="font-family:var(--font-display);font-size:18px;color:var(--cyan);margin-bottom:16px">🎹 About PSY6</h2>
+<div style="font-size:13px;color:var(--text);line-height:1.8">
+<p style="margin-bottom:12px">PSY6 is an experimental psytrance engine running entirely in your browser. No install, no account, no server.</p>
+<p style="margin-bottom:12px"><b>Features:</b></p>
+<ul style="margin-left:20px;margin-bottom:12px">
+<li>12 Presets with A/B variants</li>
+<li>119 Sound Bank items</li>
+<li>MIDI Support</li>
+<li>Export/Import presets</li>
+<li>Learning System</li>
+<li>Pattern Editor</li>
+<li>Mixer Panel</li>
+<li>Theme Switcher</li>
+</ul>
+<p style="margin-bottom:12px"><b>Tech:</b> Web Audio API, Vanilla JS, No dependencies</p>
+<p style="color:var(--dim);font-size:11px">Version 1.0 · 2026</p>
+</div>
+<button onclick="$('aboutModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
+</div>
+</div>
+<!-- Help Modal -->
+<div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
+<h2 style="font-family:var(--font-display);font-size:18px;color:var(--cyan);margin-bottom:16px">⌨️ Keyboard Shortcuts</h2>
+<div style="font-size:13px;color:var(--text);line-height:2">
+<div style="display:flex;justify-content:space-between"><span>Play / Stop</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">Space</span></div>
+<div style="display:flex;justify-content:space-between"><span>Play lead notes</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">A W S E D F T G Y H U J K</span></div>
+<div style="display:flex;justify-content:space-between"><span>Select preset 1-9</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">1-9</span></div>
+<div style="display:flex;justify-content:space-between"><span>Select preset 10</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">0</span></div>
+<div style="display:flex;justify-content:space-between"><span>Toggle variant A/B</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">V</span></div>
+<div style="display:flex;justify-content:space-between"><span>Export preset</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">E</span></div>
+<div style="display:flex;justify-content:space-between"><span>Import preset</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">I</span></div>
+<div style="display:flex;justify-content:space-between"><span>Init MIDI</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">M</span></div>
+<div style="display:flex;justify-content:space-between"><span>Toggle theme</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">T</span></div>
+</div>
+<button onclick="$('helpModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
+</div>
+</div>
+
 </body>
 </html
 /* ── MIDI Support ─────────────────────────────────────────── */
@@ -1513,4 +1560,12 @@ function hideLoadingScreen(){
   },200);
 }
 hideLoadingScreen();
+
+/* ── About and Help Modals ────────────────────────────────── */
+$("aboutBtn").addEventListener("click",()=>{
+  $("aboutModal").style.display="flex";
+});
+$("helpBtn").addEventListener("click",()=>{
+  $("helpModal").style.display="flex";
+});
 >
