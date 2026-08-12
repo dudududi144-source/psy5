@@ -833,6 +833,41 @@ if(tag==="input"||tag==="textarea") return;
 const idx=KEYCHARS.indexOf(e.key.toLowerCase());
 if(idx>=0){ const pads=document.querySelectorAll(".pad"); triggerPad(idx,pads[idx]); }
 if(e.key===" "){ e.preventDefault(); isPlaying?stopSeq():startSeq(); }
+// Preset selection shortcuts (1-9, 0)
+const presetNum=parseInt(e.key);
+if(presetNum>=0&&presetNum<=9){
+  const presetIdx=presetNum===0?9:presetNum-1;
+  if(presetIdx<PRESETS.length){
+    activePresetId=PRESETS[presetIdx].id;
+    buildPresets();
+    refreshMeta();
+    syncDelay();
+    toast("🎹 Preset: "+PRESETS[presetIdx].name);
+  }
+}
+// Variant toggle shortcut (V)
+if(e.key.toLowerCase()==="v"){
+  activeVariant=activeVariant==="A"?"B":"A";
+  document.querySelectorAll(".abToggle button").forEach(x=>x.classList.toggle("on",x.dataset.v===activeVariant));
+  refreshMeta();
+  toast("🎯 Variant: "+activeVariant);
+}
+// Export shortcut (E)
+if(e.key.toLowerCase()==="e"&&!e.ctrlKey&&!e.metaKey){
+  exportPreset();
+}
+// Import shortcut (I)
+if(e.key.toLowerCase()==="i"&&!e.ctrlKey&&!e.metaKey){
+  $("importFile").click();
+}
+// MIDI init shortcut (M)
+if(e.key.toLowerCase()==="m"){
+  initMIDI();
+}
+// Theme toggle shortcut (T)
+if(e.key.toLowerCase()==="t"){
+  $("themeBtn").click();
+}
 });
 $("playBtn").addEventListener("click",()=>isPlaying?stopSeq():startSeq());
 let volTimeout=null;
