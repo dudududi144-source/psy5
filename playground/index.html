@@ -44,28 +44,7 @@ background-image:
 radial-gradient(1200px 600px at 80% -10%, rgba(120,40,200,.22), transparent 60%),
 radial-gradient(900px 500px at 10% 110%, rgba(0,255,200,.08), transparent 60%);
 }
-/* ── dev-only security banner ─────────────────────────────── */
-#secBanner{
-display:none;
-direction:rtl;
-text-align:right;
-background:linear-gradient(90deg,#3a0d1c,#2a0a14);
-border-bottom:1px solid var(--danger);
-color:#ffdbe4;
-padding:14px 20px;
-font-size:14px;
-line-height:1.7;
-position:relative;
-z-index:50;
-}
-#secBanner.show{display:block;animation:bannerIn .4s ease}
-#secBanner b{color:#fff}
-#secBanner code{font-family:var(--font-mono);background:rgba(255,255,255,.1);padding:1px 6px;border-radius:4px;font-size:12px}
-#secBanner button{
-position:absolute;left:12px;top:12px;background:none;border:1px solid var(--danger);
-color:var(--danger);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--font-body);
-}
-@keyframes bannerIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+to{opacity:1;transform:none}}
 header{
 position:relative;
 padding:64px 24px 88px;
@@ -208,15 +187,7 @@ footer a:hover{color:var(--cyan)}
 </style>
 </head>
 <body>
-<!-- dev-only security banner (localhost / ?dev) -->
-<div id="secBanner" role="alert">
-<button id="secClose" type="button">סגור</button>
-<b>⚠️ אזהרת אבטחה:</b> הטוקנים שלך (GitHub / Cloudflare / Supabase / Turso) הודבקו בקובץ בצ'אט ונחשבים חשופים.
-סובב אותם <b>עכשיו</b>: GitHub → Developer settings → Revoke token · Cloudflare → API Tokens → Rotate ·
-Supabase → Access Tokens → Revoke · Turso → <code>turso db tokens invalidate</code>.
-לעולם אל תשמור secrets בקבצים בריפו — רק ב־GitHub Actions secrets / Workers secrets.
-(באנר זה מוצג רק בסביבת פיתוח — מחק אותו לפני דיפלוי ציבורי.)
-</div>
+
 
 <header>
 <div class="logo">PSY6</div>
@@ -253,48 +224,7 @@ Supabase → Access Tokens → Revoke · Turso → <code>turso db tokens invalid
 <div class="kbHint">Play lead with your keyboard: <b>A W S E D F T G Y H U J K</b> — or tap the pads.</div>
 <div class="pads" id="pads"></div>
 </section>
-<section class="panel">
-<h2>Feedback · 30s</h2>
-<form id="fbForm" autocomplete="off">
-<div class="fRow">
-<label>Genre fit — "does it sound psytrance?"</label>
-<div class="rateBtns" id="rateGenre"></div>
-</div>
-<div class="fRow">
-<label>Sound quality</label>
-<div class="rateBtns" id="rateQuality"></div>
-</div>
-<div class="fRow">
-<label>What is wrong? (multi)</label>
-<div class="chips" id="issueChips"></div>
-</div>
-<div class="fRow">
-<label>Which variant is better?</label>
-<div class="voteRow">
-<button type="button" data-vote="A">▲ A</button>
-<button type="button" data-vote="B">▲ B</button>
-</div>
-</div>
-<div class="fRow">
-<label for="fbComment">Comment</label>
-<textarea id="fbComment" rows="3" placeholder="harsh highs? muddy low end? not rolling enough?"></textarea>
-</div>
-<div class="fRow">
-<label for="fbAlias">Alias (optional, for credits)</label>
-<input type="text" id="fbAlias" maxlength="40" placeholder="anonymous by default">
-</div>
-<div class="consent">
-<input type="checkbox" id="fbConsent">
-<span>I'm okay with being credited under this alias in the README.</span>
-</div>
-<button id="submitFb" type="submit">SEND FEEDBACK ▸</button>
-<div class="fbStats">
-<span>sessions: <b id="statPlays">0</b></span>
-<span>submissions: <b id="statFb">0</b></span>
-<span>privacy-first · no cookies</span>
-</div>
-</form>
-</section>
+
 </div>
 </main>
 <footer>
@@ -581,30 +511,7 @@ function toast(msg){
 const t=$("toast");t.textContent=msg;t.classList.add("show");
 clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
 }
-if(location.hostname==="localhost"||location.hostname==="127.0.0.1"||new URLSearchParams(location.search).has("dev")){
-$("secBanner").classList.add("show");
-}
-$("secClose").addEventListener("click",()=>$("secBanner").classList.remove("show"));
-/* ── init ─────────────────────────────────────────────────── */
-buildPresets();buildSteps();buildPads();refreshMeta();paintStats();sizeScope();
-</script>
-</body>
-</html>==="localhost"||location.hostname==="127.0.0.1"||new URLSearchParams(location.search).has("dev")){
-$("secBanner").classList.add("show");
-}
-$("secClose").addEventListener("click",()=>$("secBanner").classList.remove("show"));
-buildPresets(){
-const wrap=$("presetList");wrap.innerHTML="";
-PRESETS.forEach(p=>{
-const el=document.createElement("div");
-el.className="presetCard"+(p.id===activePresetId?" sel":"");
-el.dataset.id=p.id;
-el.innerHTML='<div class="pbpm">'+p.bpm+'</div><div class="pname">'+p.name+'</div><div class="ptag">'+p.tag+'</div><div class="pdesc">'+p.desc+'</div>';
-el.addEventListener("click",()=>{
-activePresetId=p.id;syncDelay();
-document.querySelectorAll(".presetCard").forEach(c=>c.classList.toggle("sel",c.dataset.id===p.id));
-refreshMeta();renderSteps(-1);
-});
+
 wrap.appendChild(el);
 });
 }
