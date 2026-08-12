@@ -303,6 +303,27 @@ footer a:hover{color:var(--cyan)}
 .abToggle{justify-content:center}
 .volWrap{justify-content:center}
 }
+
+/* ── Theme Switcher ───────────────────────────────────────── */
+body.light-theme{
+--bg:#f5f5f5;
+--bg2:#ffffff;
+--panel:rgba(255,255,255,.9);
+--panel-brd:rgba(150,90,255,.25);
+--cyan:#00b894;
+--purple:#6c5ce7;
+--magenta:#e84393;
+--text:#2d3436;
+--dim:#636e72;
+--ok:#00b894;
+--warn:#fdcb6e;
+--danger:#d63031;
+}
+body.light-theme{
+background-image:
+radial-gradient(1200px 600px at 80% -10%, rgba(108,92,231,.15), transparent 60%),
+radial-gradient(900px 500px at 10% 110%, rgba(0,184,148,.08), transparent 60%);
+}
 </style>
 </head>
 <body>
@@ -347,6 +368,10 @@ footer a:hover{color:var(--cyan)}
 <button id="importBtn" style="padding:4px 8px;font-size:11px">📥 Import</button>
 <input type="file" id="importFile" accept=".json" style="display:none">
 </div>
+<div class="volWrap" style="gap:4px">
+<button id="themeBtn" style="padding:4px 8px;font-size:11px" title="Toggle theme">🌙 Theme</button>
+</div>
+
 <div class="volWrap" style="gap:4px">
 <button id="midiBtn" style="padding:4px 8px;font-size:11px">🎹 MIDI</button>
 <span id="midiStatus" style="font-size:10px;color:var(--dim)">No MIDI</span>
@@ -1370,4 +1395,22 @@ function updateStatusBar(){
 }
 setInterval(updateStatusBar,1000);
 updateStatusBar();
+
+/* ── Theme Switcher ───────────────────────────────────────── */
+$("themeBtn").addEventListener("click",()=>{
+  document.body.classList.toggle("light-theme");
+  const isLight=document.body.classList.contains("light-theme");
+  $("themeBtn").textContent=isLight?"☀️ Theme":"🌙 Theme";
+  try{
+    localStorage.setItem("psy6_theme",isLight?"light":"dark");
+  }catch(e){/* localStorage unavailable */}
+});
+// Load saved theme
+try{
+  const savedTheme=localStorage.getItem("psy6_theme");
+  if(savedTheme==="light"){
+    document.body.classList.add("light-theme");
+    $("themeBtn").textContent="☀️ Theme";
+  }
+}catch(e){/* localStorage unavailable */}
 >
