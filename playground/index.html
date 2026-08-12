@@ -1,4 +1,13 @@
-<!DOCTYPE html>
+<!DOCTYPE
+<!-- Learning System -->
+<section class="panel">
+<h2>🧠 Learning</h2>
+<div id="learningInsights" style="font-size:12px;color:var(--dim);margin-bottom:10px">
+No insights yet. Submit feedback to start learning.
+</div>
+<button id="applyLearnedBtn" style="padding:8px 16px;font-size:12px;width:100%">🧠 Apply Learned Preferences</button>
+</section>
+ html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -639,7 +648,7 @@ ts:new Date().toISOString()
 };
 try{
 const store=JSON.parse(localStorage.getItem("psy6_feedback")||"[]");
-store.push(payload); localStorage.setItem("psy6_feedback",JSON.stringify(store));
+store.push(payload);\nLEARNING.addFeedback(payload); localStorage.setItem("psy6_feedback",JSON.stringify(store));
 }catch(err){/* localStorage full or unavailable */}
 if(FEEDBACK_ENDPOINT){
 try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */ }
@@ -798,6 +807,112 @@ function applySoundBankItem(category, id){
   }
   toast('🎛️ Applied: '+item.name);
 }
+/* ── Learning System ──────────────────────────────────────── */
+const LEARNING={
+  feedbackHistory:[],
+  preferences:{
+    preferredBPM:null,
+    preferredWave:null,
+    preferredCutoff:null,
+    preferredQLvl:null,
+    dislikedIssues:[],
+    likedVariants:{A:0,B:0},
+  },
+  load(){
+    try{
+      const data=localStorage.getItem('psy6_learning');
+      if(data){
+        const parsed=JSON.parse(data);
+        this.feedbackHistory=parsed.feedbackHistory||[];
+        this.preferences=parsed.preferences||this.preferences;
+      }
+    }catch(e){/* localStorage unavailable */}
+  },
+  save(){
+    try{
+      localStorage.setItem('psy6_learning',JSON.stringify({
+        feedbackHistory:this.feedbackHistory.slice(-50),
+        preferences:this.preferences
+      }));
+    }catch(e){/* localStorage unavailable */}
+  },
+  addFeedback(payload){
+    this.feedbackHistory.push(payload);
+    // Update preferences based on feedback
+    if(payload.best_variant){
+      this.preferences.likedVariants[payload.best_variant]=(this.preferences.likedVariants[payload.best_variant]||0)+1;
+    }
+    if(payload.issues&&payload.issues.length>0){
+      payload.issues.forEach(issue=>{
+        if(!this.preferences.dislikedIssues.includes(issue)){
+          this.preferences.dislikedIssues.push(issue);
+        }
+      });
+    }
+    this.save();
+  },
+  getSuggestedVariant(){
+    const a=this.preferences.likedVariants.A||0;
+    const b=this.preferences.likedVariants.B||0;
+    if(a>b) return 'A';
+    if(b>a) return 'B';
+    return 'A';
+  },
+  getSuggestedPreset(){
+    // Suggest a preset based on feedback history
+    if(this.feedbackHistory.length===0) return null;
+    // Count genre fit ratings
+    const ratings={};
+    this.feedbackHistory.forEach(fb=>{
+      if(fb.preset_id){
+        ratings[fb.preset_id]=(ratings[fb.preset_id]||0)+(fb.genre_fit||0);
+      }
+    });
+    // Find the preset with the highest rating
+    let bestId=null, bestRating=0;
+    for(const [id, rating] of Object.entries(ratings)){
+      if(rating>bestRating){
+        bestRating=rating;
+        bestId=id;
+      }
+    }
+    return bestId;
+  },
+  applyLearnedPreferences(){
+    // Apply learned preferences to the active preset
+    const variant=this.getSuggestedVariant();
+    if(variant!==activeVariant){
+      activeVariant=variant;
+      refreshMeta();
+      toast('🧠 Applied learned preference: variant '+variant);
+    }
+    const suggestedPreset=this.getSuggestedPreset();
+    if(suggestedPreset&&suggestedPreset!==activePresetId){
+      const preset=PRESETS.find(p=>p.id===suggestedPreset);
+      if(preset){
+        activePresetId=suggestedPreset;
+        buildPresets();
+        refreshMeta();
+        toast('🧠 Applied learned preference: '+preset.name);
+      }
+    }
+  },
+  getInsights(){
+    const insights=[];
+    if(this.feedbackHistory.length>0){
+      insights.push('📊 Total feedback: '+this.feedbackHistory.length);
+    }
+    if(this.preferences.likedVariants.A>0||this.preferences.likedVariants.B>0){
+      insights.push('🎯 Preferred variant: '+this.getSuggestedVariant());
+    }
+    if(this.preferences.dislikedIssues.length>0){
+      insights.push('⚠️ Disliked issues: '+this.preferences.dislikedIssues.join(', '));
+    }
+    return insights;
+  }
+};
+LEARNING.load();
+
 
 $("exportBtn").addEventListener("click",exportPreset);
 $("importBtn").addEventListener("click",()=>$("importFile").click());
@@ -805,4 +920,11 @@ $("importFile").addEventListener("change",e=>{
   if(e.target.files.length>0) importPreset(e.target.files[0]);
 });
 $("midiBtn").addEventListener("click",initMIDI);
+
+$("applyLearnedBtn").addEventListener("click",()=>LEARNING.applyLearnedPreferences());
+// Update learning insights on load
+const insights=LEARNING.getInsights();
+if(insights.length>0){
+  $("learningInsights").innerHTML=insights.join('<br>');
+}
 >
