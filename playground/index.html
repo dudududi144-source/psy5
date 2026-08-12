@@ -57,6 +57,25 @@ No insights yet. Submit feedback to start learning.
 </div>
 </div>
 </section>
+<!-- Pattern Editor -->
+<section class="panel">
+<h2>🎼 Pattern Editor</h2>
+<div style="margin-bottom:10px">
+<select id="peTrack" style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
+<option value="kick">🥁 Kick</option>
+<option value="bass">🎸 Bass</option>
+<option value="lead">🎹 Lead</option>
+<option value="hat">🎩 Hat</option>
+</select>
+</div>
+<div id="peGrid" style="display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin-bottom:10px">
+</div>
+<div style="display:flex;gap:6px">
+<button id="peClearBtn" style="flex:1;padding:8px;font-size:12px">🗑️ Clear</button>
+<button id="peRandomBtn" style="flex:1;padding:8px;font-size:12px">🎲 Random</button>
+</div>
+</section>
+
 
 
 
@@ -1078,4 +1097,59 @@ $("mixerReverb").addEventListener("input",()=>{
     // (reverb level is set in ensureAudio, we'll update it here)
   },50);
 });
+
+/* ── Pattern Editor ───────────────────────────────────────── */
+function renderPEGrid(){
+  const track=$("peTrack").value;
+  const preset=activePreset();
+  const pattern=preset.patterns[track]||[];
+  const grid=$("peGrid");
+  grid.innerHTML="";
+  for(let i=0;i<16;i++){
+    const cell=document.createElement("div");
+    cell.style.cssText="aspect-ratio:1;border-radius:4px;cursor:pointer;transition:all .1s;";
+    const isActive=pattern[i]!==null&&pattern[i]!==undefined&&pattern[i]!==0;
+    cell.style.background=isActive?"var(--cyan)":"rgba(150,90,255,.15)";
+    cell.addEventListener("click",()=>{
+      if(pattern[i]===null||pattern[i]===undefined||pattern[i]===0){
+        pattern[i]=1;
+        cell.style.background="var(--cyan)";
+      }else{
+        pattern[i]=track==="bass"?null:0;
+        cell.style.background="rgba(150,90,255,.15)";
+      }
+    });
+    grid.appendChild(cell);
+  }
+}
+$("peTrack").addEventListener("change",renderPEGrid);
+$("peClearBtn").addEventListener("click",()=>{
+  const track=$("peTrack").value;
+  const preset=activePreset();
+  const pattern=preset.patterns[track]||[];
+  for(let i=0;i<16;i++){
+    pattern[i]=track==="bass"?null:0;
+  }
+  renderPEGrid();
+  toast("🗑️ Pattern cleared");
+});
+$("peRandomBtn").addEventListener("click",()=>{
+  const track=$("peTrack").value;
+  const preset=activePreset();
+  const pattern=preset.patterns[track]||[];
+  for(let i=0;i<16;i++){
+    if(track==="kick"){
+      pattern[i]=(i%4===0)?1:(Math.random()>0.8?1:0);
+    }else if(track==="bass"){
+      pattern[i]=(i%2===1)?0:null;
+    }else if(track==="lead"){
+      pattern[i]=(Math.random()>0.6)?(Math.floor(Math.random()*12)+12):null;
+    }else if(track==="hat"){
+      pattern[i]=(i%2===0)?0:(Math.random()>0.3?1:0);
+    }
+  }
+  renderPEGrid();
+  toast("🎲 Pattern randomized");
+});
+renderPEGrid();
 >
