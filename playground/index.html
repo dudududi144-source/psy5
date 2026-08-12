@@ -44,6 +44,28 @@ background-image:
 radial-gradient(1200px 600px at 80% -10%, rgba(120,40,200,.22), transparent 60%),
 radial-gradient(900px 500px at 10% 110%, rgba(0,255,200,.08), transparent 60%);
 }
+/* ── dev-only security banner ─────────────────────────────── */
+#secBanner{
+display:none;
+direction:rtl;
+text-align:right;
+background:linear-gradient(90deg,#3a0d1c,#2a0a14);
+border-bottom:1px solid var(--danger);
+color:#ffdbe4;
+padding:14px 20px;
+font-size:14px;
+line-height:1.7;
+position:relative;
+z-index:50;
+}
+#secBanner.show{display:block;animation:bannerIn .4s ease}
+#secBanner b{color:#fff}
+#secBanner code{font-family:var(--font-mono);background:rgba(255,255,255,.1);padding:1px 6px;border-radius:4px;font-size:12px}
+#secBanner button{
+position:absolute;left:12px;top:12px;background:none;border:1px solid var(--danger);
+color:var(--danger);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--font-body);
+}
+@keyframes bannerIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 header{
 position:relative;
 padding:64px 24px 88px;
@@ -441,7 +463,11 @@ const dots=document.querySelectorAll(".stepDot");
 const kick=activePreset().patterns.kick;
 dots.forEach((d,i)=>{d.classList.toggle("on",i===on);d.classList.toggle("kick",!!kick[i]&&i!==on);});
 }
-function buildPresets(){
+function if(location.hostname==="localhost"||location.hostname==="127.0.0.1"||new URLSearchParams(location.search).has("dev")){
+$("secBanner").classList.add("show");
+}
+$("secClose").addEventListener("click",()=>$("secBanner").classList.remove("show"));
+buildPresets(){
 const wrap=$("presetList");wrap.innerHTML="";
 PRESETS.forEach(p=>{
 const el=document.createElement("div");
