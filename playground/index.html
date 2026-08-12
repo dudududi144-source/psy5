@@ -417,6 +417,11 @@ pointer-events:none;
 <option value="genre">🎭 Sort: Genre</option>
 </select>
 </div>
+<div style="margin-bottom:10px;display:flex;gap:6px">
+<button id="favoritesBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">⭐ Favorites</button>
+<button id="historyBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🕐 History</button>
+</div>
+
 
 
 <div id="presetList"></div>
@@ -1035,6 +1040,27 @@ buildPresets(); buildSteps(); buildPads(); refreshMeta(); paintStats(); sizeScop
 <div style="font-size:13px;color:var(--text);line-height:2">
 <div style="display:flex;justify-content:space-between"><span>Play / Stop</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">Space</span></div>
 <div style="display:flex;justify-content:space-between"><span>Play lead notes</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">A W S E D F T G Y H U J K</span></div>
+
+<!-- Preset Favorites Modal -->
+<div id="favoritesModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
+<h2 style="font-family:var(--font-display);font-size:18px;color:var(--cyan);margin-bottom:16px">⭐ Favorite Presets</h2>
+<div id="favoritesList" style="font-size:13px;color:var(--text);line-height:2">
+<p>No favorites yet. Click ⭐ on a preset to add it.</p>
+</div>
+<button onclick="$('favoritesModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
+</div>
+</div>
+<!-- Preset History Modal -->
+<div id="historyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
+<h2 style="font-family:var(--font-display);font-size:18px;color:var(--cyan);margin-bottom:16px">🕐 Preset History</h2>
+<div id="historyList" style="font-size:13px;color:var(--text);line-height:2">
+<p>No history yet.</p>
+</div>
+<button onclick="$('historyModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
+</div>
+</div>
 <!-- Session Stats Modal -->
 <div id="sessionStatsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
 <div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
@@ -1698,4 +1724,80 @@ function addPresetIndices(){
   });
 }
 addPresetIndices();
+
+/* ── Preset Favorites and History ─────────────────────────── */
+const FAVORITES={
+  items:[],
+  load(){
+    try{
+      const data=localStorage.getItem("psy6_favorites");
+      if(data) this.items=JSON.parse(data);
+    }catch(e){/* localStorage unavailable */}
+  },
+  save(){
+    try{
+      localStorage.setItem("psy6_favorites",JSON.stringify(this.items));
+    }catch(e){/* localStorage unavailable */}
+  },
+  add(presetId){
+    if(!this.items.includes(presetId)){
+      this.items.push(presetId);
+      this.save();
+    }
+  },
+  remove(presetId){
+    this.items=this.items.filter(id=>id!==presetId);
+    this.save();
+  },
+  isFavorite(presetId){
+    return this.items.includes(presetId);
+  },
+  show(){
+    const list=$("favoritesList");
+    if(this.items.length===0){
+      list.innerHTML="<p>No favorites yet. Click ⭐ on a preset to add it.</p>";
+    }else{
+      let html="";
+      this.items.forEach(id=>{
+        const preset=PRESETS.find(p=>p.id===id);
+        if(preset){
+          html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span>'+preset.name+' ('+preset.bpm+' BPM)</span><button onclick="removeFavorite(''+id+'')" style="padding:2px 8px;font-size:11px;background:rgba(255,46,136,.2);border:1px solid var(--magenta);border-radius:4px;color:var(--magenta);cursor:pointer">✕</button></div>';
+        }
+      });
+      list.innerHTML=html;
+    }
+    $("favoritesModal").style.display="flex";
+  }
+};
+FAVORITES.load();
+function removeFavorite(presetId){
+  FAVORITES.remove(presetId);
+  FAVORITES.show();
+}
+const HISTORY={
+  items:[],
+  add(presetId){
+    this.items.unshift({id:presetId,time:Date.now()});
+    if(this.items.length>20) this.items.pop();
+  },
+  show(){
+    const list=$("historyList");
+    if(this.items.length===0){
+      list.innerHTML="<p>No history yet.</p>";
+    }else{
+      let html="";
+      this.items.forEach(item=>{
+        const preset=PRESETS.find(p=>p.id===item.id);
+        if(preset){
+          const time=new Date(item.time).toLocaleTimeString();
+          html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span>'+preset.name+'</span><span style="color:var(--dim);font-size:11px">'+time+'</span></div>';
+        }
+      });
+      list.innerHTML=html;
+    }
+    $("historyModal").style.display="flex";
+  }
+};
+$("favoritesBtn").addEventListener("click",()=>FAVORITES.show());
+$("historyBtn").addEventListener("click",()=>HISTORY.show());
 >
