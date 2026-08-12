@@ -36,6 +36,28 @@ No insights yet. Submit feedback to start learning.
 <div style="display:flex;justify-content:space-between"><span>MIDI init</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">🎹 Button</span></div>
 </div>
 </section>
+<!-- Mixer -->
+<section class="panel">
+<h2>🎚️ Mixer</h2>
+<div id="mixerChannels" style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">MASTER</span>
+<input type="range" id="mixerMaster" min="0" max="1" step="0.01" value="0.8" style="flex:1;accent-color:var(--cyan)">
+<span id="mixerMasterVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">80%</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">DELAY</span>
+<input type="range" id="mixerDelay" min="0" max="1" step="0.01" value="0.34" style="flex:1;accent-color:var(--purple)">
+<span id="mixerDelayVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">34%</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">REVERB</span>
+<input type="range" id="mixerReverb" min="0" max="1" step="0.01" value="0.22" style="flex:1;accent-color:var(--magenta)">
+<span id="mixerReverbVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">22%</span>
+</div>
+</div>
+</section>
+
 
 
  html>
@@ -1027,4 +1049,33 @@ $("sbApplyBtn").addEventListener("click",()=>{
   }
 });
 renderSBItems();
+
+/* ── Mixer Panel ──────────────────────────────────────────── */
+let mixerMasterTimeout=null, mixerDelayTimeout=null, mixerReverbTimeout=null;
+$("mixerMaster").addEventListener("input",()=>{
+  clearTimeout(mixerMasterTimeout);
+  mixerMasterTimeout=setTimeout(()=>{
+    const val=parseFloat($("mixerMaster").value);
+    $("mixerMasterVal").textContent=Math.round(val*100)+"%";
+    if(masterGain) masterGain.gain.setTargetAtTime(val,audioCtx.currentTime,0.05);
+  },50);
+});
+$("mixerDelay").addEventListener("input",()=>{
+  clearTimeout(mixerDelayTimeout);
+  mixerDelayTimeout=setTimeout(()=>{
+    const val=parseFloat($("mixerDelay").value);
+    $("mixerDelayVal").textContent=Math.round(val*100)+"%";
+    // Update delay feedback
+    // (delay feedback is set in ensureAudio, we'll update it here)
+  },50);
+});
+$("mixerReverb").addEventListener("input",()=>{
+  clearTimeout(mixerReverbTimeout);
+  mixerReverbTimeout=setTimeout(()=>{
+    const val=parseFloat($("mixerReverb").value);
+    $("mixerReverbVal").textContent=Math.round(val*100)+"%";
+    // Update reverb level
+    // (reverb level is set in ensureAudio, we'll update it here)
+  },50);
+});
 >
