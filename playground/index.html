@@ -405,6 +405,10 @@ pointer-events:none;
 </div>
 <section class="panel">
 <h2>Presets</h2>
+<div style="margin-bottom:10px">
+<input type="text" id="presetSearch" placeholder="🔍 Search presets..." style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
+</div>
+
 <div id="presetList"></div>
 </section>
 <section class="panel">
@@ -1620,4 +1624,17 @@ function showSessionStats(){
   $("sessionStatsModal").style.display="flex";
 }
 $("sessionStatsBtn").addEventListener("click",showSessionStats);
+
+/* ── Preset Search ────────────────────────────────────────── */
+$("presetSearch").addEventListener("input",()=>{
+  const query=$("presetSearch").value.toLowerCase();
+  const presetCards=document.querySelectorAll(".presetCard");
+  presetCards.forEach(card=>{
+    const name=card.querySelector(".pname").textContent.toLowerCase();
+    const tag=card.querySelector(".ptag").textContent.toLowerCase();
+    const desc=card.querySelector(".pdesc").textContent.toLowerCase();
+    const matches=name.includes(query)||tag.includes(query)||desc.includes(query);
+    card.style.display=matches?"block":"none";
+  });
+});
 >
