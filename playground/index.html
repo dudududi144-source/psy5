@@ -1002,6 +1002,13 @@ const LEARNING={
     preferredQLvl:null,
     dislikedIssues:[],
     likedVariants:{A:0,B:0},
+    bpmHistory:[],
+    waveHistory:{sawtooth:0,square:0,sine:0,triangle:0},
+    cutoffHistory:[],
+    qlHistory:[],
+    genreFitHistory:[],
+    soundQualityHistory:[],
+
   },
   load(){
     try{
@@ -1034,8 +1041,48 @@ const LEARNING={
         }
       });
     }
-    this.save();
-  },
+    // Track BPM history
+    const preset=activePreset();
+    if(preset){
+      this.preferences.bpmHistory.push(preset.bpm);
+      if(this.preferences.bpmHistory.length>20) this.preferences.bpmHistory.shift();
+      // Calculate preferred BPM (average of last 10)
+      const recentBPM=this.preferences.bpmHistory.slice(-10);
+      this.preferences.preferredBPM=Math.round(recentBPM.reduce((a,b)=>a+b,0)/recentBPM.length);
+      // Track wave history
+      const variant=activeParams();
+      if(variant.bassWave){
+        this.preferences.waveHistory[variant.bassWave]=(this.preferences.waveHistory[variant.bassWave]||0)+1;
+        // Find preferred wave
+        const waveCounts=Object.entries(this.preferences.waveHistory);
+        waveCounts.sort((a,b)=>b[1]-a[1]);
+        if(waveCounts.length>0) this.preferences.preferredWave=waveCounts[0][0];
+      }
+      // Track cutoff history
+      if(variant.bassCut){
+        this.preferences.cutoffHistory.push(variant.bassCut);
+        if(this.preferences.cutoffHistory.length>20) this.preferences.cutoffHistory.shift();
+        const recentCutoff=this.preferences.cutoffHistory.slice(-10);
+        this.preferences.preferredCutoff=Math.round(recentCutoff.reduce((a,b)=>a+b,0)/recentCutoff.length);
+      }
+      // Track Q level history
+      if(variant.bassQ){
+        this.preferences.qlHistory.push(variant.bassQ);
+        if(this.preferences.qlHistory.length>20) this.preferences.qlHistory.shift();
+        const recentQL=this.preferences.qlHistory.slice(-10);
+        this.preferences.preferredQLvl=Math.round(recentQL.reduce((a,b)=>a+b,0)/recentQL.length);
+      }
+    }
+    // Track genre fit and sound quality history
+    if(payload.genre_fit){
+      this.preferences.genreFitHistory.push(payload.genre_fit);
+      if(this.preferences.genreFitHistory.length>20) this.preferences.genreFitHistory.shift();
+    }
+    if(payload.sound_quality){
+      this.preferences.soundQualityHistory.push(payload.sound_quality);
+      if(this.preferences.soundQualityHistory.length>20) this.preferences.soundQualityHistory.shift();
+    }
+
   getSuggestedVariant(){
     const a=this.preferences.likedVariants.A||0;
     const b=this.preferences.likedVariants.B||0;
@@ -1093,64 +1140,28 @@ const LEARNING={
     if(this.preferences.dislikedIssues.length>0){
       insights.push('⚠️ Disliked issues: '+this.preferences.dislikedIssues.join(', '));
     }
+    if(this.preferences.preferredBPM){
+      insights.push('🎵 Preferred BPM: '+this.preferences.preferredBPM);
+    }
+    if(this.preferences.preferredWave){
+      insights.push('🌊 Preferred wave: '+this.preferences.preferredWave);
+    }
+    if(this.preferences.preferredCutoff){
+      insights.push('🔊 Preferred cutoff: '+this.preferences.preferredCutoff+' Hz');
+    }
+    if(this.preferences.preferredQLvl){
+      insights.push('📈 Preferred Q: '+this.preferences.preferredQLvl);
+    }
+    if(this.preferences.genreFitHistory.length>0){
+      const avgGenreFit=this.preferences.genreFitHistory.reduce((a,b)=>a+b,0)/this.preferences.genreFitHistory.length;
+      insights.push('🎭 Avg genre fit: '+avgGenreFit.toFixed(1)+'/5');
+    }
+    if(this.preferences.soundQualityHistory.length>0){
+      const avgSoundQuality=this.preferences.soundQualityHistory.reduce((a,b)=>a+b,0)/this.preferences.soundQualityHistory.length;
+      insights.push('🔊 Avg sound quality: '+avgSoundQuality.toFixed(1)+'/5');
+    }
     return insights;
-  }
-};
-LEARNING.load();
-
-
-$("exportBtn").addEventListener("click",exportPreset);
-$("importBtn").addEventListener("click",()=>$("importFile").click());
-$("importFile").addEventListener("change",e=>{
-  if(e.target.files.length>0) importPreset(e.target.files[0]);
-});
-$("midiBtn").addEventListener("click",initMIDI);
-
-$("applyLearnedBtn").addEventListener("click",()=>LEARNING.applyLearnedPreferences());
-// Update learning insights on load
-const insights=LEARNING.getInsights();
-if(insights.length>0){
-  $("learningInsights").innerHTML=insights.join('<br>');
-}
-
-/* ── Sound Bank UI ────────────────────────────────────────── */
-let selectedSBItem=null;
-function renderSBItems(){
-  const category=$("sbCategory").value;
-  const items=SOUND_BANK[category]||[];
-  const container=$("sbItems");
-  container.innerHTML="";
-  items.forEach(item=>{
-    const div=document.createElement("div");
-    div.style.cssText="padding:8px;border:1px solid var(--panel-brd);border-radius:8px;cursor:pointer;transition:all .15s;font-size:12px";
-    div.textContent=item.name;
-    div.addEventListener("click",()=>{
-      selectedSBItem={category,id:item.id};
-      container.querySelectorAll("div").forEach(d=>d.style.borderColor="var(--panel-brd)");
-      div.style.borderColor="var(--cyan)";
-    });
-    container.appendChild(div);
-  });
-}
-$("sbCategory").addEventListener("change",renderSBItems);
-$("sbApplyBtn").addEventListener("click",()=>{
-  if(selectedSBItem){
-    applySoundBankItem(selectedSBItem.category,selectedSBItem.id);
-  }else{
-    toast("❌ Select an item first");
-  }
-});
-renderSBItems();
-
-/* ── Mixer Panel ──────────────────────────────────────────── */
-let mixerMasterTimeout=null, mixerDelayTimeout=null, mixerReverbTimeout=null;
-$("mixerMaster").addEventListener("input",()=>{
-  clearTimeout(mixerMasterTimeout);
-  mixerMasterTimeout=setTimeout(()=>{
-    const val=parseFloat($("mixerMaster").value);
-    $("mixerMasterVal").textContent=Math.round(val*100)+"%";
-    if(masterGain) masterGain.gain.setTargetAtTime(val,audioCtx.currentTime,0.05);
-  },50);
+50);
 });
 $("mixerDelay").addEventListener("input",()=>{
   clearTimeout(mixerDelayTimeout);
