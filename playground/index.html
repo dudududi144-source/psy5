@@ -324,9 +324,27 @@ background-image:
 radial-gradient(1200px 600px at 80% -10%, rgba(108,92,231,.15), transparent 60%),
 radial-gradient(900px 500px at 10% 110%, rgba(0,184,148,.08), transparent 60%);
 }
+
+/* ── Loading Screen ───────────────────────────────────────── */
+#loadingScreen{
+opacity:1;
+}
+#loadingScreen.hidden{
+opacity:0;
+pointer-events:none;
+}
 </style>
 </head>
 <body>
+<!-- Loading Screen -->
+<div id="loadingScreen" style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity .5s ease">
+<div style="font-family:var(--font-display);font-weight:900;font-size:clamp(36px,6vw,64px);letter-spacing:.14em;background:linear-gradient(90deg,var(--cyan),var(--purple),var(--magenta));-webkit-background-clip:text;background-clip:text;color:transparent;animation:logoPulse 2s ease-in-out infinite">PSY6</div>
+<div style="color:var(--dim);font-size:14px;margin-top:16px;font-family:var(--font-mono);letter-spacing:.2em">Loading...</div>
+<div style="width:200px;height:4px;background:rgba(150,90,255,.2);border-radius:2px;margin-top:24px;overflow:hidden">
+<div id="loadingBar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:2px;transition:width .3s ease"></div>
+</div>
+</div>
+
 <header>
 <div class="logo">PSY6</div>
 <div class="tagline">Experimental Psytrance Engine · Browser Playground</div>
@@ -1473,4 +1491,26 @@ try{
     $("themeBtn").textContent="☀️ Theme";
   }
 }catch(e){/* localStorage unavailable */}
+
+/* ── Loading Screen ───────────────────────────────────────── */
+function hideLoadingScreen(){
+  const loadingScreen=$("loadingScreen");
+  const loadingBar=$("loadingBar");
+  let progress=0;
+  const interval=setInterval(()=>{
+    progress+=Math.random()*30;
+    if(progress>=100){
+      progress=100;
+      clearInterval(interval);
+      setTimeout(()=>{
+        loadingScreen.classList.add("hidden");
+        setTimeout(()=>{
+          loadingScreen.style.display="none";
+        },500);
+      },300);
+    }
+    loadingBar.style.width=progress+"%";
+  },200);
+}
+hideLoadingScreen();
 >
