@@ -186,6 +186,16 @@ footer a:hover{color:var(--cyan)}
 </style>
 </head>
 <body>
+<!-- dev-only security banner (localhost / ?dev) -->
+<div id="secBanner" role="alert">
+<button id="secClose" type="button">סגור</button>
+<b>⚠️ אזהרת אבטחה:</b> הטוקנים שלך (GitHub / Cloudflare / Supabase / Turso) הודבקו בקובץ בצ'אט ונחשבים חשופים.
+סובב אותם <b>עכשיו</b>: GitHub → Developer settings → Revoke token · Cloudflare → API Tokens → Rotate ·
+Supabase → Access Tokens → Revoke · Turso → <code>turso db tokens invalidate</code>.
+לעולם אל תשמור secrets בקבצים בריפו — רק ב־GitHub Actions secrets / Workers secrets.
+(באנר זה מוצג רק בסביבת פיתוח — מחק אותו לפני דיפלוי ציבורי.)
+</div>
+
 <header>
 <div class="logo">PSY6</div>
 <div class="tagline">Experimental Psytrance Engine · Browser Playground</div>
