@@ -231,6 +231,16 @@ footer a:hover{color:var(--cyan)}
 <button data-v="B">B</button>
 </div>
 <div class="volWrap">VOL <input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></div>
+<div class="volWrap" style="gap:4px">
+<button id="exportBtn" style="padding:4px 8px;font-size:11px">📤 Export</button>
+<button id="importBtn" style="padding:4px 8px;font-size:11px">📥 Import</button>
+<input type="file" id="importFile" accept=".json" style="display:none">
+</div>
+<div class="volWrap" style="gap:4px">
+<button id="midiBtn" style="padding:4px 8px;font-size:11px">🎹 MIDI</button>
+<span id="midiStatus" style="font-size:10px;color:var(--dim)">No MIDI</span>
+</div>
+
 </div>
 <section class="panel">
 <h2>Presets</h2>
@@ -660,4 +670,139 @@ clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2
 buildPresets(); buildSteps(); buildPads(); refreshMeta(); paintStats(); sizeScope();
 </script>
 </body>
-</html>
+</html
+/* ── MIDI Support ─────────────────────────────────────────── */
+let midiAccess=null, midiInputs=[];
+async function initMIDI(){
+  try{
+    midiAccess=await navigator.requestMIDIAccess({sysex:false});
+    midiInputs=[...midiAccess.inputs.values()];
+    midiInputs.forEach(input=>{
+      input.onmidimessage=handleMIDIMessage;
+    });
+    midiAccess.onstatechange=e=>{
+      midiInputs=[...midiAccess.inputs.values()];
+      midiInputs.forEach(input=>{
+        input.onmidimessage=handleMIDIMessage;
+      });
+      toast('🎹 MIDI device '+(e.port.state==='connected'?'connected':'disconnected'));
+    };
+    if(midiInputs.length>0){
+      toast('🎹 MIDI ready: '+midiInputs.map(i=>i.name).join(', '));
+    }else{
+      toast('🎹 No MIDI devices found');
+    }
+  }catch(e){
+    toast('❌ MIDI not supported in this browser');
+  }
+}
+function handleMIDIMessage(msg){
+  const [status, note, velocity]=msg.data;
+  const cmd=status&0xf0;
+  if(cmd===0x90&&velocity>0){
+    triggerMIDINote(note, velocity/127);
+  }
+}
+function triggerMIDINote(note, velocity){
+  ensureAudio();
+  if(!audioCtx) return;
+  playLead(audioCtx.currentTime, mtof(note), activeParams(), true, true);
+}
+/* ── Export/Import of presets ─────────────────────────────── */
+function exportPreset(){
+  const preset=activePreset();
+  const data={
+    version:1,
+    type:'psy6-preset',
+    preset:preset,
+    variant:activeVariant,
+    exportedAt:new Date().toISOString()
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=preset.id+'.psy6.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('📤 Exported: '+preset.id+'.psy6.json');
+}
+function importPreset(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(data.type!=='psy6-preset'){
+        toast('❌ Invalid preset file');
+        return;
+      }
+      PRESETS.push(data.preset);
+      buildPresets();
+      activePresetId=data.preset.id;
+      activeVariant=data.variant||'A';
+      refreshMeta();
+      toast('📥 Imported: '+data.preset.name);
+    }catch(err){
+      toast('❌ Failed to import preset');
+    }
+  };
+  reader.readAsText(file);
+}
+/* ── Sound Bank ───────────────────────────────────────────── */
+const SOUND_BANK={
+  drums:[
+    {id:'kick-808', name:'808 Kick', type:'kick', tune:0.8, decay:1.2},
+    {id:'kick-909', name:'909 Kick', type:'kick', tune:1.0, decay:0.8},
+    {id:'kick-techno', name:'Techno Kick', type:'kick', tune:0.9, decay:1.0},
+    {id:'snare-808', name:'808 Snare', type:'snare', tune:1.0, decay:0.6},
+    {id:'snare-909', name:'909 Snare', type:'snare', tune:1.1, decay:0.5},
+    {id:'hat-closed', name:'Closed Hat', type:'hatC', tune:1.0, decay:0.3},
+    {id:'hat-open', name:'Open Hat', type:'hatO', tune:1.0, decay:0.8},
+    {id:'clap-808', name:'808 Clap', type:'clap', tune:1.0, decay:0.7},
+    {id:'clap-909', name:'909 Clap', type:'clap', tune:1.0, decay:0.6},
+    {id:'perc-808', name:'808 Perc', type:'perc', tune:1.0, decay:0.4},
+  ],
+  bass:[
+    {id:'bass-sub', name:'Sub Bass', wave:'sine', cutoff:200},
+    {id:'bass-saw', name:'Saw Bass', wave:'sawtooth', cutoff:800},
+    {id:'bass-square', name:'Square Bass', wave:'square', cutoff:600},
+    {id:'bass-acid', name:'Acid Bass', wave:'sawtooth', cutoff:1200},
+  ],
+  lead:[
+    {id:'lead-saw', name:'Saw Lead', wave:'sawtooth', cutoff:2000},
+    {id:'lead-square', name:'Square Lead', wave:'square', cutoff:1800},
+    {id:'lead-acid', name:'Acid Lead', wave:'sawtooth', cutoff:2500},
+    {id:'lead-fm', name:'FM Lead', wave:'sine', cutoff:3000},
+  ],
+  pad:[
+    {id:'pad-warm', name:'Warm Pad', wave:'sawtooth', cutoff:1200},
+    {id:'pad-dark', name:'Dark Pad', wave:'sawtooth', cutoff:800},
+    {id:'pad-bright', name:'Bright Pad', wave:'sawtooth', cutoff:2000},
+  ]
+};
+function getSoundBankItem(category, id){
+  const items=SOUND_BANK[category]||[];
+  return items.find(item=>item.id===id)||null;
+}
+function applySoundBankItem(category, id){
+  const item=getSoundBankItem(category, id);
+  if(!item) return;
+  const preset=activePreset();
+  if(category==='bass'){
+    const variant=activeParams();
+    variant.bassWave=item.wave;
+    variant.bassCut=item.cutoff;
+  }else if(category==='lead'){
+    const variant=activeParams();
+    variant.leadWave=item.wave;
+    variant.leadCut=item.cutoff;
+  }
+  toast('🎛️ Applied: '+item.name);
+}
+
+$("exportBtn").addEventListener("click",exportPreset);
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("importFile").addEventListener("change",e=>{
+  if(e.target.files.length>0) importPreset(e.target.files[0]);
+});
+$("midiBtn").addEventListener("click",initMIDI);
+>
