@@ -363,6 +363,8 @@ pointer-events:none;
 <span>🎛️ <span id="statusVariant">A</span></span>
 
 <div style="display:flex;gap:8px">
+
+<button id="sessionStatsBtn" style="padding:4px 8px;font-size:10px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:4px;color:var(--dim);cursor:pointer">📊 Stats</button>
 <button id="aboutBtn" style="padding:4px 8px;font-size:10px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:4px;color:var(--dim);cursor:pointer">ℹ️ About</button>
 <button id="helpBtn" style="padding:4px 8px;font-size:10px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:4px;color:var(--dim);cursor:pointer">❓ Help</button>
 </div>
@@ -1019,6 +1021,17 @@ buildPresets(); buildSteps(); buildPads(); refreshMeta(); paintStats(); sizeScop
 <div style="font-size:13px;color:var(--text);line-height:2">
 <div style="display:flex;justify-content:space-between"><span>Play / Stop</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">Space</span></div>
 <div style="display:flex;justify-content:space-between"><span>Play lead notes</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">A W S E D F T G Y H U J K</span></div>
+<!-- Session Stats Modal -->
+<div id="sessionStatsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
+<h2 style="font-family:var(--font-display);font-size:18px;color:var(--cyan);margin-bottom:16px">📊 Session Stats</h2>
+<div id="sessionStatsContent" style="font-size:13px;color:var(--text);line-height:2">
+<p>Loading...</p>
+</div>
+<button onclick="$('sessionStatsModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
+</div>
+</div>
+
 <div style="display:flex;justify-content:space-between"><span>Select preset 1-9</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">1-9</span></div>
 <div style="display:flex;justify-content:space-between"><span>Select preset 10</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">0</span></div>
 <div style="display:flex;justify-content:space-between"><span>Toggle variant A/B</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">V</span></div>
@@ -1568,4 +1581,43 @@ $("aboutBtn").addEventListener("click",()=>{
 $("helpBtn").addEventListener("click",()=>{
   $("helpModal").style.display="flex";
 });
+
+/* ── Session Stats ────────────────────────────────────────── */
+const SESSION={
+  startTime:Date.now(),
+  presetChanges:[],
+  variantChanges:[],
+  noteCount:0,
+  trackPresetChange(presetName){
+    this.presetChanges.push({name:presetName,time:Date.now()});
+  },
+  trackVariantChange(variant){
+    this.variantChanges.push({variant:variant,time:Date.now()});
+  },
+  trackNote(){
+    this.noteCount++;
+  },
+  getStats(){
+    const elapsed=Math.floor((Date.now()-this.startTime)/1000);
+    const minutes=Math.floor(elapsed/60);
+    const seconds=elapsed%60;
+    return {
+      elapsed:minutes+"m "+seconds+"s",
+      presetChanges:this.presetChanges.length,
+      variantChanges:this.variantChanges.length,
+      noteCount:this.noteCount,
+      lastPreset:this.presetChanges.length>0?this.presetChanges[this.presetChanges.length-1].name:"None",
+    };
+  }
+};
+function showSessionStats(){
+  const stats=SESSION.getStats();
+  $("sessionStatsContent").innerHTML='<div style="display:flex;justify-content:space-between"><span>Session duration:</span><b>'+stats.elapsed+'</b></div>'
+    +'<div style="display:flex;justify-content:space-between"><span>Preset changes:</span><b>'+stats.presetChanges+'</b></div>'
+    +'<div style="display:flex;justify-content:space-between"><span>Variant changes:</span><b>'+stats.variantChanges+'</b></div>'
+    +'<div style="display:flex;justify-content:space-between"><span>Notes played:</span><b>'+stats.noteCount+'</b></div>'
+    +'<div style="display:flex;justify-content:space-between"><span>Last preset:</span><b>'+stats.lastPreset+'</b></div>';
+  $("sessionStatsModal").style.display="flex";
+}
+$("sessionStatsBtn").addEventListener("click",showSessionStats);
 >
