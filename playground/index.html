@@ -408,6 +408,16 @@ pointer-events:none;
 <div style="margin-bottom:10px">
 <input type="text" id="presetSearch" placeholder="🔍 Search presets..." style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
 </div>
+<div style="margin-bottom:10px">
+<select id="presetSort" style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
+<option value="default">📋 Sort: Default</option>
+<option value="name">🔤 Sort: Name (A-Z)</option>
+<option value="bpm-asc">🎵 Sort: BPM (Low-High)</option>
+<option value="bpm-desc">🎵 Sort: BPM (High-Low)</option>
+<option value="genre">🎭 Sort: Genre</option>
+</select>
+</div>
+
 
 <div id="presetList"></div>
 </section>
@@ -1637,4 +1647,55 @@ $("presetSearch").addEventListener("input",()=>{
     card.style.display=matches?"block":"none";
   });
 });
+
+/* ── Preset Sort ──────────────────────────────────────────── */
+$("presetSort").addEventListener("change",()=>{
+  const sortType=$("presetSort").value;
+  const presetList=$("presetList");
+  const presetCards=Array.from(presetList.querySelectorAll(".presetCard"));
+  
+  if(sortType==="default"){
+    // Reset to original order
+    presetCards.sort((a,b)=>{
+      const aIdx=parseInt(a.dataset.idx||0);
+      const bIdx=parseInt(b.dataset.idx||0);
+      return aIdx-bIdx;
+    });
+  }else if(sortType==="name"){
+    presetCards.sort((a,b)=>{
+      const aName=a.querySelector(".pname").textContent;
+      const bName=b.querySelector(".pname").textContent;
+      return aName.localeCompare(bName);
+    });
+  }else if(sortType==="bpm-asc"){
+    presetCards.sort((a,b)=>{
+      const aBPM=parseInt(a.querySelector(".pbpm").textContent);
+      const bBPM=parseInt(b.querySelector(".pbpm").textContent);
+      return aBPM-bBPM;
+    });
+  }else if(sortType==="bpm-desc"){
+    presetCards.sort((a,b)=>{
+      const aBPM=parseInt(a.querySelector(".pbpm").textContent);
+      const bBPM=parseInt(b.querySelector(".pbpm").textContent);
+      return bBPM-aBPM;
+    });
+  }else if(sortType==="genre"){
+    presetCards.sort((a,b)=>{
+      const aTag=a.querySelector(".ptag").textContent;
+      const bTag=b.querySelector(".ptag").textContent;
+      return aTag.localeCompare(bTag);
+    });
+  }
+  
+  // Re-append sorted cards
+  presetCards.forEach(card=>presetList.appendChild(card));
+});
+// Add data-idx to preset cards for default sort
+function addPresetIndices(){
+  const presetCards=document.querySelectorAll(".presetCard");
+  presetCards.forEach((card,idx)=>{
+    card.dataset.idx=idx;
+  });
+}
+addPresetIndices();
 >
