@@ -427,6 +427,11 @@ pointer-events:none;
 <button id="favoritesBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">⭐ Favorites</button>
 <button id="historyBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🕐 History</button>
 </div>
+<div style="margin-bottom:10px;display:flex;gap:6px">
+<button id="randomPresetBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🎲 Random Preset</button>
+<button id="shuffleBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🔀 Shuffle</button>
+</div>
+
 
 
 
@@ -1837,4 +1842,27 @@ function updateBPMSlider(){
     $("bpmVal").textContent=preset.bpm;
   }
 }
+
+/* ── Preset Randomizer and Shuffle ────────────────────────── */
+$("randomPresetBtn").addEventListener("click",()=>{
+  const randomIdx=Math.floor(Math.random()*PRESETS.length);
+  activePresetId=PRESETS[randomIdx].id;
+  buildPresets();
+  refreshMeta();
+  syncDelay();
+  updateBPMSlider();
+  SESSION.trackPresetChange(PRESETS[randomIdx].name);
+  HISTORY.add(PRESETS[randomIdx].id);
+  toast("🎲 Random preset: "+PRESETS[randomIdx].name);
+});
+$("shuffleBtn").addEventListener("click",()=>{
+  // Shuffle presets array
+  for(let i=PRESETS.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [PRESETS[i],PRESETS[j]]=[PRESETS[j],PRESETS[i]];
+  }
+  buildPresets();
+  addPresetIndices();
+  toast("🔀 Presets shuffled");
+});
 >
