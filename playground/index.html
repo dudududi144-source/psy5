@@ -4204,6 +4204,10 @@ const VOCODER={
     return this.release;
   }
 };
+// Add VOCODER.enable() and VOCODER.disable() calls
+VOCODER.enable();
+VOCODER.disable();
+
 // Add keyboard shortcut for vocoder (T)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='t'&&!e.ctrlKey&&!e.metaKey){
