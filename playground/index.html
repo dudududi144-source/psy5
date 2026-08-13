@@ -394,6 +394,12 @@ pointer-events:none;
 <input type="file" id="importFile" accept=".json" style="display:none">
 </div>
 <div class="volWrap" style="gap:4px">
+<span style="font-size:11px;color:var(--dim)">BPM</span>
+<input id="bpmSlider" type="range" min="100" max="180" step="1" value="145" style="width:80px;accent-color:var(--cyan)">
+<span id="bpmVal" style="font-size:11px;color:var(--cyan);font-family:var(--font-mono)">145</span>
+</div>
+
+<div class="volWrap" style="gap:4px">
 <button id="themeBtn" style="padding:4px 8px;font-size:11px" title="Toggle theme">🌙 Theme</button>
 </div>
 
@@ -1800,4 +1806,35 @@ const HISTORY={
 };
 $("favoritesBtn").addEventListener("click",()=>FAVORITES.show());
 $("historyBtn").addEventListener("click",()=>HISTORY.show());
+
+/* ── BPM Slider ───────────────────────────────────────────── */
+let bpmTimeout=null;
+$("bpmSlider").addEventListener("input",()=>{
+  clearTimeout(bpmTimeout);
+  bpmTimeout=setTimeout(()=>{
+    const bpm=parseInt($("bpmSlider").value);
+    $("bpmVal").textContent=bpm;
+    // Update the active preset BPM
+    const preset=activePreset();
+    if(preset){
+      preset.bpm=bpm;
+      syncDelay();
+      refreshMeta();
+      updateStatusBar();
+      // Track BPM change in LEARNING
+      LEARNING.preferences.bpmHistory.push(bpm);
+      if(LEARNING.preferences.bpmHistory.length>20) LEARNING.preferences.bpmHistory.shift();
+      const recentBPM=LEARNING.preferences.bpmHistory.slice(-10);
+      LEARNING.preferences.preferredBPM=Math.round(recentBPM.reduce((a,b)=>a+b,0)/recentBPM.length);
+    }
+  },100);
+});
+// Update BPM slider when preset changes
+function updateBPMSlider(){
+  const preset=activePreset();
+  if(preset){
+    $("bpmSlider").value=preset.bpm;
+    $("bpmVal").textContent=preset.bpm;
+  }
+}
 >
