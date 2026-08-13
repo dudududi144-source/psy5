@@ -1711,7 +1711,6 @@ document.addEventListener('keydown',(e)=>{
       AI.toggle();
     }
   });
-}
 if(FEEDBACK_ENDPOINT){
 try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */
 /* ── Cloud Sync ───────────────────────────────────────────── */
@@ -1775,7 +1774,6 @@ document.addEventListener('keydown',(e)=>{
       CLOUD.toggle();
     }
   });
-}
 bumpStat("fb");
 toast("✔ Feedback recorded — thank you!");
 e.target.reset();
@@ -1850,7 +1848,6 @@ document.addEventListener('keydown',(e)=>{
       MIDILEARN.toggle();
     }
   });
-}
 paintStats();
 }
 function paintStats(){
