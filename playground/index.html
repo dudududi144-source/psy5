@@ -4343,6 +4343,10 @@ const GATE={
     return this.hold;
   }
 };
+// Add GATE.enable() and GATE.disable() calls
+GATE.enable();
+GATE.disable();
+
 // Add keyboard shortcut for gate (I)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='i'&&!e.ctrlKey&&!e.metaKey){
