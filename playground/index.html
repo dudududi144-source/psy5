@@ -389,6 +389,71 @@ DATA.load();
 }
 
 /* ── Theme Switcher ───────────────────────────────────────── */
+/* ── UI/UX Improvements ───────────────────────────────────── */
+// Add keyboard shortcuts for common actions
+document.addEventListener('keydown', (e) => {
+  // Ctrl+S: Save current state
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    try {
+      const state = {
+        activePresetId: activePresetId,
+        activeVariant: activeVariant,
+        bpm: activePreset().bpm,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('psy6_state', JSON.stringify(state));
+      toast('💾 State saved');
+    } catch (err) {
+      toast('❌ Failed to save state');
+    }
+  }
+  // Ctrl+L: Load saved state
+  if (e.ctrlKey && e.key === 'l') {
+    e.preventDefault();
+    try {
+      const stateStr = localStorage.getItem('psy6_state');
+      if (stateStr) {
+        const state = JSON.parse(stateStr);
+        activePresetId = state.activePresetId;
+        activeVariant = state.activeVariant;
+        buildPresets();
+        refreshMeta();
+        syncDelay();
+        toast('📂 State loaded');
+      } else {
+        toast('❌ No saved state found');
+      }
+    } catch (err) {
+      toast('❌ Failed to load state');
+    }
+  }
+  // Ctrl+R: Reset to defaults
+  if (e.ctrlKey && e.key === 'r') {
+    e.preventDefault();
+    activePresetId = PRESETS[0].id;
+    activeVariant = 'A';
+    buildPresets();
+    refreshMeta();
+    syncDelay();
+    toast('🔄 Reset to defaults');
+  }
+});
+// Add auto-save on preset change
+function autoSaveState() {
+  try {
+    const state = {
+      activePresetId: activePresetId,
+      activeVariant: activeVariant,
+      bpm: activePreset().bpm,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('psy6_state', JSON.stringify(state));
+  } catch (err) {
+    // Silently fail on auto-save
+  }
+}
+
 body.light-theme{
 --bg:#f5f5f5;
 --bg2:#ffffff;
