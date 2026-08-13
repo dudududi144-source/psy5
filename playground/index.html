@@ -3371,6 +3371,10 @@ const WAVETABLE={
     return this.position;
   }
 };
+// Add WAVETABLE.enable() and WAVETABLE.disable() calls
+WAVETABLE.enable();
+WAVETABLE.disable();
+
 // Add keyboard shortcut for wavetable (B)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='b'&&!e.ctrlKey&&!e.metaKey){
