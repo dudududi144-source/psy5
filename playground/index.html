@@ -3650,6 +3650,59 @@ function hideLoadingScreen(){
 hideLoadingScreen();
 
 /* ── About and Help Modals ────────────────────────────────── */
+/* ── Limiter ──────────────────────────────────────────────── */
+const LIMITER={
+  enabled:false,
+  threshold:-6, // dB
+  release:0.1, // seconds
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🔊 Limiter enabled');
+    }catch(e){
+      toast('❌ Failed to enable Limiter');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🔊 Limiter disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setThreshold(threshold){
+    if(threshold>=-24&&threshold<=0){
+      this.threshold=threshold;
+    }
+  },
+  setRelease(release){
+    if(release>=0&&release<=1){
+      this.release=release;
+    }
+  },
+  getThreshold(){
+    return this.threshold;
+  },
+  getRelease(){
+    return this.release;
+  }
+};
+// Add keyboard shortcut for limiter (U)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='u'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      LIMITER.toggle();
+    }
+  }
+});
+
 $("aboutBtn").addEventListener("click",()=>{
   $("aboutModal").style.display="flex";
 });
