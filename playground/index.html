@@ -482,8 +482,7 @@ TESTS.load();
     refreshMeta();
     syncDelay();
     toast('🔄 Reset to defaults');
-  }
-});
+  });
 // Add auto-save on preset change
 function autoSaveState() {
   try {
@@ -1275,8 +1274,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       RECORDER.toggle();
     }
-  }
-});
+  });
 
 const WORKER_TIMER_SRC=`let iv=null;self.onmessage=e=>{if(e.data==='start'){iv=setInterval(()=>self.postMessage('tick'),25)}else if(e.data==='stop'){clearInterval(iv);iv=null}};`;
 function makeTimerWorker(cb){
@@ -1337,8 +1335,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       COLLAB.toggle();
     }
-  }
-});
+  });
 
 const id=setInterval(cb,25);
 return {stop:()=>clearInterval(id)};
@@ -1514,7 +1511,6 @@ toast("💔 Removed from favorites");
 FAVORITES.add(p.id);
 favBtn.textContent="⭐";
 toast("💖 Added to favorites");
-}
 });
 el.addEventListener("click",()=>{
 activePresetId=p.id; syncDelay();
@@ -1589,7 +1585,6 @@ if(e.key.toLowerCase()==="m"){
 // Theme toggle shortcut (T)
 if(e.key.toLowerCase()==="t"){
   $("themeBtn").click();
-}
 });
 $("playBtn").addEventListener("click",()=>isPlaying?stopSeq():startSeq());
 let volTimeout=null;
@@ -1715,8 +1710,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       AI.toggle();
     }
-  }
-});
+  });
 }
 if(FEEDBACK_ENDPOINT){
 try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */
@@ -1780,8 +1774,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       CLOUD.toggle();
     }
-  }
-});
+  });
  }
 }
 bumpStat("fb");
@@ -1857,8 +1850,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       MIDILEARN.toggle();
     }
-  }
-});
+  });
 }
 paintStats();
 }
@@ -2400,8 +2392,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       ARPEGGIATOR.toggle();
     }
-  }
-});
+  });
 
 const SOUND_BANK={
   drums:[
@@ -2647,8 +2638,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       CHORDS.toggle();
     }
-  }
-});
+  });
 
 const LEARNING={
   feedbackHistory:[],
@@ -2754,8 +2744,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       SCALES.toggle();
     }
-  }
-});
+  });
 }
   },
   save(){
@@ -2847,8 +2836,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       LFO.toggle();
     }
-  }
-});
+  });
 }
   },
   addFeedback(payload){
@@ -3106,8 +3094,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       FILTERENV.toggle();
     }
-  }
-});
+  });
 
 function renderPEGrid(){
   const track=$("peTrack").value;
@@ -3255,8 +3242,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       AMPENV.toggle();
     }
-  }
-});
+  });
 
 function updateStatusBar(){
   const preset=activePreset();
@@ -3389,8 +3375,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       WAVETABLE.toggle();
     }
-  }
-});
+  });
 
 $("themeBtn").addEventListener("click",()=>{
   document.body.classList.toggle("light-theme");
@@ -3469,9 +3454,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       NOISE.toggle();
     }
-  }
-});
-}
+  });
 });
 // Load saved theme
 try{
@@ -3546,8 +3529,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       SAMPLEPLAYER.toggle();
     }
-  }
-});
+  });
 }
 
 /* ── Loading Screen ───────────────────────────────────────── */
@@ -3632,8 +3614,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       COMPRESSOR.toggle();
     }
-  }
-});
+  });
 
 function hideLoadingScreen(){
   const loadingScreen=$("loadingScreen");
@@ -3711,8 +3692,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       LIMITER.toggle();
     }
-  }
-});
+  });
 
 $("aboutBtn").addEventListener("click",()=>{
   $("aboutModal").style.display="flex";
@@ -3767,8 +3747,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       WIDENER.toggle();
     }
-  }
-});
+  });
 
 const SESSION={
   startTime:Date.now(),
@@ -3863,8 +3842,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       BITCRUSHER.toggle();
     }
-  }
-});
+  });
 
 $("presetSearch").addEventListener("input",()=>{
   const query=$("presetSearch").value.toLowerCase();
@@ -3951,8 +3929,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       PHASER.toggle();
     }
-  }
-});
+  });
 
 $("presetSort").addEventListener("change",()=>{
   const sortType=$("presetSort").value;
@@ -4077,8 +4054,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       FLANGER.toggle();
     }
-  }
-});
+  });
 
 const FAVORITES={
   items:[],
@@ -4151,8 +4127,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       TREMOLO.toggle();
     }
-  }
-});
+  });
 }
   },
   save(){
@@ -4222,8 +4197,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       VOCODER.toggle();
     }
-  }
-});
+  });
 }
   },
   add(presetId){
@@ -4361,8 +4335,7 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       GATE.toggle();
     }
-  }
-});
+  });
 
 let bpmTimeout=null;
 $("bpmSlider").addEventListener("input",()=>{
@@ -4469,8 +4442,7 @@ $("importAllFile").addEventListener("change",e=>{
     };
     reader.readAsText(file);
     e.target.value='';
-  }
-});
+  });
 
 /* ── Foundation Integration and Samples ───────────────────── */
 $("foundationBtn").addEventListener("click",()=>{
@@ -4478,7 +4450,6 @@ $("foundationBtn").addEventListener("click",()=>{
 });
 $("samplesBtn").addEventListener("click",()=>{
   $("samplesModal").style.display="flex";
-}
 });
 
 
