@@ -316,6 +316,62 @@ footer a:hover{color:var(--cyan)}
 .gh{display:inline-block;margin:0 6px}
 
 /* ── UI Animations ────────────────────────────────────────── */
+/* ── Data Integration ─────────────────────────────────────── */
+const DATA={
+  loaded:false,
+  motifs:null,
+  presets:null,
+  rhythms:null,
+  scales:null,
+  styles:null,
+  async load(){
+    if(this.loaded) return;
+    try{
+      // Load data files
+      const [motifsRes,presetsRes,rhythmsRes,scalesRes,stylesRes]=await Promise.all([
+        fetch('../data/motifs.json'),
+        fetch('../data/presets.json'),
+        fetch('../data/rhythms.json'),
+        fetch('../data/scales.json'),
+        fetch('../data/styles.json')
+      ]);
+      
+      this.motifs=await motifsRes.json();
+      this.presets=await presetsRes.json();
+      this.rhythms=await rhythmsRes.json();
+      this.scales=await scalesRes.json();
+      this.styles=await stylesRes.json();
+      
+      this.loaded=true;
+      toast('📁 Data files loaded');
+    }catch(e){
+      toast('❌ Failed to load Data files');
+    }
+  },
+  getMotifs(){
+    if(!this.loaded) return null;
+    return this.motifs;
+  },
+  getPresets(){
+    if(!this.loaded) return null;
+    return this.presets;
+  },
+  getRhythms(){
+    if(!this.loaded) return null;
+    return this.rhythms;
+  },
+  getScales(){
+    if(!this.loaded) return null;
+    return this.scales;
+  },
+  getStyles(){
+    if(!this.loaded) return null;
+    return this.styles;
+  }
+};
+// Load Data files on startup
+DATA.load();
+
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:none}}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
