@@ -1,0 +1,71 @@
+{
+  "description": "Synth presets for the PSY family. Each preset is a bag of parameters for a specific engine. Used by @psy-foundation/material.",
+  "presets": [
+    {
+      "id": "preset-psy-lead-001",
+      "engine": "psy-lead",
+      "role": "lead",
+      "style": "full-on",
+      "params": {
+        "cutoff": 0.7,
+        "resonance": 0.4,
+        "decay": 0.3,
+        "detune": 0.15,
+        "osc-mix": 0.6,
+        "fm-amount": 0.2
+      }
+    },
+    {
+      "id": "preset-psy-bass-001",
+      "engine": "psy-bass",
+      "role": "bass",
+      "style": "full-on",
+      "params": {
+        "cutoff": 0.5,
+        "resonance": 0.6,
+        "decay": 0.2,
+        "distortion": 0.4,
+        "sub-level": 0.8
+      }
+    },
+    {
+      "id": "preset-psy-fx-001",
+      "engine": "psy-fx",
+      "role": "fx",
+      "style": "full-on",
+      "params": {
+        "cutoff": 0.9,
+        "resonance": 0.8,
+        "decay": 1.5,
+        "reverb-wet": 0.7,
+        "delay-time": 0.375
+      }
+    },
+    {
+      "id": "preset-darkpsy-lead-001",
+      "engine": "psy-lead",
+      "role": "lead",
+      "style": "darkpsy",
+      "params": {
+        "cutoff": 0.4,
+        "resonance": 0.7,
+        "decay": 0.5,
+        "detune": 0.3,
+        "fm-amount": 0.5
+      }
+    },
+    {
+      "id": "preset-progressive-bass-001",
+      "engine": "psy-bass",
+      "role": "bass",
+      "style": "progressive",
+      "params": {
+        "cutoff": 0.6,
+        "resonance": 0.3,
+        "decay": 0.4,
+        "distortion": 0.2,
+        "sub-level": 0.6
+      }
+    }
+  ]
+}
