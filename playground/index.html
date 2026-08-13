@@ -1322,6 +1322,10 @@ const COLLAB={
     return this.peers;
   }
 };
+// Add COLLAB.enable() and COLLAB.disable() calls
+COLLAB.enable();
+COLLAB.disable();
+
 // Add keyboard shortcut for collaboration (C)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='c'&&!e.ctrlKey&&!e.metaKey){
