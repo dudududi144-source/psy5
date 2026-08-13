@@ -3528,6 +3528,10 @@ const SAMPLEPLAYER={
     return this.currentSample;
   }
 };
+// Add SAMPLEPLAYER.enable() and SAMPLEPLAYER.disable() calls
+SAMPLEPLAYER.enable();
+SAMPLEPLAYER.disable();
+
 // Add keyboard shortcut for sample player (P)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='p'&&!e.ctrlKey&&!e.metaKey){
