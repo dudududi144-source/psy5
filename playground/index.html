@@ -4133,6 +4133,10 @@ const TREMOLO={
     return this.waveform;
   }
 };
+// Add TREMOLO.enable() and TREMOLO.disable() calls
+TREMOLO.enable();
+TREMOLO.disable();
+
 // Add keyboard shortcut for tremolo (W)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='w'&&!e.ctrlKey&&!e.metaKey){
