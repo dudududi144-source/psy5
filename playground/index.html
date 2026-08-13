@@ -3237,6 +3237,10 @@ const AMPENV={
     return this.release;
   }
 };
+// Add AMPENV.enable() and AMPENV.disable() calls
+AMPENV.enable();
+AMPENV.disable();
+
 // Add keyboard shortcut for amplitude envelope (X)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='x'&&!e.ctrlKey&&!e.metaKey){
