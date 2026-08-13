@@ -3265,6 +3265,122 @@ setInterval(updateStatusBar,1000);
 updateStatusBar();
 
 /* ── Theme Switcher ───────────────────────────────────────── */
+/* ── Wavetable Oscillator ─────────────────────────────────── */
+const WAVETABLE={
+  enabled:false,
+  tables:[],
+  currentTable:0,
+  position:0, // 0-1
+  async enable(){
+    if(this.enabled) return;
+    try{
+      // Initialize default wavetables
+      this.tables=[
+        {name:'Sine',data:this.generateSine()},
+        {name:'Square',data:this.generateSquare()},
+        {name:'Sawtooth',data:this.generateSawtooth()},
+        {name:'Triangle',data:this.generateTriangle()},
+        {name:'PWM',data:this.generatePWM()},
+        {name:'Wobble',data:this.generateWobble()}
+      ];
+      this.enabled=true;
+      toast('🎛️ Wavetable Oscillator enabled');
+    }catch(e){
+      toast('❌ Failed to enable Wavetable Oscillator');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    this.position=0;
+    toast('🎛️ Wavetable Oscillator disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  generateSine(){
+    const data=new Float32Array(256);
+    for(let i=0;i<256;i++){
+      data[i]=Math.sin(i/256*2*Math.PI);
+    }
+    return data;
+  },
+  generateSquare(){
+    const data=new Float32Array(256);
+    for(let i=0;i<256;i++){
+      data[i]=i<128?1:-1;
+    }
+    return data;
+  },
+  generateSawtooth(){
+    const data=new Float32Array(256);
+    for(let i=0;i<256;i++){
+      data[i]=i/128-1;
+    }
+    return data;
+  },
+  generateTriangle(){
+    const data=new Float32Array(256);
+    for(let i=0;i<256;i++){
+      data[i]=i<128?i/64-1:3-i/64;
+    }
+    return data;
+  },
+  generatePWM(){
+    const data=new Float32Array(256);
+    for(let i=0;i<256;i++){
+      data[i]=i<64?1:-1;
+    }
+    return data;
+  },
+  generateWobble(){
+    const data=new Float32Array(256);
+    for(let i=0;i<256;i++){
+      data[i]=Math.sin(i/256*2*Math.PI)*Math.sin(i/256*4*Math.PI);
+    }
+    return data;
+  },
+  setTable(idx){
+    if(idx>=0&&idx<this.tables.length){
+      this.currentTable=idx;
+      toast('🎛️ Wavetable: '+this.tables[idx].name);
+    }
+  },
+  setPosition(position){
+    if(position>=0&&position<=1){
+      this.position=position;
+    }
+  },
+  getValue(phase){
+    if(!this.enabled||this.tables.length===0) return 0;
+    const table=this.tables[this.currentTable].data;
+    const idx=Math.floor(phase*table.length)%table.length;
+    return table[idx];
+  },
+  getTableNames(){
+    return this.tables.map(t=>t.name);
+  },
+  getCurrentTable(){
+    return this.currentTable;
+  },
+  getPosition(){
+    return this.position;
+  }
+};
+// Add keyboard shortcut for wavetable (B)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='b'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      WAVETABLE.toggle();
+    }
+  }
+});
+
 $("themeBtn").addEventListener("click",()=>{
   document.body.classList.toggle("light-theme");
   const isLight=document.body.classList.contains("light-theme");
