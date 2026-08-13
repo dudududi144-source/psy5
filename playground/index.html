@@ -4282,6 +4282,77 @@ $("favoritesBtn").addEventListener("click",()=>FAVORITES.show());
 $("historyBtn").addEventListener("click",()=>HISTORY.show());
 
 /* ── BPM Slider ───────────────────────────────────────────── */
+/* ── Gate ─────────────────────────────────────────────────── */
+const GATE={
+  enabled:false,
+  threshold:-40, // dB
+  attack:0.01, // seconds
+  release:0.1, // seconds
+  hold:0.05, // seconds
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🚪 Gate enabled');
+    }catch(e){
+      toast('❌ Failed to enable Gate');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🚪 Gate disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setThreshold(threshold){
+    if(threshold>=-60&&threshold<=0){
+      this.threshold=threshold;
+    }
+  },
+  setAttack(attack){
+    if(attack>=0&&attack<=1){
+      this.attack=attack;
+    }
+  },
+  setRelease(release){
+    if(release>=0&&release<=1){
+      this.release=release;
+    }
+  },
+  setHold(hold){
+    if(hold>=0&&hold<=1){
+      this.hold=hold;
+    }
+  },
+  getThreshold(){
+    return this.threshold;
+  },
+  getAttack(){
+    return this.attack;
+  },
+  getRelease(){
+    return this.release;
+  },
+  getHold(){
+    return this.hold;
+  }
+};
+// Add keyboard shortcut for gate (I)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='i'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      GATE.toggle();
+    }
+  }
+});
+
 let bpmTimeout=null;
 $("bpmSlider").addEventListener("input",()=>{
   clearTimeout(bpmTimeout);
