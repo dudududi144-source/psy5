@@ -3451,6 +3451,10 @@ const NOISE={
     return this.level;
   }
 };
+// Add NOISE.enable() and NOISE.disable() calls
+NOISE.enable();
+NOISE.disable();
+
 // Add keyboard shortcut for noise (N)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='n'&&!e.ctrlKey&&!e.metaKey){
