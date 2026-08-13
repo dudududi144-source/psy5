@@ -917,7 +917,20 @@ PRESETS.forEach(p=>{
 const el=document.createElement("div");
 el.className="presetCard"+(p.id===activePresetId?" sel":"");
 el.dataset.id=p.id;
-el.innerHTML='<div class="pbpm">'+p.bpm+'</div><div class="pname">'+p.name+'</div><div class="ptag">'+p.tag+'</div><div class="pdesc">'+p.desc+'</div>';
+el.innerHTML='<div class="pbpm">'+p.bpm+'</div><div class="pname">'+p.name+'</div><div class="ptag">'+p.tag+'</div><div class="pdesc">'+p.desc+'</div><button class="favBtn" style="position:absolute;top:8px;left:8px;background:none;border:none;cursor:pointer;font-size:16px">⭐</button>';
+const favBtn=el.querySelector(".favBtn");
+favBtn.addEventListener("click",(e)=>{
+e.stopPropagation();
+if(FAVORITES.isFavorite(p.id)){
+FAVORITES.remove(p.id);
+favBtn.textContent="⭐";
+toast("💔 Removed from favorites");
+}else{
+FAVORITES.add(p.id);
+favBtn.textContent="⭐";
+toast("💖 Added to favorites");
+}
+});
 el.addEventListener("click",()=>{
 activePresetId=p.id; syncDelay();
 document.querySelectorAll(".presetCard").forEach(c=>c.classList.toggle("sel",c.dataset.id===p.id));
