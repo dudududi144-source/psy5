@@ -3802,6 +3802,59 @@ function showSessionStats(){
 $("sessionStatsBtn").addEventListener("click",showSessionStats);
 
 /* ── Preset Search ────────────────────────────────────────── */
+/* ── Bitcrusher ───────────────────────────────────────────── */
+const BITCRUSHER={
+  enabled:false,
+  bits:8, // 1-16
+  sampleRateReduction:1, // 1-20
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🎛️ Bitcrusher enabled');
+    }catch(e){
+      toast('❌ Failed to enable Bitcrusher');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🎛️ Bitcrusher disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setBits(bits){
+    if(bits>=1&&bits<=16){
+      this.bits=bits;
+    }
+  },
+  setSampleRateReduction(reduction){
+    if(reduction>=1&&reduction<=20){
+      this.sampleRateReduction=reduction;
+    }
+  },
+  getBits(){
+    return this.bits;
+  },
+  getSampleRateReduction(){
+    return this.sampleRateReduction;
+  }
+};
+// Add keyboard shortcut for bitcrusher (Q)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='q'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      BITCRUSHER.toggle();
+    }
+  }
+});
+
 $("presetSearch").addEventListener("input",()=>{
   const query=$("presetSearch").value.toLowerCase();
   const presetCards=document.querySelectorAll(".presetCard");
