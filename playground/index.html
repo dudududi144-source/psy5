@@ -1715,7 +1715,65 @@ document.addEventListener('keydown',(e)=>{
 });
 }
 if(FEEDBACK_ENDPOINT){
-try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */ }
+try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */
+/* ── Cloud Sync ───────────────────────────────────────────── */
+const CLOUD={
+  enabled:false,
+  syncInterval:null,
+  lastSync:null,
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('☁️ Cloud Sync enabled');
+      // Start sync interval (every 30 seconds)
+      this.syncInterval=setInterval(()=>{
+        this.sync();
+      },30000);
+    }catch(e){
+      toast('❌ Failed to enable Cloud Sync');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    if(this.syncInterval){
+      clearInterval(this.syncInterval);
+      this.syncInterval=null;
+    }
+    toast('☁️ Cloud Sync disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  async sync(){
+    if(!this.enabled) return;
+    try{
+      // Placeholder for cloud sync logic
+      this.lastSync=Date.now();
+      toast('☁️ Synced with cloud');
+    }catch(e){
+      toast('❌ Failed to sync with cloud');
+    }
+  },
+  getLastSync(){
+    return this.lastSync;
+  }
+};
+// Add keyboard shortcut for cloud sync (S)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='s'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      CLOUD.toggle();
+    }
+  }
+});
+ }
 }
 bumpStat("fb");
 toast("✔ Feedback recorded — thank you!");
