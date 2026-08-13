@@ -2052,4 +2052,48 @@ $("foundationBtn").addEventListener("click",()=>{
 $("samplesBtn").addEventListener("click",()=>{
   $("samplesModal").style.display="flex";
 });
+
+/* ── Foundation Integration ───────────────────────────────── */
+// Load Foundation Architecture
+const FOUNDATION={
+  loaded:false,
+  modules:{},
+  async load(){
+    if(this.loaded) return;
+    try{
+      // Load foundation modules
+      this.modules.motif=await import('../foundation/music/motif.mjs');
+      this.modules.planner=await import('../foundation/music/planner.mjs');
+      this.modules.policy=await import('../foundation/music/policy.mjs');
+      this.modules.memory=await import('../foundation/music/memory.mjs');
+      this.modules.context=await import('../foundation/music/context.mjs');
+      this.loaded=true;
+      toast('🏗️ Foundation Architecture loaded');
+    }catch(e){
+      toast('❌ Failed to load Foundation Architecture');
+    }
+  },
+  getMotif(){
+    if(!this.loaded||!this.modules.motif) return null;
+    return this.modules.motif;
+  },
+  getPlanner(){
+    if(!this.loaded||!this.modules.planner) return null;
+    return this.modules.planner;
+  },
+  getPolicy(){
+    if(!this.loaded||!this.modules.policy) return null;
+    return this.modules.policy;
+  },
+  getMemory(){
+    if(!this.loaded||!this.modules.memory) return null;
+    return this.modules.memory;
+  },
+  getContext(){
+    if(!this.loaded||!this.modules.context) return null;
+    return this.modules.context;
+  }
+};
+// Load Foundation Architecture on startup
+FOUNDATION.load();
 >
