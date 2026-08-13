@@ -520,6 +520,52 @@ radial-gradient(900px 500px at 10% 110%, rgba(0,184,148,.08), transparent 60%);
 }
 
 /* ── Loading Screen ───────────────────────────────────────── */
+/* ── Performance Monitor ──────────────────────────────────── */
+const PERF={
+  startTime:Date.now(),
+  frameCount:0,
+  lastFrameTime:Date.now(),
+  fps:0,
+  audioLatency:0,
+  memoryUsage:0,
+  update(){
+    this.frameCount++;
+    const now=Date.now();
+    const elapsed=now-this.lastFrameTime;
+    if(elapsed>=1000){
+      this.fps=Math.round(this.frameCount*1000/elapsed);
+      this.frameCount=0;
+      this.lastFrameTime=now;
+      // Update memory usage (if available)
+      if(performance.memory){
+        this.memoryUsage=Math.round(performance.memory.usedJSHeapSize/1048576);
+      }
+      // Update audio latency (if available)
+      if(audioCtx){
+        this.audioLatency=Math.round(audioCtx.baseLatency*1000);
+      }
+    }
+  },
+  getFPS(){
+    return this.fps;
+  },
+  getMemoryUsage(){
+    return this.memoryUsage;
+  },
+  getAudioLatency(){
+    return this.audioLatency;
+  },
+  getUptime(){
+    return Math.round((Date.now()-this.startTime)/1000);
+  }
+};
+// Update performance monitor on each animation frame
+function updatePerfMonitor(){
+  PERF.update();
+  requestAnimationFrame(updatePerfMonitor);
+}
+updatePerfMonitor();
+
 #loadingScreen{
 opacity:1;
 }
