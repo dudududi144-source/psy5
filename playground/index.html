@@ -2382,6 +2382,10 @@ const ARPEGGIATOR={
     return this.octaveRange;
   }
 };
+// Add ARPEGGIATOR.enable() and ARPEGGIATOR.disable() calls
+ARPEGGIATOR.enable();
+ARPEGGIATOR.disable();
+
 // Add keyboard shortcut for arpeggiator (G)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='g'&&!e.ctrlKey&&!e.metaKey){
