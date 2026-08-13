@@ -2829,6 +2829,10 @@ const LFO={
     return this.depth;
   }
 };
+// Add LFO.enable() and LFO.disable() calls
+LFO.enable();
+LFO.disable();
+
 // Add keyboard shortcut for LFO (K)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='k'&&!e.ctrlKey&&!e.metaKey){
