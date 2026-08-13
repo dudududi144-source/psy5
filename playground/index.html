@@ -1700,6 +1700,10 @@ const AI={
     return this.suggestions;
   }
 };
+// Add AI.enable() and AI.disable() calls
+AI.enable();
+AI.disable();
+
 // Add keyboard shortcut for AI Assistant (A)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='a'&&!e.ctrlKey&&!e.metaKey){
