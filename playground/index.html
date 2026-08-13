@@ -3088,6 +3088,10 @@ const FILTERENV={
     return this.amount;
   }
 };
+// Add FILTERENV.enable() and FILTERENV.disable() calls
+FILTERENV.enable();
+FILTERENV.disable();
+
 // Add keyboard shortcut for filter envelope (Z)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='z'&&!e.ctrlKey&&!e.metaKey){
