@@ -1840,6 +1840,10 @@ const MIDILEARN={
     }catch(e){/* localStorage unavailable */}
   }
 };
+// Add MIDILEARN.enable() and MIDILEARN.disable() calls
+MIDILEARN.enable();
+MIDILEARN.disable();
+
 // Load MIDI mappings on startup
 MIDILEARN.loadMappings();
 // Add keyboard shortcut for MIDI Learn Mode (L)
