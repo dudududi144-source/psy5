@@ -1791,7 +1791,67 @@ const k="psy6_stat_"+kind;
 try{
 const n=parseInt(localStorage.getItem(k)||"0",10)+1;
 localStorage.setItem(k,String(n));
-}catch(e){/* localStorage unavailable */}
+}catch(e){/* localStorage unavailable */
+/* ── MIDI Learn Mode ──────────────────────────────────────── */
+const MIDILEARN={
+  enabled:false,
+  mappings:{},
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🎹 MIDI Learn Mode enabled');
+      toast('📋 Move a MIDI control to map it');
+    }catch(e){
+      toast('❌ Failed to enable MIDI Learn Mode');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🎹 MIDI Learn Mode disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  mapControl(controlId,param){
+    if(!this.enabled) return;
+    this.mappings[controlId]=param;
+    toast('🎹 Mapped control '+controlId+' to '+param);
+    // Save mappings to localStorage
+    try{
+      localStorage.setItem('psy6_midi_mappings',JSON.stringify(this.mappings));
+    }catch(e){/* localStorage unavailable */}
+  },
+  getMappings(){
+    return this.mappings;
+  },
+  loadMappings(){
+    try{
+      const data=localStorage.getItem('psy6_midi_mappings');
+      if(data){
+        this.mappings=JSON.parse(data);
+        toast('🎹 Loaded MIDI mappings');
+      }
+    }catch(e){/* localStorage unavailable */}
+  }
+};
+// Load MIDI mappings on startup
+MIDILEARN.loadMappings();
+// Add keyboard shortcut for MIDI Learn Mode (L)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='l'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      MIDILEARN.toggle();
+    }
+  }
+});
+}
 paintStats();
 }
 function paintStats(){
