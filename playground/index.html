@@ -3614,6 +3614,10 @@ const COMPRESSOR={
     return this.makeupGain;
   }
 };
+// Add COMPRESSOR.enable() and COMPRESSOR.disable() calls
+COMPRESSOR.enable();
+COMPRESSOR.disable();
+
 // Add keyboard shortcut for compressor (O)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='o'&&!e.ctrlKey&&!e.metaKey){
