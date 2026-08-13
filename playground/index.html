@@ -1153,6 +1153,67 @@ const activePreset=()=>PRESETS.find(p=>p.id===activePresetId);
 const activeParams=()=>activePreset().variants[activeVariant];
 const mtof=m=>440*Math.pow(2,(m-69)/12);
 /* Web Worker timer for accurate scheduling (fixes setInterval drift) */
+/* ── Audio Recorder ───────────────────────────────────────── */
+const RECORDER={
+  mediaRecorder:null,
+  chunks:[],
+  isRecording:false,
+  async start(){
+    if(this.isRecording) return;
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      this.mediaRecorder=new MediaRecorder(stream);
+      this.chunks=[];
+      
+      this.mediaRecorder.ondataavailable=(e)=>{
+        if(e.data.size>0){
+          this.chunks.push(e.data);
+        }
+      };
+      
+      this.mediaRecorder.onstop=()=>{
+        const blob=new Blob(this.chunks,{type:'audio/webm'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download='psy6-recording-'+Date.now()+'.webm';
+        a.click();
+        URL.revokeObjectURL(url);
+        stream.getTracks().forEach(track=>track.stop());
+        toast('🎙️ Recording saved');
+      };
+      
+      this.mediaRecorder.start();
+      this.isRecording=true;
+      toast('🎙️ Recording started');
+    }catch(e){
+      toast('❌ Failed to start recording');
+    }
+  },
+  stop(){
+    if(!this.isRecording) return;
+    this.mediaRecorder.stop();
+    this.isRecording=false;
+    toast('🎙️ Recording stopped');
+  },
+  toggle(){
+    if(this.isRecording){
+      this.stop();
+    }else{
+      this.start();
+    }
+  }
+};
+// Add keyboard shortcut for recording (R)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='r'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      RECORDER.toggle();
+    }
+  }
+});
+
 const WORKER_TIMER_SRC=`let iv=null;self.onmessage=e=>{if(e.data==='start'){iv=setInterval(()=>self.postMessage('tick'),25)}else if(e.data==='stop'){clearInterval(iv);iv=null}};`;
 function makeTimerWorker(cb){
 try{
