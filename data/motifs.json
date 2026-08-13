@@ -1,0 +1,59 @@
+{
+  "description": "Psytrance motif seeds. Each motif is a 32-step call-&-response phrase generated from a seed. These seeds produce distinct motifs when fed to generateMotif().",
+  "motifs": [
+    {
+      "id": "motif-lead-001",
+      "rootPc": 4,
+      "scaleName": "phrygian-dominant",
+      "seed": 1,
+      "role": "lead",
+      "style": "full-on",
+      "energy": 0.75
+    },
+    {
+      "id": "motif-lead-002",
+      "rootPc": 4,
+      "scaleName": "phrygian-dominant",
+      "seed": 2,
+      "role": "lead",
+      "style": "full-on",
+      "energy": 0.7
+    },
+    {
+      "id": "motif-lead-003",
+      "rootPc": 9,
+      "scaleName": "phrygian-dominant",
+      "seed": 3,
+      "role": "lead",
+      "style": "full-on",
+      "energy": 0.8
+    },
+    {
+      "id": "motif-lead-004",
+      "rootPc": 11,
+      "scaleName": "harmonic-minor",
+      "seed": 4,
+      "role": "lead",
+      "style": "full-on",
+      "energy": 0.7
+    },
+    {
+      "id": "motif-lead-005",
+      "rootPc": 2,
+      "scaleName": "phrygian-dominant",
+      "seed": 7,
+      "role": "lead",
+      "style": "darkpsy",
+      "energy": 0.85
+    },
+    {
+      "id": "motif-lead-006",
+      "rootPc": 7,
+      "scaleName": "minor",
+      "seed": 11,
+      "role": "lead",
+      "style": "progressive",
+      "energy": 0.6
+    }
+  ]
+}
