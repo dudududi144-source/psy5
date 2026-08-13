@@ -677,6 +677,62 @@ variants:{
 A:{bassWave:"sawtooth",bassCut:750, bassQ:6, leadWave:"triangle",leadCut:2000,leadQ:8, hatLvl:.10,leadLvl:.45},
 B:{bassWave:"sawtooth",bassCut:950, bassQ:9, leadWave:"sawtooth",leadCut:2400,leadQ:11,hatLvl:.14,leadLvl:.52}
 }
+},
+{
+id:"zen_pad_13", name:"Zen Pad", tag:"meditative · 100", bpm:100, root:33,
+desc:"Peaceful zen atmosphere pad. Slow, calm, and meditative.",
+patterns:{
+kick:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+bass:[null,0,null,null,null,null,null,null,null,0,null,null,null,null,null,null],
+lead:[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+hat :[0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0]
+},
+variants:{
+A:{bassWave:"sine",bassCut:200, bassQ:3, leadWave:"sine",leadCut:800,leadQ:4, hatLvl:.05,leadLvl:.20},
+B:{bassWave:"triangle",bassCut:350, bassQ:4, leadWave:"triangle",leadCut:1000,leadQ:5,hatLvl:.07,leadLvl:.25}
+}
+},
+{
+id:"pulse_bass_14", name:"Pulse Bass", tag:"driving · 140", bpm:140, root:33,
+desc:"Driving pulse bass with rhythmic energy.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,0,0],
+lead:[null,null,null,null,null,null,12,null,null,null,null,null,null,null,null,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:600, bassQ:6, leadWave:"sawtooth",leadCut:1800,leadQ:8, hatLvl:.10,leadLvl:.40},
+B:{bassWave:"square",bassCut:800, bassQ:8, leadWave:"sawtooth",leadCut:2200,leadQ:10,hatLvl:.14,leadLvl:.48}
+}
+},
+{
+id:"wave_lead_15", name:"Wave Lead", tag:"melodic · 135", bpm:135, root:35,
+desc:"Melodic wave lead with smooth phrasing.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,5,7],
+lead:[0,null,3,null,7,null,3,null,0,null,3,null,7,null,10,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:700, bassQ:7, leadWave:"sawtooth",leadCut:2000,leadQ:9, hatLvl:.12,leadLvl:.45},
+B:{bassWave:"sawtooth",bassCut:900, bassQ:9, leadWave:"square",leadCut:2400,leadQ:11,hatLvl:.16,leadLvl:.52}
+}
+},
+{
+id:"crystal_arp_16", name:"Crystal Arp", tag:"crystalline · 144", bpm:144, root:33,
+desc:"Crystalline arp with shimmering harmonics. Clear and precise.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,0,3],
+lead:[0,null,4,null,7,null,4,null,0,null,4,null,7,null,11,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:750, bassQ:6, leadWave:"triangle",leadCut:2000,leadQ:8, hatLvl:.10,leadLvl:.45},
+B:{bassWave:"sawtooth",bassCut:950, bassQ:9, leadWave:"sawtooth",leadCut:2400,leadQ:11,hatLvl:.14,leadLvl:.52}
+}
 }];
 let audioCtx=null, masterGain=null, analyser=null, delayNode=null, delaySend=null, noiseBuf=null;
 let isPlaying=false, schedulerTimer=null, currentStep=0, nextNoteTime=0;
