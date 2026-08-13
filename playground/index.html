@@ -4059,6 +4059,10 @@ const FLANGER={
     return this.delay;
   }
 };
+// Add FLANGER.enable() and FLANGER.disable() calls
+FLANGER.enable();
+FLANGER.disable();
+
 // Add keyboard shortcut for flanger (D)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='d'&&!e.ctrlKey&&!e.metaKey){
