@@ -431,6 +431,12 @@ pointer-events:none;
 <button id="randomPresetBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🎲 Random Preset</button>
 <button id="shuffleBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🔀 Shuffle</button>
 </div>
+<div style="margin-bottom:10px;display:flex;gap:6px">
+<button id="exportAllBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">📦 Export All</button>
+<button id="importAllBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">📥 Import All</button>
+<input type="file" id="importAllFile" accept=".json" style="display:none">
+</div>
+
 
 
 
@@ -1864,5 +1870,60 @@ $("shuffleBtn").addEventListener("click",()=>{
   buildPresets();
   addPresetIndices();
   toast("🔀 Presets shuffled");
+});
+
+/* ── Export All and Import All ────────────────────────────── */
+$("exportAllBtn").addEventListener("click",()=>{
+  const data={
+    version:1,
+    type:'psy6-all-presets',
+    presets:PRESETS,
+    exportedAt:new Date().toISOString()
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='psy6-all-presets.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('📦 Exported all '+PRESETS.length+' presets');
+});
+$("importAllBtn").addEventListener("click",()=>{
+  $("importAllFile").click();
+});
+$("importAllFile").addEventListener("change",e=>{
+  if(e.target.files.length>0){
+    const file=e.target.files[0];
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(data.type!=='psy6-all-presets'){
+          toast('❌ Invalid file format');
+          return;
+        }
+        if(!data.presets||!Array.isArray(data.presets)){
+          toast('❌ No presets found in file');
+          return;
+        }
+        // Add new presets (skip duplicates)
+        let addedCount=0;
+        data.presets.forEach(preset=>{
+          const exists=PRESETS.find(p=>p.id===preset.id);
+          if(!exists){
+            PRESETS.push(preset);
+            addedCount++;
+          }
+        });
+        buildPresets();
+        addPresetIndices();
+        toast('📥 Imported '+addedCount+' new presets (skipped '+(data.presets.length-addedCount)+' duplicates)');
+      }catch(err){
+        toast('❌ Failed to import presets');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value='';
+  }
 });
 >
