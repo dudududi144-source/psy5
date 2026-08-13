@@ -2002,6 +2002,70 @@ buildPresets(); buildSteps(); buildPads(); refreshMeta(); paintStats(); sizeScop
 </body>
 </html
 /* ── MIDI Support ─────────────────────────────────────────── */
+/* ── Voice Manager ────────────────────────────────────────── */
+const VOICES={
+  pool:[],
+  maxVoices:16,
+  activeVoices:0,
+  async init(){
+    if(this.pool.length>0) return;
+    try{
+      // Initialize voice pool
+      for(let i=0;i<this.maxVoices;i++){
+        this.pool.push({
+          id:i,
+          active:false,
+          note:null,
+          startTime:null
+        });
+      }
+      toast('🎤 Voice Manager initialized');
+    }catch(e){
+      toast('❌ Failed to initialize Voice Manager');
+    }
+  },
+  allocateVoice(note){
+    // Find a free voice
+    for(let i=0;i<this.pool.length;i++){
+      if(!this.pool[i].active){
+        this.pool[i].active=true;
+        this.pool[i].note=note;
+        this.pool[i].startTime=Date.now();
+        this.activeVoices++;
+        return i;
+      }
+    }
+    // No free voice, steal the oldest one
+    let oldestIdx=0;
+    let oldestTime=Infinity;
+    for(let i=0;i<this.pool.length;i++){
+      if(this.pool[i].startTime<oldestTime){
+        oldestTime=this.pool[i].startTime;
+        oldestIdx=i;
+      }
+    }
+    this.pool[oldestIdx].note=note;
+    this.pool[oldestIdx].startTime=Date.now();
+    return oldestIdx;
+  },
+  releaseVoice(voiceIdx){
+    if(voiceIdx>=0&&voiceIdx<this.pool.length){
+      this.pool[voiceIdx].active=false;
+      this.pool[voiceIdx].note=null;
+      this.pool[voiceIdx].startTime=null;
+      this.activeVoices--;
+    }
+  },
+  getActiveVoices(){
+    return this.activeVoices;
+  },
+  getVoicePool(){
+    return this.pool;
+  }
+};
+// Initialize Voice Manager on startup
+VOICES.init();
+
 let midiAccess=null, midiInputs=[];
 async function initMIDI(){
   try{
