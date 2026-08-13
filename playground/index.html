@@ -1641,7 +1641,75 @@ ts:new Date().toISOString()
 try{
 const store=JSON.parse(localStorage.getItem("psy6_feedback")||"[]");
 store.push(payload);\nLEARNING.addFeedback(payload); localStorage.setItem("psy6_feedback",JSON.stringify(store));
-}catch(err){/* localStorage full or unavailable */}
+}catch(err){/* localStorage full or unavailable */
+/* ── AI Assistant ─────────────────────────────────────────── */
+const AI={
+  enabled:false,
+  suggestions:[],
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🤖 AI Assistant enabled');
+      // Generate initial suggestions
+      this.generateSuggestions();
+    }catch(e){
+      toast('❌ Failed to enable AI Assistant');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    this.suggestions=[];
+    toast('🤖 AI Assistant disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  generateSuggestions(){
+    // Generate suggestions based on current state
+    const preset=activePreset();
+    const suggestions=[];
+    
+    // Suggest BPM adjustment
+    if(preset.bpm<130){
+      suggestions.push('🎵 Try increasing BPM to 135-145 for more energy');
+    }else if(preset.bpm>150){
+      suggestions.push('🎵 Try decreasing BPM to 140-148 for more groove');
+    }
+    
+    // Suggest variant change
+    if(activeVariant==='A'){
+      suggestions.push('🎯 Try variant B for a different sound');
+    }else{
+      suggestions.push('🎯 Try variant A for a different sound');
+    }
+    
+    // Suggest preset change
+    const randomPreset=PRESETS[Math.floor(Math.random()*PRESETS.length)];
+    suggestions.push('🎹 Try the '+randomPreset.name+' preset');
+    
+    this.suggestions=suggestions;
+    return suggestions;
+  },
+  getSuggestions(){
+    return this.suggestions;
+  }
+};
+// Add keyboard shortcut for AI Assistant (A)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='a'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      AI.toggle();
+    }
+  }
+});
+}
 if(FEEDBACK_ENDPOINT){
 try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */ }
 }
