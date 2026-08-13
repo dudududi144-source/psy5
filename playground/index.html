@@ -3998,6 +3998,77 @@ function addPresetIndices(){
 addPresetIndices();
 
 /* ── Preset Favorites and History ─────────────────────────── */
+/* ── Flanger ──────────────────────────────────────────────── */
+const FLANGER={
+  enabled:false,
+  rate:0.25, // Hz
+  depth:0.5, // 0-1
+  feedback:0.5, // 0-1
+  delay:0.005, // seconds
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🌊 Flanger enabled');
+    }catch(e){
+      toast('❌ Failed to enable Flanger');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🌊 Flanger disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setRate(rate){
+    if(rate>=0&&rate<=10){
+      this.rate=rate;
+    }
+  },
+  setDepth(depth){
+    if(depth>=0&&depth<=1){
+      this.depth=depth;
+    }
+  },
+  setFeedback(feedback){
+    if(feedback>=0&&feedback<=1){
+      this.feedback=feedback;
+    }
+  },
+  setDelay(delay){
+    if(delay>=0&&delay<=0.02){
+      this.delay=delay;
+    }
+  },
+  getRate(){
+    return this.rate;
+  },
+  getDepth(){
+    return this.depth;
+  },
+  getFeedback(){
+    return this.feedback;
+  },
+  getDelay(){
+    return this.delay;
+  }
+};
+// Add keyboard shortcut for flanger (D)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='d'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      FLANGER.toggle();
+    }
+  }
+});
+
 const FAVORITES={
   items:[],
   load(){
