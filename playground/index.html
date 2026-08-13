@@ -432,6 +432,11 @@ pointer-events:none;
 <button id="shuffleBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🔀 Shuffle</button>
 </div>
 <div style="margin-bottom:10px;display:flex;gap:6px">
+<button id="foundationBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🏗️ Foundation</button>
+<button id="samplesBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">🎵 Samples</button>
+</div>
+
+<div style="margin-bottom:10px;display:flex;gap:6px">
 <button id="exportAllBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">📦 Export All</button>
 <button id="importAllBtn" style="flex:1;padding:8px;font-size:12px;background:rgba(150,90,255,.2);border:1px solid var(--panel-brd);border-radius:8px;color:var(--dim);cursor:pointer">📥 Import All</button>
 <input type="file" id="importAllFile" accept=".json" style="display:none">
@@ -1076,6 +1081,48 @@ buildPresets(); buildSteps(); buildPads(); refreshMeta(); paintStats(); sizeScop
 <p>No history yet.</p>
 </div>
 <button onclick="$('historyModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
+</div>
+</div>
+
+<!-- Foundation Integration Modal -->
+<div id="foundationModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
+<h2 style="font-family:var(--font-display);font-size:18px;color:var(--cyan);margin-bottom:16px">🏗️ Foundation Architecture</h2>
+<div style="font-size:13px;color:var(--text);line-height:2">
+<p style="margin-bottom:12px">The Foundation Architecture provides the core building blocks for the PSY6 engine:</p>
+<ul style="margin-left:20px;margin-bottom:12px">
+<li><b>Music Theory:</b> motif.mjs, planner.mjs, policy.mjs, memory.mjs, context.mjs</li>
+<li><b>Learning System:</b> musical-learning.ts, learner.ts, policy.ts, store.ts</li>
+<li><b>Composition Engine:</b> composition-engine.ts, learning-kernel.ts</li>
+<li><b>Transport System:</b> transport.ts, v1-transport.ts</li>
+<li><b>DSP Package:</b> effects.ts, envelopes.ts, filters.ts, oscillators.ts, voicePool.ts</li>
+<li><b>Analysis Package:</b> analyzer.ts, dsp.ts, features.ts, inference.ts, onset.ts, pitch.ts, tempo.ts</li>
+<li><b>Scheduler Package:</b> scheduler.ts, rng.ts, types.ts</li>
+<li><b>Material Package:</b> material.ts, factory.ts, seed.ts, types.ts</li>
+<li><b>Protocol Package:</b> channel.ts, events.ts, state.ts</li>
+<li><b>Device SDK:</b> device.ts, host.ts, reference.ts</li>
+</ul>
+<p style="color:var(--dim);font-size:11px">All files are located in the foundation/ directory.</p>
+</div>
+<button onclick="$('foundationModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
+</div>
+</div>
+<!-- Samples Modal -->
+<div id="samplesModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;padding:24px;max-width:500px;max-height:80vh;overflow-y:auto;backdrop-filter:blur(14px);animation:fadeIn .3s ease">
+<h2 style="font-family:var(--font-display);font-size:18px;color:var(--cyan);margin-bottom:16px">🎵 Real Samples</h2>
+<div style="font-size:13px;color:var(--text);line-height:2">
+<p style="margin-bottom:12px">The Real Samples library contains 16 high-quality samples:</p>
+<ul style="margin-left:20px;margin-bottom:12px">
+<li><b>Kick (7):</b> 909_BD_02, 909_BD_04, 909_BD_05, md_kick_Kicks_0000, md_kick_Kicks_0007, nord_kick_deep_68, nord_kick_punchy_67</li>
+<li><b>Snare (3):</b> md_snare_Snares_0000, md_snare_Snares_0001, nord_snare_Snare1</li>
+<li><b>Hat (2):</b> md_hat_Hats_0008, md_hat_Hats_0013</li>
+<li><b>Clap (1):</b> md_clap_Claps_0000</li>
+<li><b>Perc (3):</b> md_perc_Percs_0000, md_perc_Percs_0001, nord_perc_Perc1</li>
+</ul>
+<p style="color:var(--dim);font-size:11px">All samples are located in the samples/real/ directory.</p>
+</div>
+<button onclick="$('samplesModal').style.display='none'" style="margin-top:16px;padding:8px 16px;width:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border:none;border-radius:8px;color:#0a0518;font-family:var(--font-display);font-weight:700;cursor:pointer">Close</button>
 </div>
 </div>
 <!-- Session Stats Modal -->
@@ -1925,5 +1972,13 @@ $("importAllFile").addEventListener("change",e=>{
     reader.readAsText(file);
     e.target.value='';
   }
+});
+
+/* ── Foundation Integration and Samples ───────────────────── */
+$("foundationBtn").addEventListener("click",()=>{
+  $("foundationModal").style.display="flex";
+});
+$("samplesBtn").addEventListener("click",()=>{
+  $("samplesModal").style.display="flex";
 });
 >
