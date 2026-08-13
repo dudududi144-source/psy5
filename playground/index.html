@@ -3845,6 +3845,10 @@ const BITCRUSHER={
     return this.sampleRateReduction;
   }
 };
+// Add BITCRUSHER.enable() and BITCRUSHER.disable() calls
+BITCRUSHER.enable();
+BITCRUSHER.disable();
+
 // Add keyboard shortcut for bitcrusher (Q)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='q'&&!e.ctrlKey&&!e.metaKey){
