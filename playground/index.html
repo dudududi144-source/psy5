@@ -2149,6 +2149,68 @@ const EFFECTS={
 EFFECTS.init();
 
 /* ── Effects Chain ────────────────────────────────────────── */
+/* ── Step Sequencer ───────────────────────────────────────── */
+const SEQUENCER={
+  steps:16,
+  currentStep:0,
+  isPlaying:false,
+  tracks:{
+    kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+    snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+    hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],
+    clap:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0]
+  },
+  async init(){
+    if(this.isPlaying) return;
+    try{
+      this.isPlaying=true;
+      toast('🎼 Step Sequencer initialized');
+    }catch(e){
+      toast('❌ Failed to initialize Step Sequencer');
+    }
+  },
+  play(){
+    if(this.isPlaying) return;
+    this.isPlaying=true;
+    toast('🎼 Step Sequencer playing');
+  },
+  stop(){
+    if(!this.isPlaying) return;
+    this.isPlaying=false;
+    this.currentStep=0;
+    toast('🎼 Step Sequencer stopped');
+  },
+  toggle(){
+    if(this.isPlaying){
+      this.stop();
+    }else{
+      this.play();
+    }
+  },
+  nextStep(){
+    if(!this.isPlaying) return;
+    this.currentStep=(this.currentStep+1)%this.steps;
+    // Trigger sounds based on current step
+    if(this.tracks.kick[this.currentStep]) playKick();
+    if(this.tracks.snare[this.currentStep]) playSnare();
+    if(this.tracks.hat[this.currentStep]) playHat();
+    if(this.tracks.clap[this.currentStep]) playClap();
+  },
+  getCurrentStep(){
+    return this.currentStep;
+  },
+  getTracks(){
+    return this.tracks;
+  },
+  toggleStep(track,step){
+    if(track in this.tracks&&step>=0&&step<this.steps){
+      this.tracks[track][step]=this.tracks[track][step]?0:1;
+    }
+  }
+};
+// Initialize Step Sequencer on startup
+SEQUENCER.init();
+
 const EFFECTS={
   chain:[],
   enabled:false,
