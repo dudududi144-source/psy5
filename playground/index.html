@@ -4151,7 +4151,69 @@ document.addEventListener('keydown',(e)=>{
   save(){
     try{
       localStorage.setItem("psy6_favorites",JSON.stringify(this.items));
-    }catch(e){/* localStorage unavailable */}
+    }catch(e){/* localStorage unavailable */
+/* ── Vocoder ──────────────────────────────────────────────── */
+const VOCODER={
+  enabled:false,
+  bands:16, // 4-32
+  attack:0.1, // seconds
+  release:0.3, // seconds
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🎤 Vocoder enabled');
+    }catch(e){
+      toast('❌ Failed to enable Vocoder');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🎤 Vocoder disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setBands(bands){
+    if(bands>=4&&bands<=32){
+      this.bands=bands;
+    }
+  },
+  setAttack(attack){
+    if(attack>=0&&attack<=1){
+      this.attack=attack;
+    }
+  },
+  setRelease(release){
+    if(release>=0&&release<=1){
+      this.release=release;
+    }
+  },
+  getBands(){
+    return this.bands;
+  },
+  getAttack(){
+    return this.attack;
+  },
+  getRelease(){
+    return this.release;
+  }
+};
+// Add keyboard shortcut for vocoder (T)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='t'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      VOCODER.toggle();
+    }
+  }
+});
+}
   },
   add(presetId){
     if(!this.items.includes(presetId)){
