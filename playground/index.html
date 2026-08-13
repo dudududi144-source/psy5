@@ -3693,6 +3693,10 @@ const LIMITER={
     return this.release;
   }
 };
+// Add LIMITER.enable() and LIMITER.disable() calls
+LIMITER.enable();
+LIMITER.disable();
+
 // Add keyboard shortcut for limiter (U)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='u'&&!e.ctrlKey&&!e.metaKey){
