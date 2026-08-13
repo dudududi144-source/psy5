@@ -1,4 +1,32 @@
-<!DOCTYPE
+<
+/* ── Worklets Integration ─────────────────────────────────── */
+const WORKLETS={
+  loaded:false,
+  audioContext:null,
+  async load(){
+    if(this.loaded) return;
+    try{
+      // Create AudioContext
+      this.audioContext=new (window.AudioContext||window.webkitAudioContext)();
+      
+      // Load worklets
+      await this.audioContext.audioWorklet.addModule('../worklets/psy4-dsp.js');
+      await this.audioContext.audioWorklet.addModule('../worklets/psy4-engine.js');
+      
+      this.loaded=true;
+      toast('🔧 Worklets loaded');
+    }catch(e){
+      toast('❌ Failed to load Worklets');
+    }
+  },
+  getAudioContext(){
+    if(!this.loaded) return null;
+    return this.audioContext;
+  }
+};
+// Load Worklets on startup
+WORKLETS.load();
+!DOCTYPE
 <!-- Learning System -->
 <section class="panel">
 <h2>🧠 Learning</h2>
