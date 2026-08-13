@@ -3872,6 +3872,77 @@ $("presetSearch").addEventListener("input",()=>{
 });
 
 /* ── Preset Sort ──────────────────────────────────────────── */
+/* ── Phaser ───────────────────────────────────────────────── */
+const PHASER={
+  enabled:false,
+  rate:0.5, // Hz
+  depth:0.5, // 0-1
+  feedback:0.3, // 0-1
+  stages:4, // 2-12
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🌀 Phaser enabled');
+    }catch(e){
+      toast('❌ Failed to enable Phaser');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🌀 Phaser disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setRate(rate){
+    if(rate>=0&&rate<=10){
+      this.rate=rate;
+    }
+  },
+  setDepth(depth){
+    if(depth>=0&&depth<=1){
+      this.depth=depth;
+    }
+  },
+  setFeedback(feedback){
+    if(feedback>=0&&feedback<=1){
+      this.feedback=feedback;
+    }
+  },
+  setStages(stages){
+    if(stages>=2&&stages<=12){
+      this.stages=stages;
+    }
+  },
+  getRate(){
+    return this.rate;
+  },
+  getDepth(){
+    return this.depth;
+  },
+  getFeedback(){
+    return this.feedback;
+  },
+  getStages(){
+    return this.stages;
+  }
+};
+// Add keyboard shortcut for phaser (F)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='f'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      PHASER.toggle();
+    }
+  }
+});
+
 $("presetSort").addEventListener("change",()=>{
   const sortType=$("presetSort").value;
   const presetList=$("presetList");
