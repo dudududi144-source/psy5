@@ -1585,7 +1585,6 @@ if(e.key.toLowerCase()==="m"){
 if(e.key.toLowerCase()==="t"){
   $("themeBtn").click();
 });
-}
 $("playBtn").addEventListener("click",()=>isPlaying?stopSeq():startSeq());
 let volTimeout=null;
 $("vol").addEventListener("input",()=>{
@@ -1594,7 +1593,6 @@ volTimeout=setTimeout(()=>{
 if(masterGain) masterGain.gain.setTargetAtTime(parseFloat($("vol").value),audioCtx.currentTime,0.05);
 },50);
 });
-}
 document.querySelectorAll(".abToggle button").forEach(b=>{
 b.addEventListener("click",()=>{
 activeVariant=b.dataset.v;
@@ -1602,7 +1600,6 @@ document.querySelectorAll(".abToggle button").forEach(x=>x.classList.toggle("on"
 refreshMeta();
 });
 });
-}
 function refreshMeta(){
 const p=activePreset();
 $("nowName").textContent=p.name+" · variant "+activeVariant;
