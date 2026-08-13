@@ -3749,6 +3749,10 @@ const WIDENER={
     return this.width;
   }
 };
+// Add WIDENER.enable() and WIDENER.disable() calls
+WIDENER.enable();
+WIDENER.disable();
+
 // Add keyboard shortcut for stereo widener (Y)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='y'&&!e.ctrlKey&&!e.metaKey){
