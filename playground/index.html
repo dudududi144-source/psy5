@@ -3715,6 +3715,50 @@ $("helpBtn").addEventListener("click",()=>{
 });
 
 /* ── Session Stats ────────────────────────────────────────── */
+/* ── Stereo Widener ───────────────────────────────────────── */
+const WIDENER={
+  enabled:false,
+  width:0.5, // 0-1
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🎧 Stereo Widener enabled');
+    }catch(e){
+      toast('❌ Failed to enable Stereo Widener');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🎧 Stereo Widener disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setWidth(width){
+    if(width>=0&&width<=1){
+      this.width=width;
+    }
+  },
+  getWidth(){
+    return this.width;
+  }
+};
+// Add keyboard shortcut for stereo widener (Y)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='y'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      WIDENER.toggle();
+    }
+  }
+});
+
 const SESSION={
   startTime:Date.now(),
   presetChanges:[],
