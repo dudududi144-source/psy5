@@ -2549,6 +2549,96 @@ function applySoundBankItem(category, id){
   toast('🎛️ Applied: '+item.name);
 }
 /* ── Learning System ──────────────────────────────────────── */
+/* ── Chord Generator ──────────────────────────────────────── */
+const CHORDS={
+  enabled:false,
+  root:0,
+  chordType:'major', // major, minor, dim, aug, maj7, min7, dom7
+  progression:[],
+  currentChord:0,
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🎹 Chord Generator enabled');
+    }catch(e){
+      toast('❌ Failed to enable Chord Generator');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    this.currentChord=0;
+    toast('🎹 Chord Generator disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setRoot(root){
+    if(root>=0&&root<12){
+      this.root=root;
+    }
+  },
+  setChordType(type){
+    if(['major','minor','dim','aug','maj7','min7','dom7'].includes(type)){
+      this.chordType=type;
+      toast('🎹 Chord type: '+type);
+    }
+  },
+  getChordNotes(){
+    const chordIntervals={
+      major:[0,4,7],
+      minor:[0,3,7],
+      dim:[0,3,6],
+      aug:[0,4,8],
+      maj7:[0,4,7,11],
+      min7:[0,3,7,10],
+      dom7:[0,4,7,10]
+    };
+    const intervals=chordIntervals[this.chordType]||chordIntervals.major;
+    return intervals.map(interval=>this.root+interval);
+  },
+  generateProgression(){
+    // Generate a simple chord progression
+    const progressions={
+      major:[0,5,7,4], // I-IV-V-iii
+      minor:[0,3,5,7], // i-III-iv-v
+      blues:[0,5,0,5,7,5,0,7] // 12-bar blues
+    };
+    this.progression=progressions[this.chordType==='minor'?'minor':'major'];
+    this.currentChord=0;
+    return this.progression;
+  },
+  getNextChord(){
+    if(this.progression.length===0) return null;
+    const chord=this.progression[this.currentChord%this.progression.length];
+    this.currentChord++;
+    return this.root+chord;
+  },
+  getRoot(){
+    return this.root;
+  },
+  getChordType(){
+    return this.chordType;
+  },
+  getProgression(){
+    return this.progression;
+  }
+};
+// Add keyboard shortcut for chord generator (H)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='h'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      CHORDS.toggle();
+    }
+  }
+});
+
 const LEARNING={
   feedbackHistory:[],
   preferences:{
