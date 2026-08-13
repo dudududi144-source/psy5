@@ -1085,6 +1085,62 @@ variants:{
 A:{bassWave:"sawtooth",bassCut:700, bassQ:8, leadWave:"sawtooth",leadCut:2200,leadQ:10,hatLvl:.12,leadLvl:.48},
 B:{bassWave:"square",bassCut:900, bassQ:10,leadWave:"sawtooth",leadCut:2600,leadQ:12,hatLvl:.16,leadLvl:.55}
 }
+},
+{
+id:"goa_trance_25", name:"Goa Trance", tag:"goa · 140", bpm:140, root:33,
+desc:"Classic Goa trance with melodic lead and rolling bass.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,0,3],
+lead:[0,null,3,null,7,null,3,null,0,null,3,null,7,null,10,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:750, bassQ:7, leadWave:"sawtooth",leadCut:2200,leadQ:9, hatLvl:.12,leadLvl:.48},
+B:{bassWave:"square",bassCut:950, bassQ:9, leadWave:"sawtooth",leadCut:2600,leadQ:11,hatLvl:.16,leadLvl:.55}
+}
+},
+{
+id:"suomi_26", name:"Suomi", tag:"suomi · 135", bpm:135, root:33,
+desc:"Suomi trance with melodic lead and warm bass.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,5,7],
+lead:[0,null,3,null,7,null,3,null,0,null,3,null,7,null,10,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:700, bassQ:6, leadWave:"sawtooth",leadCut:2000,leadQ:8, hatLvl:.10,leadLvl:.45},
+B:{bassWave:"sawtooth",bassCut:900, bassQ:8, leadWave:"square",leadCut:2400,leadQ:10,hatLvl:.14,leadLvl:.52}
+}
+},
+{
+id:"dark_psy_27", name:"Dark Psy", tag:"dark psy · 150", bpm:150, root:31,
+desc:"Dark psy trance with aggressive lead and driving rhythm.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,0,3],
+lead:[0,null,3,null,7,null,3,null,0,null,3,null,7,null,10,null],
+hat :[0,0,1,0,0,1,1,0,0,0,1,0,0,1,1,0]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:800, bassQ:9, leadWave:"sawtooth",leadCut:2400,leadQ:12,hatLvl:.14,leadLvl:.50},
+B:{bassWave:"square",bassCut:1000, bassQ:11,leadWave:"sawtooth",leadCut:2800,leadQ:14,hatLvl:.18,leadLvl:.58}
+}
+},
+{
+id:"forest_psy_28", name:"Forest Psy", tag:"forest psy · 145", bpm:145, root:33,
+desc:"Forest psy trance with organic textures and rolling bass.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,0,3],
+lead:[0,null,3,null,7,null,3,null,0,null,3,null,7,null,10,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:750, bassQ:8, leadWave:"sawtooth",leadCut:2200,leadQ:10,hatLvl:.12,leadLvl:.48},
+B:{bassWave:"square",bassCut:950, bassQ:10,leadWave:"sawtooth",leadCut:2600,leadQ:12,hatLvl:.16,leadLvl:.55}
+}
 }];
 let audioCtx=null, masterGain=null, analyser=null, delayNode=null, delaySend=null, noiseBuf=null;
 let isPlaying=false, schedulerTimer=null, currentStep=0, nextNoteTime=0;
