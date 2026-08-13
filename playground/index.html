@@ -3157,6 +3157,96 @@ $("peRandomBtn").addEventListener("click",()=>{
 renderPEGrid();
 
 /* ── Status Bar ───────────────────────────────────────────── */
+/* ── Amplitude Envelope ───────────────────────────────────── */
+const AMPENV={
+  enabled:false,
+  attack:0.01, // seconds
+  decay:0.1, // seconds
+  sustain:0.7, // 0-1
+  release:0.2, // seconds
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('📊 Amplitude Envelope enabled');
+    }catch(e){
+      toast('❌ Failed to enable Amplitude Envelope');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('📊 Amplitude Envelope disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setAttack(attack){
+    if(attack>=0&&attack<=1){
+      this.attack=attack;
+    }
+  },
+  setDecay(decay){
+    if(decay>=0&&decay<=1){
+      this.decay=decay;
+    }
+  },
+  setSustain(sustain){
+    if(sustain>=0&&sustain<=1){
+      this.sustain=sustain;
+    }
+  },
+  setRelease(release){
+    if(release>=0&&release<=1){
+      this.release=release;
+    }
+  },
+  getValue(time,noteOn){
+    if(!this.enabled) return 1;
+    if(noteOn){
+      if(time<this.attack){
+        return time/this.attack;
+      }else if(time<this.attack+this.decay){
+        const decayTime=time-this.attack;
+        return 1-(decayTime/this.decay)*(1-this.sustain);
+      }else{
+        return this.sustain;
+      }
+    }else{
+      if(time<this.release){
+        return this.sustain*(1-time/this.release);
+      }else{
+        return 0;
+      }
+    }
+  },
+  getAttack(){
+    return this.attack;
+  },
+  getDecay(){
+    return this.decay;
+  },
+  getSustain(){
+    return this.sustain;
+  },
+  getRelease(){
+    return this.release;
+  }
+};
+// Add keyboard shortcut for amplitude envelope (X)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='x'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      AMPENV.toggle();
+    }
+  }
+});
+
 function updateStatusBar(){
   const preset=activePreset();
   if(preset){
