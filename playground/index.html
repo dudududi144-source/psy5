@@ -946,6 +946,7 @@ function triggerPad(off,el){
 ensureAudio();
 if(!audioCtx) return;
 playLead(audioCtx.currentTime,mtof(activePreset().root+24+off),activeParams(),true,true);
+SESSION.trackNote();
 if(el){ el.classList.add("hit"); setTimeout(()=>el.classList.remove("hit"),120); }
 }
 window.addEventListener("keydown",e=>{
@@ -972,6 +973,7 @@ if(e.key.toLowerCase()==="v"){
   activeVariant=activeVariant==="A"?"B":"A";
   document.querySelectorAll(".abToggle button").forEach(x=>x.classList.toggle("on",x.dataset.v===activeVariant));
   refreshMeta();
+SESSION.trackVariantChange(activeVariant);
   toast("🎯 Variant: "+activeVariant);
 }
 // Export shortcut (E)
