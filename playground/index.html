@@ -4332,7 +4332,7 @@ document.addEventListener('keydown',(e)=>{
       GATE.toggle();
     }
   });
-
+}
 let bpmTimeout=null;
 $("bpmSlider").addEventListener("input",()=>{
   clearTimeout(bpmTimeout);
@@ -4439,7 +4439,7 @@ $("importAllFile").addEventListener("change",e=>{
     reader.readAsText(file);
     e.target.value='';
   });
-
+}
 /* ── Foundation Integration and Samples ───────────────────── */
 $("foundationBtn").addEventListener("click",()=>{
   $("foundationModal").style.display="flex";
