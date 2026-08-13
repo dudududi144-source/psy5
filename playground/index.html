@@ -1284,6 +1284,54 @@ w.postMessage('start');
 return {stop:()=>{w.postMessage('stop');w.terminate();}};
 }catch(e){
 /* Fallback to setInterval if Worker not available */
+/* ── Collaboration Mode ───────────────────────────────────── */
+const COLLAB={
+  enabled:false,
+  sessionId:null,
+  peers:[],
+  async enable(){
+    if(this.enabled) return;
+    try{
+      // Generate a session ID
+      this.sessionId='psy6-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+      this.enabled=true;
+      toast('🤝 Collaboration Mode enabled');
+      toast('📋 Session ID: '+this.sessionId);
+    }catch(e){
+      toast('❌ Failed to enable Collaboration Mode');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    this.sessionId=null;
+    this.peers=[];
+    toast('🤝 Collaboration Mode disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  getSessionId(){
+    return this.sessionId;
+  },
+  getPeers(){
+    return this.peers;
+  }
+};
+// Add keyboard shortcut for collaboration (C)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='c'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      COLLAB.toggle();
+    }
+  }
+});
+
 const id=setInterval(cb,25);
 return {stop:()=>clearInterval(id)};
 }
