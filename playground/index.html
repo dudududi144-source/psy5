@@ -2103,6 +2103,48 @@ function triggerMIDINote(note, velocity){
   playLead(audioCtx.currentTime, mtof(note), activeParams(), true, true);
 }
 /* ── Export/Import of presets ─────────────────────────────── */
+/* ── Effects Chain ────────────────────────────────────────── */
+const EFFECTS={
+  chain:[],
+  enabled:false,
+  async init(){
+    if(this.chain.length>0) return;
+    try{
+      // Initialize default effects chain
+      this.chain=[
+        {name:'Reverb',type:'reverb',enabled:true,params:{decay:2.0,mix:0.3}},
+        {name:'Delay',type:'delay',enabled:true,params:{time:0.3,feedback:0.4,mix:0.25}},
+        {name:'Chorus',type:'chorus',enabled:false,params:{rate:0.5,depth:0.3,mix:0.3}},
+        {name:'Distortion',type:'distortion',enabled:false,params:{drive:0.5,mix:0.5}},
+        {name:'Compressor',type:'compressor',enabled:true,params:{threshold:-20,ratio:4,attack:0.01,release:0.2}}
+      ];
+      this.enabled=true;
+      toast('🎛️ Effects Chain initialized');
+    }catch(e){
+      toast('❌ Failed to initialize Effects Chain');
+    }
+  },
+  getChain(){
+    return this.chain;
+  },
+  toggleEffect(idx){
+    if(idx>=0&&idx<this.chain.length){
+      this.chain[idx].enabled=!this.chain[idx].enabled;
+      toast('🎛️ '+this.chain[idx].name+' '+(this.chain[idx].enabled?'enabled':'disabled'));
+    }
+  },
+  setParam(idx,param,value){
+    if(idx>=0&&idx<this.chain.length){
+      this.chain[idx].params[param]=value;
+    }
+  },
+  getEnabledEffects(){
+    return this.chain.filter(e=>e.enabled);
+  }
+};
+// Initialize Effects Chain on startup
+EFFECTS.init();
+
 function exportPreset(){
   const preset=activePreset();
   const data={
