@@ -1,0 +1,132 @@
+{
+  "description": "Rhythm pattern definitions. Each pattern is a 16-step boolean grid. Used by @psy-foundation/music rhythm builders.",
+  "rhythms": [
+    {
+      "id": "four-on-floor",
+      "role": "kick",
+      "steps": 16,
+      "hits": [
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "velocities": [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+      "description": "Classic 4/4 kick on every beat"
+    },
+    {
+      "id": "psy-kick",
+      "role": "kick",
+      "steps": 16,
+      "hits": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "velocities": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "description": "Psytrance single kick on beat 1"
+    },
+    {
+      "id": "offbeat-hats",
+      "role": "hat",
+      "steps": 16,
+      "hits": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false
+      ],
+      "velocities": [0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0],
+      "description": "Offbeat hats on the 'and' of each beat"
+    },
+    {
+      "id": "driving-hats",
+      "role": "hat",
+      "steps": 16,
+      "hits": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "velocities": [
+        0.9, 0.5, 0.5, 0.5, 0.9, 0.5, 0.5, 0.5, 0.9, 0.5, 0.5, 0.5, 0.9, 0.5, 0.5, 0.5
+      ],
+      "description": "Driving 16th hats with downbeat accents"
+    },
+    {
+      "id": "backbeat",
+      "role": "snare",
+      "steps": 16,
+      "hits": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "velocities": [0, 0, 0, 0, 0.9, 0, 0, 0, 0, 0, 0, 0, 0.9, 0, 0, 0],
+      "description": "Snare/clap on beats 2 and 4"
+    }
+  ]
+}
