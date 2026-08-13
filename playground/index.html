@@ -2599,6 +2599,10 @@ const CHORDS={
       min7:[0,3,7,10],
       dom7:[0,4,7,10]
     };
+// Add CHORDS.enable() and CHORDS.disable() calls
+CHORDS.enable();
+CHORDS.disable();
+
     const intervals=chordIntervals[this.chordType]||chordIntervals.major;
     return intervals.map(interval=>this.root+interval);
   },
