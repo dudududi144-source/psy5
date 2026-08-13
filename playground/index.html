@@ -4079,7 +4079,70 @@ const FAVORITES={
     try{
       const data=localStorage.getItem("psy6_favorites");
       if(data) this.items=JSON.parse(data);
-    }catch(e){/* localStorage unavailable */}
+    }catch(e){/* localStorage unavailable */
+/* ── Tremolo ──────────────────────────────────────────────── */
+const TREMOLO={
+  enabled:false,
+  rate:5, // Hz
+  depth:0.5, // 0-1
+  waveform:'sine', // sine, square, triangle
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('〰️ Tremolo enabled');
+    }catch(e){
+      toast('❌ Failed to enable Tremolo');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('〰️ Tremolo disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setRate(rate){
+    if(rate>=0&&rate<=20){
+      this.rate=rate;
+    }
+  },
+  setDepth(depth){
+    if(depth>=0&&depth<=1){
+      this.depth=depth;
+    }
+  },
+  setWaveform(waveform){
+    if(['sine','square','triangle'].includes(waveform)){
+      this.waveform=waveform;
+      toast('〰️ Tremolo waveform: '+waveform);
+    }
+  },
+  getRate(){
+    return this.rate;
+  },
+  getDepth(){
+    return this.depth;
+  },
+  getWaveform(){
+    return this.waveform;
+  }
+};
+// Add keyboard shortcut for tremolo (W)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='w'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      TREMOLO.toggle();
+    }
+  }
+});
+}
   },
   save(){
     try{
