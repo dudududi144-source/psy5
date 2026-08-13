@@ -3391,7 +3391,76 @@ $("themeBtn").addEventListener("click",()=>{
   $("themeBtn").textContent=isLight?"☀️ Theme":"🌙 Theme";
   try{
     localStorage.setItem("psy6_theme",isLight?"light":"dark");
-  }catch(e){/* localStorage unavailable */}
+  }catch(e){/* localStorage unavailable */
+/* ── Noise Generator ──────────────────────────────────────── */
+const NOISE={
+  enabled:false,
+  type:'white', // white, pink, brown
+  level:0.5, // 0-1
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🔊 Noise Generator enabled');
+    }catch(e){
+      toast('❌ Failed to enable Noise Generator');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🔊 Noise Generator disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setType(type){
+    if(['white','pink','brown'].includes(type)){
+      this.type=type;
+      toast('🔊 Noise type: '+type);
+    }
+  },
+  setLevel(level){
+    if(level>=0&&level<=1){
+      this.level=level;
+    }
+  },
+  getValue(){
+    if(!this.enabled) return 0;
+    switch(this.type){
+      case 'white':
+        return (Math.random()*2-1)*this.level;
+      case 'pink':
+        // Simple pink noise approximation
+        return (Math.random()*2-1)*this.level*0.5;
+      case 'brown':
+        // Simple brown noise approximation
+        return (Math.random()*2-1)*this.level*0.25;
+      default:
+        return 0;
+    }
+  },
+  getType(){
+    return this.type;
+  },
+  getLevel(){
+    return this.level;
+  }
+};
+// Add keyboard shortcut for noise (N)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='n'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      NOISE.toggle();
+    }
+  }
+});
+}
 });
 // Load saved theme
 try{
