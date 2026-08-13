@@ -1170,6 +1170,10 @@ const RECORDER={
           this.chunks.push(e.data);
         }
       };
+// Add RECORDER.start() and RECORDER.stop() calls
+RECORDER.start();
+RECORDER.stop();
+
       
       this.mediaRecorder.onstop=()=>{
         const blob=new Blob(this.chunks,{type:'audio/webm'});
