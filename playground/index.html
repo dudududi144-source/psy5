@@ -407,6 +407,51 @@ document.addEventListener('keydown', (e) => {
     } catch (err) {
       toast('❌ Failed to save state');
     }
+/* ── Tests Integration ────────────────────────────────────── */
+const TESTS={
+  loaded:false,
+  results:[],
+  async load(){
+    if(this.loaded) return;
+    try{
+      // Load test files
+      const testFiles=[
+        '../tests/music.test.ts',
+        '../tests/learning.test.ts',
+        '../tests/transport.test.ts',
+        '../tests/dsp.test.ts',
+        '../tests/analysis.test.ts'
+      ];
+      
+      // Note: In a browser environment, we can't directly run TypeScript tests
+      // This is a placeholder for future integration with a test runner
+      this.loaded=true;
+      toast('🧪 Tests Integration ready');
+    }catch(e){
+      toast('❌ Failed to load Tests Integration');
+    }
+  },
+  getResults(){
+    return this.results;
+  },
+  runTests(){
+    // Placeholder for running tests
+    toast('🧪 Running tests...');
+    // In a real implementation, this would run the tests
+    // and update the results
+    this.results=[
+      {name:'music.test.ts', status:'pending'},
+      {name:'learning.test.ts', status:'pending'},
+      {name:'transport.test.ts', status:'pending'},
+      {name:'dsp.test.ts', status:'pending'},
+      {name:'analysis.test.ts', status:'pending'}
+    ];
+    return this.results;
+  }
+};
+// Load Tests Integration on startup
+TESTS.load();
+
   }
   // Ctrl+L: Load saved state
   if (e.ctrlKey && e.key === 'l') {
