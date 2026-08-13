@@ -3544,6 +3544,86 @@ document.addEventListener('keydown',(e)=>{
 }
 
 /* ── Loading Screen ───────────────────────────────────────── */
+/* ── Compressor ───────────────────────────────────────────── */
+const COMPRESSOR={
+  enabled:false,
+  threshold:-20, // dB
+  ratio:4, // 1:1 to 20:1
+  attack:0.01, // seconds
+  release:0.1, // seconds
+  makeupGain:0, // dB
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🔉 Compressor enabled');
+    }catch(e){
+      toast('❌ Failed to enable Compressor');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('🔉 Compressor disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setThreshold(threshold){
+    if(threshold>=-60&&threshold<=0){
+      this.threshold=threshold;
+    }
+  },
+  setRatio(ratio){
+    if(ratio>=1&&ratio<=20){
+      this.ratio=ratio;
+    }
+  },
+  setAttack(attack){
+    if(attack>=0&&attack<=1){
+      this.attack=attack;
+    }
+  },
+  setRelease(release){
+    if(release>=0&&release<=1){
+      this.release=release;
+    }
+  },
+  setMakeupGain(gain){
+    if(gain>=0&&gain<=24){
+      this.makeupGain=gain;
+    }
+  },
+  getThreshold(){
+    return this.threshold;
+  },
+  getRatio(){
+    return this.ratio;
+  },
+  getAttack(){
+    return this.attack;
+  },
+  getRelease(){
+    return this.release;
+  },
+  getMakeupGain(){
+    return this.makeupGain;
+  }
+};
+// Add keyboard shortcut for compressor (O)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='o'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      COMPRESSOR.toggle();
+    }
+  }
+});
+
 function hideLoadingScreen(){
   const loadingScreen=$("loadingScreen");
   const loadingBar=$("loadingBar");
