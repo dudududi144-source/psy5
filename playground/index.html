@@ -2999,6 +2999,105 @@ $("mixerReverb").addEventListener("input",()=>{
 });
 
 /* ── Pattern Editor ───────────────────────────────────────── */
+/* ── Filter Envelope ──────────────────────────────────────── */
+const FILTERENV={
+  enabled:false,
+  attack:0.01, // seconds
+  decay:0.1, // seconds
+  sustain:0.5, // 0-1
+  release:0.3, // seconds
+  amount:0.8, // 0-1
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('📈 Filter Envelope enabled');
+    }catch(e){
+      toast('❌ Failed to enable Filter Envelope');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    toast('📈 Filter Envelope disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setAttack(attack){
+    if(attack>=0&&attack<=1){
+      this.attack=attack;
+    }
+  },
+  setDecay(decay){
+    if(decay>=0&&decay<=1){
+      this.decay=decay;
+    }
+  },
+  setSustain(sustain){
+    if(sustain>=0&&sustain<=1){
+      this.sustain=sustain;
+    }
+  },
+  setRelease(release){
+    if(release>=0&&release<=1){
+      this.release=release;
+    }
+  },
+  setAmount(amount){
+    if(amount>=0&&amount<=1){
+      this.amount=amount;
+    }
+  },
+  getValue(time,noteOn){
+    if(!this.enabled) return 0;
+    if(noteOn){
+      if(time<this.attack){
+        return (time/this.attack)*this.amount;
+      }else if(time<this.attack+this.decay){
+        const decayTime=time-this.attack;
+        return this.amount-(decayTime/this.decay)*(this.amount-this.sustain*this.amount);
+      }else{
+        return this.sustain*this.amount;
+      }
+    }else{
+      if(time<this.release){
+        return this.sustain*this.amount*(1-time/this.release);
+      }else{
+        return 0;
+      }
+    }
+  },
+  getAttack(){
+    return this.attack;
+  },
+  getDecay(){
+    return this.decay;
+  },
+  getSustain(){
+    return this.sustain;
+  },
+  getRelease(){
+    return this.release;
+  },
+  getAmount(){
+    return this.amount;
+  }
+};
+// Add keyboard shortcut for filter envelope (Z)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='z'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      FILTERENV.toggle();
+    }
+  }
+});
+
 function renderPEGrid(){
   const track=$("peTrack").value;
   const preset=activePreset();
