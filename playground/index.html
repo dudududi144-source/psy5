@@ -3473,7 +3473,71 @@ try{
     document.body.classList.add("light-theme");
     $("themeBtn").textContent="☀️ Theme";
   }
-}catch(e){/* localStorage unavailable */}
+}catch(e){/* localStorage unavailable */
+/* ── Sample Player ────────────────────────────────────────── */
+const SAMPLEPLAYER={
+  enabled:false,
+  samples:{},
+  currentSample:null,
+  async enable(){
+    if(this.enabled) return;
+    try{
+      // Load sample manifest
+      const manifestRes=await fetch('../samples/manifest.json');
+      const manifest=await manifestRes.json();
+      
+      // Load samples
+      for(const item of manifest){
+        const sampleRes=await fetch('../samples/'+item.file);
+        const sampleBuffer=await sampleRes.arrayBuffer();
+        this.samples[item.file]=sampleBuffer;
+      }
+      
+      this.enabled=true;
+      toast('🎵 Sample Player enabled');
+    }catch(e){
+      toast('❌ Failed to enable Sample Player');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    this.currentSample=null;
+    toast('🎵 Sample Player disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  playSample(fileName){
+    if(!this.enabled) return;
+    if(fileName in this.samples){
+      this.currentSample=fileName;
+      toast('🎵 Playing: '+fileName);
+      // In a real implementation, this would play the sample
+      // using the Web Audio API
+    }
+  },
+  getSampleNames(){
+    return Object.keys(this.samples);
+  },
+  getCurrentSample(){
+    return this.currentSample;
+  }
+};
+// Add keyboard shortcut for sample player (P)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='p'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      SAMPLEPLAYER.toggle();
+    }
+  }
+});
+}
 
 /* ── Loading Screen ───────────────────────────────────────── */
 function hideLoadingScreen(){
