@@ -2296,6 +2296,102 @@ function importPreset(file){
   reader.readAsText(file);
 }
 /* ── Sound Bank ───────────────────────────────────────────── */
+/* ── Arpeggiator ──────────────────────────────────────────── */
+const ARPEGGIATOR={
+  enabled:false,
+  mode:'up', // up, down, updown, random
+  rate:1/8, // 1/8 note
+  octaveRange:2,
+  currentNote:0,
+  async enable(){
+    if(this.enabled) return;
+    try{
+      this.enabled=true;
+      toast('🎹 Arpeggiator enabled');
+    }catch(e){
+      toast('❌ Failed to enable Arpeggiator');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    this.currentNote=0;
+    toast('🎹 Arpeggiator disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  setMode(mode){
+    if(['up','down','updown','random'].includes(mode)){
+      this.mode=mode;
+      toast('🎹 Arpeggiator mode: '+mode);
+    }
+  },
+  setRate(rate){
+    if(rate>0&&rate<=1){
+      this.rate=rate;
+    }
+  },
+  setOctaveRange(range){
+    if(range>=1&&range<=4){
+      this.octaveRange=range;
+    }
+  },
+  getNextNote(notes){
+    if(!this.enabled||notes.length===0) return null;
+    
+    let nextNote;
+    switch(this.mode){
+      case 'up':
+        nextNote=notes[this.currentNote%notes.length];
+        this.currentNote++;
+        break;
+      case 'down':
+        nextNote=notes[notes.length-1-(this.currentNote%notes.length)];
+        this.currentNote++;
+        break;
+      case 'updown':
+        const idx=this.currentNote%(notes.length*2-2);
+        if(idx<notes.length){
+          nextNote=notes[idx];
+        }else{
+          nextNote=notes[notes.length*2-2-idx];
+        }
+        this.currentNote++;
+        break;
+      case 'random':
+        nextNote=notes[Math.floor(Math.random()*notes.length)];
+        break;
+      default:
+        nextNote=notes[0];
+    }
+    
+    return nextNote;
+  },
+  getMode(){
+    return this.mode;
+  },
+  getRate(){
+    return this.rate;
+  },
+  getOctaveRange(){
+    return this.octaveRange;
+  }
+};
+// Add keyboard shortcut for arpeggiator (G)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='g'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      ARPEGGIATOR.toggle();
+    }
+  }
+});
+
 const SOUND_BANK={
   drums:[
     {id:'kick-808', name:'808 Kick', type:'kick', tune:0.8, decay:1.2},
