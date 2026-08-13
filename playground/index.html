@@ -1764,6 +1764,11 @@ const CLOUD={
     return this.lastSync;
   }
 };
+// Add CLOUD.enable(), CLOUD.disable(), and CLOUD.sync() calls
+CLOUD.enable();
+CLOUD.disable();
+CLOUD.sync();
+
 // Add keyboard shortcut for cloud sync (S)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='s'&&!e.ctrlKey&&!e.metaKey){
