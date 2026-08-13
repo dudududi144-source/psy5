@@ -938,6 +938,62 @@ variants:{
 A:{bassWave:"sine",bassCut:200, bassQ:3, leadWave:"sine",leadCut:800,leadQ:4, hatLvl:.05,leadLvl:.20},
 B:{bassWave:"triangle",bassCut:350, bassQ:4, leadWave:"triangle",leadCut:1000,leadQ:5,hatLvl:.07,leadLvl:.25}
 }
+},
+{
+id:"dark_ambient_21", name:"Dark Ambient", tag:"dark ambient · 80", bpm:80, root:31,
+desc:"Dark ambient atmosphere with deep, evolving textures.",
+patterns:{
+kick:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+bass:[null,0,null,null,null,null,null,null,null,0,null,null,null,null,null,null],
+lead:[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+hat :[0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0]
+},
+variants:{
+A:{bassWave:"sine",bassCut:150, bassQ:3, leadWave:"sine",leadCut:600,leadQ:4, hatLvl:.04,leadLvl:.15},
+B:{bassWave:"triangle",bassCut:250, bassQ:4, leadWave:"triangle",leadCut:800,leadQ:5,hatLvl:.06,leadLvl:.20}
+}
+},
+{
+id:"hard_techno_22", name:"Hard Techno", tag:"hard techno · 150", bpm:150, root:33,
+desc:"Hard techno with aggressive kick and driving rhythm.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,0,0],
+lead:[null,null,null,null,null,null,12,null,null,null,null,null,null,null,null,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:800, bassQ:8, leadWave:"sawtooth",leadCut:2400,leadQ:12,hatLvl:.14,leadLvl:.50},
+B:{bassWave:"square",bassCut:1000, bassQ:10,leadWave:"sawtooth",leadCut:2800,leadQ:14,hatLvl:.18,leadLvl:.58}
+}
+},
+{
+id:"melodic_techno_23", name:"Melodic Techno", tag:"melodic techno · 128", bpm:128, root:33,
+desc:"Melodic techno with emotional lead and rolling bass.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,5,7],
+lead:[0,null,3,null,7,null,3,null,0,null,3,null,7,null,10,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:650, bassQ:7, leadWave:"sawtooth",leadCut:2000,leadQ:9, hatLvl:.12,leadLvl:.45},
+B:{bassWave:"sawtooth",bassCut:850, bassQ:9, leadWave:"square",leadCut:2400,leadQ:11,hatLvl:.16,leadLvl:.52}
+}
+},
+{
+id:"psy_trance_24", name:"Psy Trance", tag:"psy trance · 145", bpm:145, root:33,
+desc:"Classic psy trance with rolling bass and squelchy lead.",
+patterns:{
+kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],
+bass:[null,0,0,0,null,0,0,0,null,0,0,0,null,0,0,3],
+lead:[0,null,3,null,7,null,3,null,0,null,3,null,7,null,10,null],
+hat :[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1]
+},
+variants:{
+A:{bassWave:"sawtooth",bassCut:700, bassQ:8, leadWave:"sawtooth",leadCut:2200,leadQ:10,hatLvl:.12,leadLvl:.48},
+B:{bassWave:"square",bassCut:900, bassQ:10,leadWave:"sawtooth",leadCut:2600,leadQ:12,hatLvl:.16,leadLvl:.55}
+}
 }];
 let audioCtx=null, masterGain=null, analyser=null, delayNode=null, delaySend=null, noiseBuf=null;
 let isPlaying=false, schedulerTimer=null, currentStep=0, nextNoteTime=0;
