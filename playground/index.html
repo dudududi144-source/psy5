@@ -1275,6 +1275,7 @@ document.addEventListener('keydown',(e)=>{
       RECORDER.toggle();
     }
   });
+}
 const WORKER_TIMER_SRC=`let iv=null;self.onmessage=e=>{if(e.data==='start'){iv=setInterval(()=>self.postMessage('tick'),25)}else if(e.data==='stop'){clearInterval(iv);iv=null}};`;
 function makeTimerWorker(cb){
 try{
@@ -1335,6 +1336,7 @@ document.addEventListener('keydown',(e)=>{
       COLLAB.toggle();
     }
   });
+}
 const id=setInterval(cb,25);
 return {stop:()=>clearInterval(id)};
 }
