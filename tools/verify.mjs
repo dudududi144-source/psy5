@@ -44,6 +44,23 @@ for (const f of standalone) {
   }
 }
 
+/* ── 1b. ES modules (js/) — checked as .mjs so node applies module goal ── */
+console.log('== ES modules (js/) ==');
+const esmFiles = [
+  ...readdirSync('js').filter(f => f.endsWith('.js')).map(f => 'js/' + f),
+  ...readdirSync('js/ui').filter(f => f.endsWith('.js')).map(f => 'js/ui/' + f),
+];
+for (const f of esmFiles) {
+  const tmpF = join(tmp, f.replace(/[/.]/g, '_') + '.mjs');
+  writeFileSync(tmpF, readFileSync(f, 'utf8'));
+  try {
+    execFileSync('node', ['--check', tmpF], { stdio: 'pipe' });
+    ok(f + ' (ESM)');
+  } catch (e) {
+    fail(`${f}: ${String(e.stderr).split('\n').slice(0, 3).join(' ')}`);
+  }
+}
+
 /* ── 2 + 3. HTML documents ────────────────────────────────── */
 const docs = ['index.html', 'playground/index.html'];
 for (const doc of docs) {
