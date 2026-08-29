@@ -71,7 +71,7 @@ export interface ComposedBar {
   harmonicContext: number[]
   /** Role activation for this bar (copied from arrangement slot). */
   roles: RoleActivation
-  /** Timbre intent from learned context (PSY4 translates to synth params). */
+  /** Timbre intent from learned context (PSY6 translates to synth params). */
   timbreIntent?: {
     brightness: number
     harmonicity: number

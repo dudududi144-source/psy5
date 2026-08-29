@@ -1,5 +1,5 @@
 /**
- * Voice lifecycle — pooled voice allocation (the pattern from psy5).
+ * Voice lifecycle — pooled voice allocation (the pattern proven in the PSY device line).
  *
  * Voices are pre-allocated and run for the lifetime of the engine. `noteOn`
  * only re-targets AudioParams; no nodes are created or destroyed in the hot

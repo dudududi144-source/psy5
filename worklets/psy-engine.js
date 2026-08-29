@@ -1,5 +1,5 @@
 /**
- * PSY4 Engine — Single AudioWorklet processor.
+ * PSY6 Engine — Single AudioWorklet processor.
  *
  * This is the REAL-TIME PRODUCTION ENGINE. It replaces the setInterval(25ms)
  * main-thread scheduler and the per-hit Web Audio node creation that caused
@@ -36,19 +36,19 @@
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-// ─── PSY5 RT-safe tunables ─────────────────────────────────────────────────
-// 256-slot ring buffer is PSY5's proven size — plenty for a 100ms lookahead
+// ─── PSY6 RT-safe tunables ─────────────────────────────────────────────────
+// 256-slot ring buffer is the PSY device line's proven size (psy5) — plenty for a 100ms lookahead
 // at 145 BPM (16th = 41ms, so 100ms = ~2.4 steps × ~12 voices/step ≈ 30 events).
 // 256 saves memory vs 1024 and is bounded (PSY6 RT contract: fixed arrays only).
 const MAX_VOICES = 32;        // was 64 — reduced to match pool size
 const EVENT_SIZE = 6;         // floats per event: [time, voice, note, vel, dur, param]
-const MAX_EVENTS = 256;       // PSY5 proven size (was 1024) — bounded ring buffer
+const MAX_EVENTS = 256;       // proven size from the PSY device line (was 1024) — bounded ring buffer
 
-// CPU-load monitoring (PSY5 dynamic voice budget). If process() exceeds the
+// CPU-load monitoring (PSY6 dynamic voice budget). If process() exceeds the
 // budget, we drop the lowest-priority active voices to stay RT-safe. Reported
 // to the main thread every 30 blocks (~10 Hz at 128-sample blocks / 44.1 kHz).
-const PROCESS_BUDGET_MS = 3.0;        // PSY5: drop voices if process() > 3ms
-const STATS_REPORT_BLOCKS = 30;       // PSY5: report load every 30 blocks
+const PROCESS_BUDGET_MS = 3.0;        // PSY6: drop voices if process() > 3ms
+const STATS_REPORT_BLOCKS = 30;       // PSY6: report load every 30 blocks
 const VOICE_BUDGET_MIN = 8;           // never drop below 8 active voices
 const VOICE_BUDGET_DROP_PER_OVERAGE = 1; // drop 1 voice per 0.5ms overage
 
@@ -58,7 +58,7 @@ const V_HAT = 5, V_HAT_OPEN = 6, V_CLAP = 7, V_PERC = 8, V_SHAKER = 9;
 const V_TEXTURE = 10, V_RISER = 11, V_IMPACT = 12, V_SWEEP = 13;
 const V_ZAP = 14, V_BLIP = 15, V_DOWNLIFTER = 16, V_FM = 17;
 
-// ─── Fast polynomial tanh (Pade approximation, PSY5 pattern) ───────────────
+// ─── Fast polynomial tanh (Pade approximation, proven in the PSY device line) ──
 // 10x cheaper than Math.tanh (no transcendental call, just multiply + add).
 // Accuracy: max error ~0.005 in [-3, 3]; saturates cleanly outside.
 // Replaces the lookup-table fastTanh (which required a table + interpolation).
@@ -68,7 +68,7 @@ function fastTanh(x) {
   const x2 = x * x;
   return x * (27 + x2) / (27 + 9 * x2);
 }
-// Alias so existing call sites that use `ftanh` (PSY5 naming) also work.
+// Alias so existing call sites that use `ftanh` (earlier-device naming) also work.
 const ftanh = fastTanh;
 
 // ─── polyBLEP ──────────────────────────────────────────────────────────────
@@ -1704,7 +1704,7 @@ class MasterChain {
 
 // ─── Main Engine Processor ─────────────────────────────────────────────────
 
-class Psy4EngineProcessor extends AudioWorkletProcessor {
+class PsyEngineProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.sr = sampleRate;
@@ -1726,7 +1726,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
 
     // Voice pools (preallocated — no per-hit allocation)
     // REDUCED from 92 to 32 voices — saves memory, faster iteration
-    // psy5 uses 8 voices total and sounds fine. We use 32 for safety.
+    // The earlier psy5 device used 8 voices total and sounded fine. We use 32 for safety.
     this.kickPool = [];
     this.bassPool = [];
     this.leadPool = [];
@@ -1855,9 +1855,9 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
     this.statsTimer = 0;
     this.activeVoiceCount = 0;
 
-    // ── PSY5 RT-safe: preallocated active-voice tracking ──────────────────
+    // ── PSY6 RT-safe: preallocated active-voice tracking ──────────────────
     // Instead of allocating `const activeVoices = []` + `push({v, bus, stereo})`
-    // object literals every block (PSY5 violation), we preallocate flat typed
+    // object literals every block (RT contract violation), we preallocate flat typed
     // arrays. The active-voice list is rebuilt each block but the storage is
     // reused — zero per-block allocation.
     //
@@ -1871,7 +1871,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
     this.activeVoiceStereo = new Uint8Array(MAX_ACTIVE);
     this.activeVoiceCount = 0;
 
-    // ── PSY5 RT-safe: CPU load monitoring + dynamic voice budget ──────────
+    // ── PSY6 RT-safe: CPU load monitoring + dynamic voice budget ──────────
     // If process() takes > PROCESS_BUDGET_MS, we drop the lowest-priority
     // active voices to stay RT-safe. Reported to the main thread every
     // STATS_REPORT_BLOCKS (~10 Hz at 128-sample blocks / 44.1 kHz).
@@ -1888,7 +1888,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
     this.ST_SAMPLE = 4;
     this.ST_PAD = 5; // NEW: pad stereo (renderStereo with L/C/R panning)
 
-    // ── PSY5 RT-safe: preallocated pool table ──────────────────────────
+    // ── PSY6 RT-safe: preallocated pool table ──────────────────────────
     // Avoids the per-block `const pools = [[...]]` array literal allocation
     // that the previous version did. Each entry is [pool, bus, stereo].
     // Built once in the constructor after the voice pools exist.
@@ -2008,7 +2008,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
             };
           }
           this.samplesReady = Object.keys(this.samples).length > 0;
-          console.log('[PSY4 Engine] Samples loaded:', Object.keys(this.samples).length);
+          console.log('[PSY6 Engine] Samples loaded:', Object.keys(this.samples).length);
         }
         break;
     }
@@ -2294,7 +2294,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
   //   - Stats reported every STATS_REPORT_BLOCKS (~10 Hz) — not every block.
   //
   process(inputs, outputs) {
-    // ── PSY5: measure process() duration for CPU-load monitoring ──
+    // ── PSY6: measure process() duration for CPU-load monitoring ──
     const __procStart = (typeof performance !== 'undefined' && performance.now)
       ? performance.now() : 0;
 
@@ -2323,7 +2323,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
       this.eventCount--;
     }
 
-    // ── PSY5: collect active voices into PREALLOCATED flat arrays ──
+    // ── PSY6: collect active voices into PREALLOCATED flat arrays ──
     // (No `const activeVoices = []` + `push({v, bus, stereo})` — that was a
     //  per-block allocation. Now we write into this.activeVoiceRef/Bus/Stereo.)
     let activeCount = 0;
@@ -2332,7 +2332,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
     const stereoArr = this.activeVoiceStereo;
     const ST_MONO = this.ST_MONO, ST_HAAS = this.ST_HAAS, ST_LFO = this.ST_LFO, ST_PAN = this.ST_PAN, ST_SAMPLE = this.ST_SAMPLE, ST_PAD = this.ST_PAD;
     const MAX_ACTIVE = refArr.length;
-    // PSY5: voicePoolTable is built once in the constructor (no per-block
+    // PSY6: voicePoolTable is built once in the constructor (no per-block
     // allocation). Each entry is [pool, bus, stereo].
     const pools = this.voicePoolTable;
 
@@ -2353,7 +2353,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
     }
     this.activeVoiceCount = activeCount;
 
-    // ── PSY5: dynamic voice budget — drop lowest-priority voices if overloaded ──
+    // ── PSY6: dynamic voice budget — drop lowest-priority voices if overloaded ──
     // We track the smoothed CPU load. If we're over budget, deactivate the
     // highest-indexed active voices (these are FX/sample/texture — lowest
     // musical priority). Kick/bass/lead (lowest indices) are protected.
@@ -2526,7 +2526,7 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
       R[i] = mixR;
     }
 
-    // ── PSY5: CPU load monitoring + dynamic voice budget ──
+    // ── PSY6: CPU load monitoring + dynamic voice budget ──
     // Measure this block's process() time, smooth it, and adjust the voice
     // budget. If we're over budget, the next block drops voices at the top
     // of this function (see "dynamic voice budget" above).
@@ -2548,9 +2548,9 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // ── PSY5: report stats every STATS_REPORT_BLOCKS (~10 Hz) ──
+    // ── PSY6: report stats every STATS_REPORT_BLOCKS (~10 Hz) ──
     // (was every 0.1s via statsTimer accumulation — that worked but tied
-    //  reporting to wall-clock time, not block count. PSY5 uses block count
+    //  reporting to wall-clock time, not block count. The PSY device line uses block count
     //  for deterministic cadence independent of sample rate.)
     this.blockCounter++;
     if (this.blockCounter >= STATS_REPORT_BLOCKS) {
@@ -2572,4 +2572,4 @@ class Psy4EngineProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('psy4-engine', Psy4EngineProcessor);
+registerProcessor('psy-engine', PsyEngineProcessor);

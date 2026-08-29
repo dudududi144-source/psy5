@@ -1,7 +1,7 @@
 /**
  * MusicalLearningKernel — the real learning + composition loop.
  *
- * This is the public API PSY4 consumes:
+ * This is the public API PSY6 consumes:
  *
  *   observe → learn → compose → evaluate → reward → update
  *

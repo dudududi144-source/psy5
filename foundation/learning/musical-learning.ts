@@ -1,7 +1,7 @@
 /**
  * Musical learning — real weighted preference learning.
  *
- * Unlike PSY4's learning.ts (which is passive bookkeeping — vote counting),
+ * Unlike the earlier PSY4 device's passive learning bookkeeping (vote counting),
  * this module implements a transparent weighted-preference model that
  * ACTUALLY influences future candidate selection.
  *

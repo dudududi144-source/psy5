@@ -1831,8 +1831,8 @@ const WORKLETS={
       this.audioContext=new (window.AudioContext||window.webkitAudioContext)();
       
       // Load worklets
-      await this.audioContext.audioWorklet.addModule('../worklets/psy4-dsp.js');
-      await this.audioContext.audioWorklet.addModule('../worklets/psy4-engine.js');
+      await this.audioContext.audioWorklet.addModule('../worklets/psy-dsp.js');
+      await this.audioContext.audioWorklet.addModule('../worklets/psy-engine.js');
       
       this.loaded=true;
       toast('🔧 Worklets loaded');

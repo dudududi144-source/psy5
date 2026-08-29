@@ -3,7 +3,7 @@
  *
  * See audit/TRANSPORT_CANONICAL_DESIGN.md for the full contract.
  *
- * Design principles (from psy4, generalized):
+ * Design principles (from the PSY4 device, generalized):
  * 1. AudioContext.currentTime (via nowFn) is the ONLY musical clock.
  * 2. Anchor-based time — no accumulation drift.
  * 3. Immutable snapshots — consumers cannot modify state.

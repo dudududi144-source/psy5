@@ -1,5 +1,11 @@
 # FOUNDATION FREEZE
 
+> **Device-lineage note.** This repository is the home of the **PSY6** device.
+> The PSY4/PSY5 references below are historical records from the foundation
+> reconciliation gate (the provenance of the PSY device family: PSY4 → PSY5 →
+> PSY6). They describe the state of the external `psy-foundation` repo at
+> gate time; the current device is PSY6, built on psy-foundation.
+
 This document captures the exact state of `psy-foundation` at the start of the
 Reconciliation + Canonical Foundation Gate. It is the baseline against which
 all reconciliation work is measured.

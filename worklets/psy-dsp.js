@@ -1,5 +1,5 @@
 /**
- * PSY4 AudioWorklet DSP primitives.
+ * PSY6 AudioWorklet DSP primitives.
  *
  * REAL sample-accurate DSP, ported from PSY3:
  *   - pro_dsp.py moog()       → MoogFilterProcessor (4-stage tanh ladder)
@@ -11,7 +11,7 @@
  * These run in the audio render thread — sample-accurate, no main-thread jitter,
  * and implement the actual nonlinear DSP that BiquadFilter/WaveShaper cannot.
  *
- * Load via: audioContext.audioWorklet.addModule('/worklets/psy4-dsp.js')
+ * Load via: audioContext.audioWorklet.addModule('/worklets/psy-dsp.js')
  */
 
 // ─── Moog Ladder Filter (4-stage, tanh saturation + feedback) ──────────────

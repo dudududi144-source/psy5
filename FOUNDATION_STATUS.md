@@ -1,5 +1,11 @@
 # FOUNDATION STATUS
 
+> **Device-lineage note.** This repository is the home of the **PSY6** device.
+> The PSY4 references in this gate report are historical (PSY4 was the proven
+> reference runtime at reconciliation time; the device line is PSY4 → PSY5 →
+> PSY6). The current device, PSY6, consumes psy-foundation as its single
+> source of truth.
+
 ## Reconciliation Gate — Final Report
 
 ### Foundation HEAD

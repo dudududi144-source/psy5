@@ -1,175 +1,96 @@
-# psy-foundation
+# PSY6 — Psytrance Groovebox
 
-> Shared musical infrastructure for the PSY device family.
-> Not a device — the gravity every PSY device is built on.
+> PSY6 is a browser-based psytrance groovebox: pooled-voice audio engine,
+> worker-timed scheduler, deterministic pattern model. Built on
+> **psy-foundation** — the shared musical infrastructure of the PSY device
+> family.
 
-[![tests](https://img.shields.io/badge/tests-250%20pass-brightgreen)]()
-[![packages](https://img.shields.io/badge/packages-13-blue)]()
+[![device](https://img.shields.io/badge/device-PSY6-ffb454)]()
+[![foundation](https://img.shields.io/badge/built%20on-psy--foundation-4fd6c0)]()
 [![license](https://img.shields.io/badge/license-MIT-blue)]()
 
-SHARED TIME · SHARED PROTOCOL · SHARED MUSICAL LANGUAGE · SHARED MATERIAL ·
-SHARED LEARNING PRIMITIVES — but every device stays LOCAL, DETERMINISTIC,
-INDEPENDENT, MUSICAL.
+LOCAL · DETERMINISTIC · NO SERVER · NO TELEMETRY · NO BUILD STEP
 
-## Quick start
+## What is in this repository
+
+| Path | What it is |
+| --- | --- |
+| `index.html` | **The PSY6 device** — standalone groovebox (power-on screen, Perform/Sequencer/Sound/Mixer/Self-Gate tabs). Self-contained by design. |
+| `worklets/psy-engine.js` | PSY6 real-time audio engine — single `AudioWorkletProcessor` (transport, ring-buffer event queue, preallocated voice pool, master chain). |
+| `worklets/psy-dsp.js` | PSY6 DSP primitives — Moog ladder, polyBLEP saw/square, saturation, phaser, bus EQ (`AudioWorkletProcessor`s). |
+| `soundBank.js`, `factory-presets.js` | Factory preset data used by the device. |
+| `foundation/` | **psy-foundation** — shared packages (music, material, learning, dsp, scheduler, transport, protocol, device-sdk, analysis, fixtures, composition). Single source of truth for musical primitives. See `FOUNDATION_API.md`. |
+| `tests/` | Bun test suite for foundation packages. |
+| `playground/` | The PSY6 browser playground (deployed to Cloudflare Pages as project `psy6`). |
+| `data/` | scales / motifs / rhythms / presets / styles JSON. |
+| `samples/` | Drum one-shot sample manifest + WAVs. |
+| `tools/verify.mjs` | Repository verification gates (syntax + document structure) — run by CI before deploy. |
+
+## Run it
 
 ```bash
-bun install
-bun test          # 250 tests, all green
-bun run benchmarks  # real numbers
+# Device: open index.html directly in a browser, or
+npx serve .          # then visit /
+
+# Playground (what Cloudflare Pages deploys):
+open playground/index.html
 ```
 
-## Packages
+No bundler, no install, no account. Everything runs locally in your browser.
 
-### Library packages (10)
+## Tests
 
-| Package | Tests | Purpose |
-| --- | --- | --- |
-| [`transport`](packages/transport) | 12 | MusicalTransport: beat/bar/phase/bpm/confidence. Observer-fed PLL with octave-fold. |
-| [`protocol`](packages/protocol) | 8 | MusicalEvent types + Channel abstraction. Transport-agnostic messaging. |
-| [`device-sdk`](packages/device-sdk) | 12 | PsyDevice interface + DeviceHost + ReferenceDevice. |
-| [`fixtures`](packages/fixtures) | 10 | 14 synthetic radio fixtures (deterministic, seeded). |
-| [`scheduler`](packages/scheduler) | 18 | MusicalPlan → ScheduledEvent[]. Deterministic pure function. |
-| [`analysis`](packages/analysis) | 26 | onset/beat/tempo/pitch/chroma/spectral features. Multi-hypothesis tempo. |
-| [`music`](packages/music) | 43 | 18 scales, 18 chords, motif generator, variation ops, bass grammar, rhythm. |
-| [`material`](packages/material) | 23 | 9 material kinds + MaterialLibrary + seed library. |
-| [`learning`](packages/learning) | 32 | CONTEXT+ACTION+OUTCOME+REWARD. DO NOTHING is legal. Contextual bandit. |
-| [`dsp`](packages/dsp) | 39 | PolyBLEP osc, Moog filter, ADSR, delay, reverb, metering, voice pool. |
-
-### Research apps (3)
-
-| App | Tests | Purpose |
-| --- | --- | --- |
-| [`reference-lab`](apps/reference-lab) | 5 | Analyze audio → BPM, beat grid, phase, key, energy, features, sections. |
-| [`sync-lab`](apps/sync-lab) | 7 | Simulate devices A/B/C → sync, drift, relock verification. |
-| [`benchmark-lab`](apps/benchmark-lab) | 11 | Full benchmark suite: timing, runtime, music, learning. |
-
-**250 tests total. All green.**
-
-## Usage examples
-
-### Transport — track beats from a radio
-
-```typescript
-import { TransportClock } from '@psy-foundation/transport';
-
-const clock = new TransportClock({ initialBpm: 120 });
-
-// Radio observer pushes beats (NOT pulled):
-clock.observe({ observedAt: 1.0, strength: 1 });
-clock.observe({ observedAt: 1.4, strength: 1 }); // 150 bpm
-
-const snap = clock.snapshot(2.0);
-console.log(snap.bpm, snap.beat, snap.phase, snap.locked);
+```bash
+bun test             # foundation suite
+node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy)
 ```
 
-### Scheduler — convert a plan to events
+Current verified test counts and benchmark numbers live in
+[CHANGELOG.md](CHANGELOG.md) — every claim there is reproducible with the
+commands shown next to it.
 
-```typescript
-import { schedule, step, emptyTrack } from '@psy-foundation/scheduler';
+## Device identity
 
-const kick = emptyTrack('kick', 'kick', 36, 16, 0.5);
-kick.steps[0] = step({ on: true });
-kick.steps[4] = step({ on: true });
+The device is **PSY6**. The engine worklets are `worklets/psy-engine.js` and
+`worklets/psy-dsp.js` (registered processor names: `psy-engine`, `moog-filter`,
+`bl-saw`, `bl-square`, `saturation`, `phaser`, `bus-eq`).
 
-const events = schedule(
-  { tracks: [kick], fromBar: 0, barCount: 1 },
-  { originAudioTime: 0, bpm: 150, beatsPerBar: 4 }
-);
-```
-
-### Music — generate a motif
-
-```typescript
-import { generateMotif, getScale } from '@psy-foundation/music';
-
-const scale = getScale('phrygian-dominant');
-const notes = generateMotif(4, scale, { seed: 42, steps: 32 });
-// 32-step call-&-response motif in E phrygian dominant
-```
-
-### Learning — contextual bandit with abstention
-
-```typescript
-import { Learner } from '@psy-foundation/learning';
-
-const learner = new Learner({ policy: { epsilon: 0.1, abstainThreshold: 0.1 } });
-
-const decision = learner.decide(context, 'lead', [
-  { type: 'play', materialId: 'motif-1' },
-  { type: 'play', materialId: 'motif-2' },
-]);
-
-if (decision.action.type === 'do-nothing') {
-  // The system chose to stay silent — sometimes the best move.
-}
-
-learner.recordOutcome(context, 'lead', decision.action, { type: 'sounded', durationSec: 0.5 }, audioTime);
-```
-
-### DSP — pooled voice synthesis
-
-```typescript
-import { PolyBlepOsc, MoogLadder, Adsr, VoicePool } from '@psy-foundation/dsp';
-
-const osc = new PolyBlepOsc({ waveform: 'saw', sampleRate: 44100, frequency: 220 });
-const filter = new MoogLadder(44100, 800, 0.7);
-const env = new Adsr({ sampleRate: 44100, attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.3 });
-
-// Process one sample:
-const sample = filter.process(env.process() * osc.process());
-```
+Historical documents in this repository (`FOUNDATION_STATUS.md`,
+`FOUNDATION_FREEZE.md`) reference earlier devices in the family — **PSY4** and
+**PSY5** — as provenance for design decisions. Those are historical records;
+the current device and all engine code are PSY6.
 
 ## Architecture
 
 ```
-                    psy-foundation
-                          │
-             ┌────────────┼────────────┐
-             │            │            │
-          TRANSPORT     MUSIC        AUDIO
-             │            │            │
-             └────────────┼────────────┘
-                          │
-                      DEVICE SDK
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-       PSY6             DRUMS             SAMPLER
-        │                 │                 │
-        └─────────────────┼─────────────────┘
-                          │
-                         FX
-                          │
-                    FUTURE DEVICES
+psy-foundation (shared musical primitives)
+        ↑
+      PSY6 device
+   ├── model        patterns, steps, scales, deterministic RNG
+   ├── scheduler    worker-timer + lookahead loop
+   ├── engine       pooled voices (synth 20 / drum 24), master chain
+   └── UI           Perform · Sequencer · Sound · Mixer · Self-Gate
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full specification and
+[FOUNDATION_API.md](FOUNDATION_API.md) for the versioned foundation API.
+
+## Deployment
+
+- `.github/workflows/pages-deployment.yaml` — pushes to `main` that touch
+  `playground/**` first run the `verify` gates, then deploy `playground/` to
+  Cloudflare Pages (project `psy6`). Requires the repository secrets
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to be configured.
 
 ## Non-negotiable rules
 
-1. **Investigation before code.**
-2. **One source of truth** per piece of musical state.
-3. **Radio is observer, not clock.**
-4. **Transport ≠ renderer ≠ radio ≠ UI.**
-5. **No device policy.**
-6. **Every claim has evidence.**
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
-
-## Benchmarks
-
-Run `bun apps/benchmark-lab/src/index.ts` for the full suite. Headline numbers:
-
-- **Transport accuracy**: perfect-150 median phase error **0.01ms**, P95 3.7ms
-- **Sparse fix**: sparse fixture correctly estimates 150 BPM (was 75 in M1)
-- **Runtime**: transport snapshot < 10μs, DSP osc < 1μs
-- **Learning**: abstention works — DO NOTHING chosen when best reward < threshold
-
-## Relation to the PSY family
-
-- **NOVA** — generation/orchestration (agent layer). Sibling, not a dependency.
-- **FORGE** — validation/CI/delivery. Foundation publishes a benchmark contract that Forge consumes.
-- **PSY DEVICES** — products built on this foundation.
+1. One source of truth per piece of musical state — the device consumes
+   `foundation/`, it does not re-implement it.
+2. Transport is not renderer, renderer is not UI.
+3. No device policy — PSY6 is built from foundation primitives.
+4. Every claim has evidence.
+5. The `process()` hot path is allocation-free.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT.
