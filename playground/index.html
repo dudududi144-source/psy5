@@ -1,113 +1,4 @@
-<
-/* ── Worklets Integration ─────────────────────────────────── */
-const WORKLETS={
-  loaded:false,
-  audioContext:null,
-  async load(){
-    if(this.loaded) return;
-    try{
-      // Create AudioContext
-      this.audioContext=new (window.AudioContext||window.webkitAudioContext)();
-      
-      // Load worklets
-      await this.audioContext.audioWorklet.addModule('../worklets/psy4-dsp.js');
-      await this.audioContext.audioWorklet.addModule('../worklets/psy4-engine.js');
-      
-      this.loaded=true;
-      toast('🔧 Worklets loaded');
-    }catch(e){
-      toast('❌ Failed to load Worklets');
-    }
-  },
-  getAudioContext(){
-    if(!this.loaded) return null;
-    return this.audioContext;
-  }
-};
-// Load Worklets on startup
-WORKLETS.load();
-!DOCTYPE
-<!-- Learning System -->
-<section class="panel">
-<h2>🧠 Learning</h2>
-<div id="learningInsights" style="font-size:12px;color:var(--dim);margin-bottom:10px">
-No insights yet. Submit feedback to start learning.
-</div>
-<button id="applyLearnedBtn" style="padding:8px 16px;font-size:12px;width:100%">🧠 Apply Learned Preferences</button>
-</section>
-<!-- Sound Bank -->
-<section class="panel">
-<h2>🎛️ Sound Bank</h2>
-<div style="margin-bottom:10px">
-<select id="sbCategory" style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
-<option value="drums">🥁 Drums (28)</option>
-<option value="bass">🎸 Bass (8)</option>
-<option value="lead">🎹 Lead (8)</option>
-<option value="pad">🎛️ Pad (6)</option>
-<option value="arp">🎶 Arp (4)</option>
-<option value="fx">✨ FX (3)</option>
-</select>
-</div>
-<div id="sbItems" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
-</div>
-<button id="sbApplyBtn" style="padding:8px 16px;font-size:12px;width:100%;margin-top:10px">🎛️ Apply Selected</button>
-</section>
-<!-- Keyboard Shortcuts -->
-<section class="panel">
-<h2>⌨️ Shortcuts</h2>
-<div style="font-size:12px;color:var(--dim);line-height:1.8">
-<div style="display:flex;justify-content:space-between"><span>Play / Stop</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">Space</kbd></div>
-<div style="display:flex;justify-content:space-between"><span>Play lead notes</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">A W S E D F T G Y H U J K</kbd></div>
-<div style="display:flex;justify-content:space-between"><span>Toggle A/B variant</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">Click A/B</kbd></div>
-<div style="display:flex;justify-content:space-between"><span>Export preset</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">📤 Button</kbd></div>
-<div style="display:flex;justify-content:space-between"><span>Import preset</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">📥 Button</kbd></div>
-<div style="display:flex;justify-content:space-between"><span>MIDI init</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">🎹 Button</kbd></div>
-</div>
-</section>
-<!-- Mixer -->
-<section class="panel">
-<h2>🎚️ Mixer</h2>
-<div id="mixerChannels" style="display:flex;flex-direction:column;gap:8px">
-<div style="display:flex;align-items:center;gap:8px;font-size:12px">
-<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">MASTER</span>
-<input type="range" id="mixerMaster" min="0" max="1" step="0.01" value="0.8" style="flex:1;accent-color:var(--cyan)">
-<span id="mixerMasterVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">80%</span>
-</div>
-<div style="display:flex;align-items:center;gap:8px;font-size:12px">
-<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">DELAY</span>
-<input type="range" id="mixerDelay" min="0" max="1" step="0.01" value="0.34" style="flex:1;accent-color:var(--purple)">
-<span id="mixerDelayVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">34%</span>
-</div>
-<div style="display:flex;align-items:center;gap:8px;font-size:12px">
-<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">REVERB</span>
-<input type="range" id="mixerReverb" min="0" max="1" step="0.01" value="0.22" style="flex:1;accent-color:var(--magenta)">
-<span id="mixerReverbVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">22%</span>
-</div>
-</div>
-</section>
-<!-- Pattern Editor -->
-<section class="panel">
-<h2>🎼 Pattern Editor</h2>
-<div style="margin-bottom:10px">
-<select id="peTrack" style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
-<option value="kick">🥁 Kick</option>
-<option value="bass">🎸 Bass</option>
-<option value="lead">🎹 Lead</option>
-<option value="hat">🎩 Hat</option>
-</select>
-</div>
-<div id="peGrid" style="display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin-bottom:10px">
-</div>
-<div style="display:flex;gap:6px">
-<button id="peClearBtn" style="flex:1;padding:8px;font-size:12px">🗑️ Clear</button>
-<button id="peRandomBtn" style="flex:1;padding:8px;font-size:12px">🎲 Random</button>
-</div>
-</section>
-
-
-
-
- html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -616,6 +507,83 @@ pointer-events:none;
 
 <main>
 <div class="grid">
+<!-- Learning System -->
+<section class="panel">
+<h2>🧠 Learning</h2>
+<div id="learningInsights" style="font-size:12px;color:var(--dim);margin-bottom:10px">
+No insights yet. Submit feedback to start learning.
+</div>
+<button id="applyLearnedBtn" style="padding:8px 16px;font-size:12px;width:100%">🧠 Apply Learned Preferences</button>
+</section>
+<!-- Sound Bank -->
+<section class="panel">
+<h2>🎛️ Sound Bank</h2>
+<div style="margin-bottom:10px">
+<select id="sbCategory" style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
+<option value="drums">🥁 Drums (28)</option>
+<option value="bass">🎸 Bass (8)</option>
+<option value="lead">🎹 Lead (8)</option>
+<option value="pad">🎛️ Pad (6)</option>
+<option value="arp">🎶 Arp (4)</option>
+<option value="fx">✨ FX (3)</option>
+</select>
+</div>
+<div id="sbItems" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
+</div>
+<button id="sbApplyBtn" style="padding:8px 16px;font-size:12px;width:100%;margin-top:10px">🎛️ Apply Selected</button>
+</section>
+<!-- Keyboard Shortcuts -->
+<section class="panel">
+<h2>⌨️ Shortcuts</h2>
+<div style="font-size:12px;color:var(--dim);line-height:1.8">
+<div style="display:flex;justify-content:space-between"><span>Play / Stop</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">Space</kbd></div>
+<div style="display:flex;justify-content:space-between"><span>Play lead notes</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">A W S E D F T G Y H U J K</kbd></div>
+<div style="display:flex;justify-content:space-between"><span>Toggle A/B variant</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">Click A/B</kbd></div>
+<div style="display:flex;justify-content:space-between"><span>Export preset</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">📤 Button</kbd></div>
+<div style="display:flex;justify-content:space-between"><span>Import preset</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">📥 Button</kbd></div>
+<div style="display:flex;justify-content:space-between"><span>MIDI init</span><kbd style="background:rgba(150,90,255,.2);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px">🎹 Button</kbd></div>
+</div>
+</section>
+<!-- Mixer -->
+<section class="panel">
+<h2>🎚️ Mixer</h2>
+<div id="mixerChannels" style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">MASTER</span>
+<input type="range" id="mixerMaster" min="0" max="1" step="0.01" value="0.8" style="flex:1;accent-color:var(--cyan)">
+<span id="mixerMasterVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">80%</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">DELAY</span>
+<input type="range" id="mixerDelay" min="0" max="1" step="0.01" value="0.34" style="flex:1;accent-color:var(--purple)">
+<span id="mixerDelayVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">34%</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+<span style="width:60px;font-family:var(--font-mono);color:var(--dim)">REVERB</span>
+<input type="range" id="mixerReverb" min="0" max="1" step="0.01" value="0.22" style="flex:1;accent-color:var(--magenta)">
+<span id="mixerReverbVal" style="width:30px;font-family:var(--font-mono);font-size:11px;color:var(--dim)">22%</span>
+</div>
+</div>
+</section>
+<!-- Pattern Editor -->
+<section class="panel">
+<h2>🎼 Pattern Editor</h2>
+<div style="margin-bottom:10px">
+<select id="peTrack" style="width:100%;padding:8px;background:rgba(8,4,18,.7);border:1px solid var(--panel-brd);border-radius:8px;color:var(--text);font-family:var(--font-body);font-size:13px">
+<option value="kick">🥁 Kick</option>
+<option value="bass">🎸 Bass</option>
+<option value="lead">🎹 Lead</option>
+<option value="hat">🎩 Hat</option>
+</select>
+</div>
+<div id="peGrid" style="display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin-bottom:10px">
+</div>
+<div style="display:flex;gap:6px">
+<button id="peClearBtn" style="flex:1;padding:8px;font-size:12px">🗑️ Clear</button>
+<button id="peRandomBtn" style="flex:1;padding:8px;font-size:12px">🎲 Random</button>
+</div>
+</section>
+
 <div class="panel transport">
 <button id="playBtn" aria-label="Play / Stop">▶</button>
 <div class="meta">
@@ -1225,14 +1193,6 @@ const RECORDER={
           this.chunks.push(e.data);
         }
       };
-// Add RECORDER.enable() and RECORDER.disable() calls
-RECORDER.enable();
-RECORDER.disable();
-
-// Add RECORDER.start() and RECORDER.stop() calls
-RECORDER.start();
-RECORDER.stop();
-
       
       this.mediaRecorder.onstop=()=>{
         const blob=new Blob(this.chunks,{type:'audio/webm'});
@@ -1274,8 +1234,8 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       RECORDER.toggle();
     }
-  });
-}
+  }
+});
 const WORKER_TIMER_SRC=`let iv=null;self.onmessage=e=>{if(e.data==='start'){iv=setInterval(()=>self.postMessage('tick'),25)}else if(e.data==='stop'){clearInterval(iv);iv=null}};`;
 function makeTimerWorker(cb){
 try{
@@ -1286,57 +1246,6 @@ w.postMessage('start');
 return {stop:()=>{w.postMessage('stop');w.terminate();}};
 }catch(e){
 /* Fallback to setInterval if Worker not available */
-/* ── Collaboration Mode ───────────────────────────────────── */
-const COLLAB={
-  enabled:false,
-  sessionId:null,
-  peers:[],
-  async enable(){
-    if(this.enabled) return;
-    try{
-      // Generate a session ID
-      this.sessionId='psy6-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
-      this.enabled=true;
-      toast('🤝 Collaboration Mode enabled');
-      toast('📋 Session ID: '+this.sessionId);
-    }catch(e){
-      toast('❌ Failed to enable Collaboration Mode');
-    }
-  },
-  disable(){
-    if(!this.enabled) return;
-    this.enabled=false;
-    this.sessionId=null;
-    this.peers=[];
-    toast('🤝 Collaboration Mode disabled');
-  },
-  toggle(){
-    if(this.enabled){
-      this.disable();
-    }else{
-      this.enable();
-    }
-  },
-  getSessionId(){
-    return this.sessionId;
-  },
-  getPeers(){
-    return this.peers;
-  }
-};
-// Add COLLAB.enable() and COLLAB.disable() calls
-COLLAB.enable();
-COLLAB.disable();
-
-// Add keyboard shortcut for collaboration (C)
-document.addEventListener('keydown',(e)=>{
-  if(e.key==='c'&&!e.ctrlKey&&!e.metaKey){
-    const tag=(e.target.tagName||'').toLowerCase();
-    if(tag!=='input'&&tag!=='textarea'){
-      COLLAB.toggle();
-    }
-  });
-}
 const id=setInterval(cb,25);
 return {stop:()=>clearInterval(id)};
 }
@@ -1586,8 +1495,8 @@ if(e.key.toLowerCase()==="m"){
 // Theme toggle shortcut (T)
 if(e.key.toLowerCase()==="t"){
   $("themeBtn").click();
-});
 }
+});
 $("playBtn").addEventListener("click",()=>isPlaying?stopSeq():startSeq());
 let volTimeout=null;
 $("vol").addEventListener("input",()=>{
@@ -1596,7 +1505,6 @@ volTimeout=setTimeout(()=>{
 if(masterGain) masterGain.gain.setTargetAtTime(parseFloat($("vol").value),audioCtx.currentTime,0.05);
 },50);
 });
-}
 document.querySelectorAll(".abToggle button").forEach(b=>{
 b.addEventListener("click",()=>{
 activeVariant=b.dataset.v;
@@ -1604,7 +1512,6 @@ document.querySelectorAll(".abToggle button").forEach(x=>x.classList.toggle("on"
 refreshMeta();
 });
 });
-}
 function refreshMeta(){
 const p=activePreset();
 $("nowName").textContent=p.name+" · variant "+activeVariant;
@@ -1643,8 +1550,84 @@ ts:new Date().toISOString()
 };
 try{
 const store=JSON.parse(localStorage.getItem("psy6_feedback")||"[]");
-store.push(payload);\nLEARNING.addFeedback(payload); localStorage.setItem("psy6_feedback",JSON.stringify(store));
-}catch(err){/* localStorage full or unavailable */
+store.push(payload);
+LEARNING.addFeedback(payload);
+localStorage.setItem("psy6_feedback",JSON.stringify(store));
+}catch(err){/* localStorage full or unavailable */}
+if(FEEDBACK_ENDPOINT){
+try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */ }
+}
+bumpStat("fb");
+toast("✔ Feedback recorded — thank you!");
+e.target.reset();
+fb.genre=0; fb.quality=0; fb.issues.clear(); fb.vote=null;
+document.querySelectorAll(".rateBtns button,.chip").forEach(x=>x.classList.remove("on"));
+});
+function bumpStat(kind){
+const k="psy6_stat_"+kind;
+try{
+const n=parseInt(localStorage.getItem(k)||"0",10)+1;
+localStorage.setItem(k,String(n));
+}catch(e){/* localStorage unavailable */}
+paintStats();
+}
+function paintStats(){
+$("statPlays").textContent=localStorage.getItem("psy6_stat_plays")||"0";
+$("statFb").textContent=localStorage.getItem("psy6_stat_fb")||"0";
+}
+let toastTimer=null;
+function toast(msg){
+const t=$("toast"); t.textContent=msg; t.classList.add("show");
+clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
+}
+/* ── Collaboration Mode ───────────────────────────────────── */
+const COLLAB={
+  enabled:false,
+  sessionId:null,
+  peers:[],
+  async enable(){
+    if(this.enabled) return;
+    try{
+      // Generate a session ID
+      this.sessionId='psy6-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+      this.enabled=true;
+      toast('🤝 Collaboration Mode enabled');
+      toast('📋 Session ID: '+this.sessionId);
+    }catch(e){
+      toast('❌ Failed to enable Collaboration Mode');
+    }
+  },
+  disable(){
+    if(!this.enabled) return;
+    this.enabled=false;
+    this.sessionId=null;
+    this.peers=[];
+    toast('🤝 Collaboration Mode disabled');
+  },
+  toggle(){
+    if(this.enabled){
+      this.disable();
+    }else{
+      this.enable();
+    }
+  },
+  getSessionId(){
+    return this.sessionId;
+  },
+  getPeers(){
+    return this.peers;
+  }
+};
+// Add keyboard shortcut for collaboration (C)
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='c'&&!e.ctrlKey&&!e.metaKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag!=='input'&&tag!=='textarea'){
+      COLLAB.toggle();
+    }
+  }
+});
+
 /* ── AI Assistant ─────────────────────────────────────────── */
 const AI={
   enabled:false,
@@ -1703,10 +1686,6 @@ const AI={
     return this.suggestions;
   }
 };
-// Add AI.enable() and AI.disable() calls
-AI.enable();
-AI.disable();
-
 // Add keyboard shortcut for AI Assistant (A)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='a'&&!e.ctrlKey&&!e.metaKey){
@@ -1714,10 +1693,10 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       AI.toggle();
     }
-  });
-}
-if(FEEDBACK_ENDPOINT){
-try{ await fetch(FEEDBACK_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }catch(err){ /* offline-first */
+  }
+});
+
+
 /* ── Cloud Sync ───────────────────────────────────────────── */
 const CLOUD={
   enabled:false,
@@ -1766,11 +1745,6 @@ const CLOUD={
     return this.lastSync;
   }
 };
-// Add CLOUD.enable(), CLOUD.disable(), and CLOUD.sync() calls
-CLOUD.enable();
-CLOUD.disable();
-CLOUD.sync();
-
 // Add keyboard shortcut for cloud sync (S)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='s'&&!e.ctrlKey&&!e.metaKey){
@@ -1778,20 +1752,10 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       CLOUD.toggle();
     }
-  });
-}
-bumpStat("fb");
-toast("✔ Feedback recorded — thank you!");
-e.target.reset();
-fb.genre=0; fb.quality=0; fb.issues.clear(); fb.vote=null;
-document.querySelectorAll(".rateBtns button,.chip").forEach(x=>x.classList.remove("on"));
+  }
 });
-function bumpStat(kind){
-const k="psy6_stat_"+kind;
-try{
-const n=parseInt(localStorage.getItem(k)||"0",10)+1;
-localStorage.setItem(k,String(n));
-}catch(e){/* localStorage unavailable */
+
+
 /* ── MIDI Learn Mode ──────────────────────────────────────── */
 const MIDILEARN={
   enabled:false,
@@ -1840,12 +1804,9 @@ const MIDILEARN={
     }catch(e){/* localStorage unavailable */}
   }
 };
-// Add MIDILEARN.enable() and MIDILEARN.disable() calls
-MIDILEARN.enable();
-MIDILEARN.disable();
-
 // Load MIDI mappings on startup
 MIDILEARN.loadMappings();
+
 // Add keyboard shortcut for MIDI Learn Mode (L)
 document.addEventListener('keydown',(e)=>{
   if(e.key==='l'&&!e.ctrlKey&&!e.metaKey){
@@ -1853,20 +1814,39 @@ document.addEventListener('keydown',(e)=>{
     if(tag!=='input'&&tag!=='textarea'){
       MIDILEARN.toggle();
     }
-  });
-}
-paintStats();
-}
-function paintStats(){
-$("statPlays").textContent=localStorage.getItem("psy6_stat_plays")||"0";
-$("statFb").textContent=localStorage.getItem("psy6_stat_fb")||"0";
-}
-let toastTimer=null;
-function toast(msg){
-const t=$("toast"); t.textContent=msg; t.classList.add("show");
-clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2600);
-}
+  }
+});
+
 buildPresets(); buildSteps(); buildPads(); refreshMeta(); paintStats(); sizeScope();
+</script>
+<script>
+/* ── Worklets Integration ─────────────────────────────────── */
+const WORKLETS={
+  loaded:false,
+  audioContext:null,
+  async load(){
+    if(this.loaded) return;
+    try{
+      // Create AudioContext
+      this.audioContext=new (window.AudioContext||window.webkitAudioContext)();
+      
+      // Load worklets
+      await this.audioContext.audioWorklet.addModule('../worklets/psy4-dsp.js');
+      await this.audioContext.audioWorklet.addModule('../worklets/psy4-engine.js');
+      
+      this.loaded=true;
+      toast('🔧 Worklets loaded');
+    }catch(e){
+      toast('❌ Failed to load Worklets');
+    }
+  },
+  getAudioContext(){
+    if(!this.loaded) return null;
+    return this.audioContext;
+  }
+};
+// Load Worklets on startup
+WORKLETS.load();
 </script>
 
 <!-- Footer -->

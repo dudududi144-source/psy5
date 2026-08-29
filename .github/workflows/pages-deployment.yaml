@@ -5,10 +5,29 @@ on:
     branches: [main]
     paths:
       - 'playground/**'
+      - 'worklets/**'
+      - 'tools/**'
+      - '.github/workflows/*'
   workflow_dispatch:
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    name: Verify (syntax + structure gates)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify JS + HTML gates
+        run: node tools/verify.mjs
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -17,7 +36,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
