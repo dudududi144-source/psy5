@@ -58,6 +58,28 @@ const V_HAT = 5, V_HAT_OPEN = 6, V_CLAP = 7, V_PERC = 8, V_SHAKER = 9;
 const V_TEXTURE = 10, V_RISER = 11, V_IMPACT = 12, V_SWEEP = 13;
 const V_ZAP = 14, V_BLIP = 15, V_DOWNLIFTER = 16, V_FM = 17;
 
+// ─── Priority-tier voice stealing (PSY6) ───────────────────────────────────
+// Tiers: 0 = kick/bass (never stolen) · 1 = hats/snare/clap/perc
+//        2 = lead/arp/pluck            · 3 = pad/fx/texture (stolen first)
+// When a pool is exhausted, the OLDEST ACTIVE voice of the LOWEST-PRIORITY
+// non-empty tier above tier 0 (scan 3 → 2 → 1) is stolen. Tier-0 requests
+// retrigger their dedicated voice — a kick/bass never waits, never drops.
+const DEFAULT_POOL_SIZES = {
+  kick: 4, bass: 2, lead: 4, acid: 2, pad: 2, hat: 4,
+  clap: 2, perc: 4, shaker: 2, texture: 2, fx: 4, fm: 2,
+};
+const DEFAULT_VOICE_TIER = new Uint8Array(32);
+DEFAULT_VOICE_TIER[V_KICK] = 0; DEFAULT_VOICE_TIER[V_BASS] = 0;
+DEFAULT_VOICE_TIER[V_HAT] = 1; DEFAULT_VOICE_TIER[V_HAT_OPEN] = 1;
+DEFAULT_VOICE_TIER[V_CLAP] = 1; DEFAULT_VOICE_TIER[V_PERC] = 1;
+DEFAULT_VOICE_TIER[V_SHAKER] = 1;
+DEFAULT_VOICE_TIER[V_LEAD] = 2; DEFAULT_VOICE_TIER[V_ACID] = 2;
+DEFAULT_VOICE_TIER[V_FM] = 2;
+DEFAULT_VOICE_TIER[V_PAD] = 3; DEFAULT_VOICE_TIER[V_TEXTURE] = 3;
+DEFAULT_VOICE_TIER[V_RISER] = 3; DEFAULT_VOICE_TIER[V_IMPACT] = 3;
+DEFAULT_VOICE_TIER[V_SWEEP] = 3; DEFAULT_VOICE_TIER[V_ZAP] = 3;
+DEFAULT_VOICE_TIER[V_BLIP] = 3; DEFAULT_VOICE_TIER[V_DOWNLIFTER] = 3;
+
 // ─── Fast polynomial tanh (Pade approximation, proven in the PSY device line) ──
 // 10x cheaper than Math.tanh (no transcendental call, just multiply + add).
 // Accuracy: max error ~0.005 in [-3, 3]; saturates cleanly outside.
@@ -1705,8 +1727,14 @@ class MasterChain {
 // ─── Main Engine Processor ─────────────────────────────────────────────────
 
 class PsyEngineProcessor extends AudioWorkletProcessor {
-  constructor() {
+  // Init-time parameters (PSY6): pool sizes and per-voice tier assignment are
+  // configurable via `new AudioWorkletNode(ctx, 'psy-engine', {
+  //   processorOptions: { poolSizes: {...}, tiers: { [voiceId]: 0..3 } } })`
+  // and re-tunable at runtime via a `config` port message (presets).
+  constructor(options) {
     super();
+    const po = (options && options.processorOptions) || {};
+    this.poolSizes = Object.assign({}, DEFAULT_POOL_SIZES, po.poolSizes || {});
     this.sr = sampleRate;
 
     // Transport
@@ -1739,18 +1767,18 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
     this.texturePool = [];
     this.fxPool = [];
     this.fmPool = [];
-    for (let i = 0; i < 4; i++) this.kickPool.push(new KickVoice());    // was 8
-    for (let i = 0; i < 2; i++) this.bassPool.push(new BassVoice());    // was 4
-    for (let i = 0; i < 4; i++) this.leadPool.push(new LeadVoice());    // was 8
-    for (let i = 0; i < 2; i++) this.acidPool.push(new AcidVoice());    // was 4
-    for (let i = 0; i < 2; i++) this.padPool.push(new PadVoice());      // was 4
-    for (let i = 0; i < 4; i++) this.hatPool.push(new HatVoice());      // was 8
-    for (let i = 0; i < 2; i++) this.clapPool.push(new ClapVoice());    // was 4
-    for (let i = 0; i < 4; i++) this.percPool.push(new PercVoice());    // was 8
-    for (let i = 0; i < 2; i++) this.shakerPool.push(new ShakerVoice());// was 4
-    for (let i = 0; i < 2; i++) this.texturePool.push(new TextureVoice());// was 4
-    for (let i = 0; i < 4; i++) this.fxPool.push(new FXVoice());        // was 8
-    for (let i = 0; i < 2; i++) this.fmPool.push(new FMVoice());        // PSY3 FM acid voice
+    for (let i = 0; i < this.poolSizes.kick; i++) this.kickPool.push(new KickVoice());
+    for (let i = 0; i < this.poolSizes.bass; i++) this.bassPool.push(new BassVoice());
+    for (let i = 0; i < this.poolSizes.lead; i++) this.leadPool.push(new LeadVoice());
+    for (let i = 0; i < this.poolSizes.acid; i++) this.acidPool.push(new AcidVoice());
+    for (let i = 0; i < this.poolSizes.pad; i++) this.padPool.push(new PadVoice());
+    for (let i = 0; i < this.poolSizes.hat; i++) this.hatPool.push(new HatVoice());
+    for (let i = 0; i < this.poolSizes.clap; i++) this.clapPool.push(new ClapVoice());
+    for (let i = 0; i < this.poolSizes.perc; i++) this.percPool.push(new PercVoice());
+    for (let i = 0; i < this.poolSizes.shaker; i++) this.shakerPool.push(new ShakerVoice());
+    for (let i = 0; i < this.poolSizes.texture; i++) this.texturePool.push(new TextureVoice());
+    for (let i = 0; i < this.poolSizes.fx; i++) this.fxPool.push(new FXVoice());
+    for (let i = 0; i < this.poolSizes.fm; i++) this.fmPool.push(new FMVoice());
     // Total: 34 voices (was 64+28=92)
 
     // Sample voice pools — DISABLED (no samples loaded, saves 28 voices)
@@ -1910,8 +1938,40 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
       [this.clapSamplePool, 0, this.ST_SAMPLE],
     ];
 
+    // ── Priority-tier voice stealing state (PSY6) ──
+    // Pool registry: [pool, representativeVoiceId]. tierPools is derived from
+    // voiceTier and rebuilt on config changes (never in process()).
+    this.voiceTier = new Uint8Array(32);
+    this.voiceTier.set(DEFAULT_VOICE_TIER);
+    if (po.tiers) {
+      for (const k in po.tiers) {
+        const id = +k;
+        if (id >= 0 && id < 32 && po.tiers[k] >= 0 && po.tiers[k] <= 3) this.voiceTier[id] = po.tiers[k];
+      }
+    }
+    this.poolRegistry = [
+      [this.kickPool, V_KICK], [this.bassPool, V_BASS],
+      [this.hatPool, V_HAT], [this.clapPool, V_CLAP],
+      [this.percPool, V_PERC], [this.shakerPool, V_SHAKER],
+      [this.leadPool, V_LEAD], [this.acidPool, V_ACID], [this.fmPool, V_FM],
+      [this.padPool, V_PAD], [this.texturePool, V_TEXTURE], [this.fxPool, V_RISER],
+    ];
+    this.tierPools = [[], [], [], []];
+    this.rebuildTierPools();
+    this._voiceSeq = 0;          // monotonic trigger order (oldest-active tracking)
+    this.stealCount = new Uint32Array(4);  // evidence: steals per victim tier
+
     // Command handler
     this.port.onmessage = (e) => this.handleMessage(e.data);
+  }
+
+  rebuildTierPools() {
+    const tp = this.tierPools;
+    for (let t = 0; t < 4; t++) tp[t].length = 0;
+    for (let i = 0; i < this.poolRegistry.length; i++) {
+      const tier = this.voiceTier[this.poolRegistry[i][1]] & 3;
+      tp[tier].push(this.poolRegistry[i][0]);
+    }
   }
 
   handleMessage(msg) {
@@ -1947,6 +2007,38 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
         if (msg.delayWet !== undefined) this.delay.setWet(msg.delayWet);
         if (msg.delayFeedback !== undefined) this.delay.setFeedback(msg.delayFeedback);
         break;
+      case 'config': {
+        // Preset-tunable engine configuration (PSY6).
+        // msg.poolSizes: { kick, bass, lead, ... } — pools are rebuilt in place
+        // (voicePoolTable keeps pointing at the same arrays).
+        // msg.tiers: { [voiceId]: 0..3 } — per-voice tier reassignment.
+        if (msg.poolSizes) {
+          const ps = Object.assign({}, this.poolSizes, msg.poolSizes);
+          this.poolSizes = ps;
+          const defs = [
+            ['kickPool', 'kick', KickVoice], ['bassPool', 'bass', BassVoice],
+            ['leadPool', 'lead', LeadVoice], ['acidPool', 'acid', AcidVoice],
+            ['padPool', 'pad', PadVoice], ['hatPool', 'hat', HatVoice],
+            ['clapPool', 'clap', ClapVoice], ['percPool', 'perc', PercVoice],
+            ['shakerPool', 'shaker', ShakerVoice], ['texturePool', 'texture', TextureVoice],
+            ['fxPool', 'fx', FXVoice], ['fmPool', 'fm', FMVoice],
+          ];
+          for (const [poolName, key, Cls] of defs) {
+            const pool = this[poolName];
+            pool.length = 0;
+            const n = Math.max(1, ps[key] | 0);
+            for (let i = 0; i < n; i++) pool.push(new Cls());
+          }
+        }
+        if (msg.tiers) {
+          for (const k in msg.tiers) {
+            const id = +k;
+            if (id >= 0 && id < 32 && msg.tiers[k] >= 0 && msg.tiers[k] <= 3) this.voiceTier[id] = msg.tiers[k];
+          }
+        }
+        this.rebuildTierPools();
+        break;
+      }
       case 'setParams':
         // PERF-FIX: Batched parameter update — apply world + fx + bpm + macros
         // in ONE message (vs. 4 separate postMessages). Each section is optional
@@ -2066,7 +2158,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
               this.phraseKickIdx = 0;
             }
             const kickName = selectedNames[this.phraseKickIdx];
-            const v = this.getFreeVoice(this.kickSamplePool);
+            const v = this.getFreeVoice(this.kickSamplePool, voiceId);
             if (v) {
               const samp = this.samples[kickName];
               // Micro variation: ±0.3% pitch, ±3% gain (imperceptible but organic)
@@ -2079,11 +2171,11 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
               this.sampleUsage[kickName] = (this.sampleUsage[kickName] || 0) + 1;
             }
           } else {
-            const v = this.getFreeVoice(this.kickPool);
+            const v = this.getFreeVoice(this.kickPool, voiceId);
             if (v) v.trigger(t, velocity, wp.kickFundamental, wp.kickDecay, sr);
           }
         } else {
-          const v = this.getFreeVoice(this.kickPool);
+          const v = this.getFreeVoice(this.kickPool, voiceId);
           if (v) v.trigger(t, velocity, wp.kickFundamental, wp.kickDecay, sr);
         }
         // Trigger sidechain — DEEPER duck for real psytrance groove
@@ -2095,7 +2187,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
         // PURE SYNTH BASS — uses WORLD-SPECIFIC parameters (not hardcoded!)
         // BEFORE: cutoffStart: 800, cutoffEnd: 200, resonance: 2 (same for all worlds)
         // AFTER: uses wp.bassCutoff, wp.bassResonance from world params
-        const v = this.getFreeVoice(this.bassPool);
+        const v = this.getFreeVoice(this.bassPool, voiceId);
         if (v) v.trigger(t, note, duration, velocity, false, sr, {
           cutoffStart: Math.min(2000, wp.bassCutoff * 4),  // world-specific
           cutoffEnd: wp.bassCutoff,                         // world-specific
@@ -2107,7 +2199,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
         // PURE SYNTH LEAD — supersaw through Moog filter with LFO modulation
         // Removed MachineDrum stabs (drum stabs are NOT leads — they're percussion)
         // The supersaw + filter + modulation IS the lead sound
-        const v = this.getFreeVoice(this.leadPool);
+        const v = this.getFreeVoice(this.leadPool, voiceId);
         if (v) v.trigger(t, note, duration, velocity, sr, {
           cutoff: wp.leadCutoff * (0.7 + mc.brightness * 0.6),
           detune: wp.leadDetune * (0.5 + mc.psychedelia),
@@ -2119,12 +2211,12 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
       }
       case V_ACID: {
         // Pass param as accent flag (param >= 0.5 = accent) for PSY3 analog modeling
-        const v = this.getFreeVoice(this.acidPool);
+        const v = this.getFreeVoice(this.acidPool, voiceId);
         if (v) v.trigger(t, note, duration, velocity, sr, param);
         break;
       }
       case V_PAD: {
-        const v = this.getFreeVoice(this.padPool);
+        const v = this.getFreeVoice(this.padPool, voiceId);
         if (v) v.trigger(t, note, duration, velocity, sr, {
           cutoff: wp.padCutoff, attack: wp.padAttack, detune: wp.padDetune, evolveRate: wp.padEvolveRate,
         });
@@ -2139,7 +2231,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
           if (names.length > 0) {
             if (this.phraseHatIdx === undefined || this.phraseHatIdx >= names.length) this.phraseHatIdx = 0;
             const hatName = names[this.phraseHatIdx];
-            const v = this.getFreeVoice(this.hatSamplePool);
+            const v = this.getFreeVoice(this.hatSamplePool, voiceId);
             if (v) {
               const samp = this.samples[hatName];
               // Micro variation (not sample rotation)
@@ -2151,11 +2243,11 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
               this.sampleUsage[hatName] = (this.sampleUsage[hatName] || 0) + 1;
             }
           } else {
-            const v = this.getFreeVoice(this.hatPool);
+            const v = this.getFreeVoice(this.hatPool, voiceId);
             if (v) v.trigger(t, false, velocity, sr);
           }
         } else {
-          const v = this.getFreeVoice(this.hatPool);
+          const v = this.getFreeVoice(this.hatPool, voiceId);
           if (v) v.trigger(t, false, velocity, sr);
         }
         break;
@@ -2167,7 +2259,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
           const names = openNames.length > 0 ? openNames : ['hat_open.wav'];
           if (this.samples[names[0]]) {
             const hatName = names[this.rrCounters.hat % names.length];
-            const v = this.getFreeVoice(this.hatSamplePool);
+            const v = this.getFreeVoice(this.hatSamplePool, voiceId);
             if (v) {
               const samp = this.samples[hatName];
               this.rrCounters.hat = (this.rrCounters.hat + 1) % Math.max(8, names.length);
@@ -2176,11 +2268,11 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
               v.trigger(samp.data, samp.sampleRate, pitchVar, velocity, 0.2, panVar);
             }
           } else {
-            const v = this.getFreeVoice(this.hatPool);
+            const v = this.getFreeVoice(this.hatPool, voiceId);
             if (v) v.trigger(t, true, velocity, sr);
           }
         } else {
-          const v = this.getFreeVoice(this.hatPool);
+          const v = this.getFreeVoice(this.hatPool, voiceId);
           if (v) v.trigger(t, true, velocity, sr);
         }
         break;
@@ -2194,7 +2286,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
           if (names.length > 0) {
             if (this.phraseClapIdx === undefined || this.phraseClapIdx >= names.length) this.phraseClapIdx = 0;
             const clapName = names[this.phraseClapIdx];
-            const v = this.getFreeVoice(this.clapSamplePool);
+            const v = this.getFreeVoice(this.clapSamplePool, voiceId);
             if (v) {
               const samp = this.samples[clapName];
               const microVar = (this.rrCounters.clap % 4 - 1.5);
@@ -2205,11 +2297,11 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
               this.sampleUsage[clapName] = (this.sampleUsage[clapName] || 0) + 1;
             }
           } else {
-            const v = this.getFreeVoice(this.clapPool);
+            const v = this.getFreeVoice(this.clapPool, voiceId);
             if (v) v.trigger(t, velocity, sr);
           }
         } else {
-          const v = this.getFreeVoice(this.clapPool);
+          const v = this.getFreeVoice(this.clapPool, voiceId);
           if (v) v.trigger(t, velocity, sr);
         }
         break;
@@ -2222,7 +2314,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
           const names = realPercNames.length > 0 ? realPercNames : percNames;
           if (names.length > 0) {
             const percName = names[this.rrCounters.clap % names.length]; // reuse clap counter for perc RR
-            const v = this.getFreeVoice(this.kickSamplePool); // reuse sample voice pool for perc
+            const v = this.getFreeVoice(this.kickSamplePool, voiceId); // reuse sample voice pool for perc
             if (v) {
               const samp = this.samples[percName];
               this.rrCounters.clap = (this.rrCounters.clap + 1) % Math.max(4, names.length);
@@ -2231,27 +2323,27 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
               this.sampleUsage[percName] = (this.sampleUsage[percName] || 0) + 1;
             }
           } else {
-            const v = this.getFreeVoice(this.percPool);
+            const v = this.getFreeVoice(this.percPool, voiceId);
             if (v) v.trigger(t, note || 400, velocity, sr);
           }
         } else {
-          const v = this.getFreeVoice(this.percPool);
+          const v = this.getFreeVoice(this.percPool, voiceId);
           if (v) v.trigger(t, note || 400, velocity, sr);
         }
         break;
       }
       case V_SHAKER: {
-        const v = this.getFreeVoice(this.shakerPool);
+        const v = this.getFreeVoice(this.shakerPool, voiceId);
         if (v) v.trigger(t, velocity, sr);
         break;
       }
       case V_TEXTURE: {
-        const v = this.getFreeVoice(this.texturePool);
+        const v = this.getFreeVoice(this.texturePool, voiceId);
         if (v) v.trigger(t, duration, velocity, param >= 0.5 ? 'noise' : 'fm', sr);
         break;
       }
       case V_RISER: case V_IMPACT: case V_SWEEP: case V_ZAP: case V_BLIP: case V_DOWNLIFTER: {
-        const v = this.getFreeVoice(this.fxPool);
+        const v = this.getFreeVoice(this.fxPool, voiceId);
         if (v) v.trigger(voiceId, t, duration, velocity, sr);
         break;
       }
@@ -2259,7 +2351,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
         // PSY3-style FM acid voice — carrier + modulator with envelope.
         // `param` encodes the FM ratio (param / 10), so the main thread can
         // send ratio=2.0 as param=20. Defaults to ratio 2.0 (param=0).
-        const v = this.getFreeVoice(this.fmPool);
+        const v = this.getFreeVoice(this.fmPool, voiceId);
         if (v) {
           const fmRatio = param > 0 ? param / 10 : 2.0;
           v.trigger(t, note, duration, velocity, sr, {
@@ -2275,12 +2367,48 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
     }
   }
 
-  getFreeVoice(pool) {
-    for (const v of pool) {
-      if (!v.active) return v;
+  // ─── Priority-tier voice allocation (PSY6) ───
+  // 1. A free voice in the requester's own pool always wins (no steal).
+  // 2. Tier 0 (kick/bass) is never stolen and never waits: its dedicated
+  //    voice (pool[0]) is retrigged — a kick/bass note is never dropped.
+  // 3. Otherwise steal the OLDEST ACTIVE voice from the LOWEST-PRIORITY
+  //    non-empty tier above tier 0 (scan tier 3 → 2 → 1); within the victim
+  //    tier the oldest active voice loses. Evidence: this.stealCount[victimTier]++.
+  // Zero allocation: numeric compares over preallocated pools only.
+  getFreeVoice(pool, voiceId) {
+    for (let i = 0; i < pool.length; i++) {
+      const v = pool[i];
+      if (!v.active) { v.lastTrigger = ++this._voiceSeq; return v; }
     }
-    // Voice stealing: return the oldest (first in pool)
-    return pool[0];
+    const tier = this.voiceTier[voiceId | 0] & 3;
+    if (tier === 0) {
+      const v = pool[0];
+      v.lastTrigger = ++this._voiceSeq;
+      return v;
+    }
+    let victim = null;
+    let victimTier = -1;
+    for (let t = 3; t >= 1; t--) {
+      const pools = this.tierPools[t];
+      for (let pi = 0; pi < pools.length; pi++) {
+        const p = pools[pi];
+        for (let vi = 0; vi < p.length; vi++) {
+          const v = p[vi];
+          if (v.active && (victim === null || v.lastTrigger < victim.lastTrigger)) {
+            victim = v;
+          }
+        }
+      }
+      if (victim) { victimTier = t; break; }
+    }
+    if (victim) {
+      this.stealCount[victimTier]++;
+      victim.lastTrigger = ++this._voiceSeq;
+      return victim;
+    }
+    const v0 = pool[0];
+    v0.lastTrigger = ++this._voiceSeq;
+    return v0;
   }
 
   // ─── Process callback (called by audio thread every 128 samples) ───
@@ -2565,6 +2693,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
         cpuLoad: this.cpuLoad,
         voiceBudget: this.voiceBudget,
         processMs: this.lastProcessMs,
+        stealCount: [this.stealCount[0], this.stealCount[1], this.stealCount[2], this.stealCount[3]],
       });
     }
 
