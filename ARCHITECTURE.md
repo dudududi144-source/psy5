@@ -123,9 +123,10 @@ CPU: Scheduler < 1ms, Voice trigger < 0.1ms, UI render < 8ms
 
 ## 10. Deployment
 
-Option A: Open index.html directly in browser
-Option B: npx serve . (local dev server)
-Option C: Deploy to Cloudflare Pages / Netlify / GitHub Pages
+Option A: npx serve . (local dev server) — the device is native ES
+          modules (js/*.js), so it needs an HTTP origin, not file://
+Option B: Deploy to Cloudflare Pages / Netlify / GitHub Pages
+          (static hosting serves the modules as-is — no bundler)
 
 No build step. No dependencies. No server required.
 

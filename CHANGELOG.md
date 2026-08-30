@@ -1,0 +1,176 @@
+# CHANGELOG — PSY6
+
+All notable changes to the PSY6 device repository. Every claim below is
+reproducible with the command shown next to it.
+
+## [1.0.0] — PSY6 stabilization, engine and groove release
+
+### Fixed — deploy pipeline (`fix: repair failing deploy pipeline`)
+
+`playground/index.html` was structurally corrupted: a stray `<` plus an
+orphaned JS fragment and a mangled `!DOCTYPE` line before `<html>`, orphaned
+HTML panels before `<head>`, and feature blocks (RECORDER / COLLAB / AI /
+CLOUD / MIDILEARN) machine-spliced inside unrelated function bodies with a
+recurring `});` vs `}` brace bug that made the main script unparseable
+(`node --check` failed: `SyntaxError: Unexpected token ')'`).
+
+- Feature objects hoisted to top level; host functions (`makeTimerWorker`,
+  fbForm submit handler, `bumpStat`) restored to their original bodies;
+  broken keyboard handlers fixed; spliced auto-calls removed (including
+  `RECORDER.start()` prompting for microphone access on page load).
+- Orphaned panels moved into `<main><div class="grid">`; the WORKLETS
+  fragment moved into a proper `<script>` after the main script.
+- `tools/verify.mjs` added: standalone-JS, ES-module, inline-script and
+  document-structure gates (zero dependencies).
+- CI (`.github/workflows/pages-deployment.yaml`): a `verify` job now runs
+  `node tools/verify.mjs` and gates the deploy job. The deploy job itself is
+  unchanged and still requires the repository secrets
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` — **note:** those
+  secrets are an ops prerequisite that cannot be created from code; the
+  deploy leg cannot be exercised from a local clone.
+
+Verify locally: `node tools/verify.mjs` → `VERIFY: GREEN (0 failures)`.
+
+### Changed — device identity (`refactor: unify device identity to PSY6`)
+
+- `worklets/psy4-engine.js` → `worklets/psy-engine.js`
+  (processor `psy4-engine` → `psy-engine`, class `Psy4EngineProcessor` →
+  `PsyEngineProcessor`); `worklets/psy4-dsp.js` → `worklets/psy-dsp.js`.
+- Playground `addModule` URLs updated; device-identity comments now say
+  PSY6; historical PSY3/PSY4/PSY5 attributions kept and labeled as history.
+- README rewritten for PSY6-on-psy-foundation; FOUNDATION_STATUS.md and
+  FOUNDATION_FREEZE.md carry device-lineage preambles.
+
+### Changed — modular device (`refactor: split index.html into ES modules`)
+
+The 62 KB `index.html` monolith (CSS + markup + model + scheduler + engine +
+UI + self-gate in one file) is split into native ES modules with zero
+behavior change (code text byte-identical per module; only import/export
+declarations added):
+
+```
+js/model.js      constants, scales, mk* factories, PRNG, hash, stepEvents
+js/presets.js    factory library, assignPresetToTrack, buildStyle
+js/engine.js     PooledEngine + SynthVoice + DrumVoice
+js/state.js      shared state I, history, macros, PERF, save/load, $, toast
+js/scheduler.js  worker timer + lookahead loop
+js/ui/header.js  js/ui/perform.js  js/ui/seq.js  js/ui/sound.js
+js/ui/mix.js     js/ui/tests.js    — one module per tab
+js/main.js       renderAll / renderLoop / meter / powerOn / boot
+css/app.css      extracted styles
+```
+
+`index.html` is now 63 lines: markup plus
+`<script type="module" src="js/main.js"></script>`. All modules are well
+under the 500-line limit (largest: `js/presets.js`, 169 lines).
+
+Verified: device boots, scheduler advances, sequencer/preset/mixer
+interactions work, Self-Gate passes — in a headless browser.
+
+### Added — priority voice stealing (`feat: priority voice stealing in pooled engine`)
+
+Tiers: `0` = kick/bass · `1` = hats/snare/clap/perc · `2` = lead/arp/pluck ·
+`3` = pad/fx/texture.
+
+- **Worklet engine** (`worklets/psy-engine.js`): when a pool is exhausted,
+  the oldest ACTIVE voice of the lowest-priority non-empty tier above tier 0
+  (scan 3 → 2 → 1) is stolen; within a tier the oldest active voice loses.
+  Tier-0 voices are never stolen — a new tier-0 note retriggers its
+  dedicated voice. Oldest-active tracking via monotonic trigger sequence;
+  victim scans are numeric compares over preallocated pools — the
+  `process()` hot path stays allocation-free.
+  *(Interpretation note:* “steal from the lowest non-empty tier above tier 0”
+  is implemented as lowest **priority** — pads/fx are sacrificed before hats
+  — the only reading consistent with the tier priorities; ambiguity resolved
+  in favor of musical behavior.*)*
+- Pool sizes and per-voice tier assignment are init-time parameters
+  (`AudioWorkletNode` `processorOptions: { poolSizes, tiers }`, defaults =
+  the historical sizes) and re-tunable at runtime via a `config` port
+  message; per-tier steal counters ship in the stats payload.
+- **Device pooled engine** (`js/engine.js`): same tier policy; pool sizes
+  are constructor parameters (defaults 20 synth / 24 drum); per-track
+  dedicated tier-0 voices; `tier0StealAttempts` guard counter.
+- **Self-Gate G9** (device): 64 consecutive open-hat 16ths + kick on every
+  4th step, rendered offline with a 3-voice drum pool (deliberate overload).
+  Latest run evidence: `kicks=16/16 hats=64/64 tier0Steals=0
+  steals(h1/h2/h3)=70/0/2 peak=0.752` → PASS. Full gate: **9/9 passed**.
+- Tests: `tests/voice-stealing.test.ts` — 11 pass / 0 fail (loads the real
+  worklet source in a stubbed AudioWorklet environment).
+
+### Added — deterministic per-bar seeding, full-range micro, grooves (`feat: deterministic per-bar seeding, full-range micro timing, groove templates`)
+
+- `stepEvents()` draws all probabilistic decisions from a per-bar seeded
+  RNG: `seed = fnv1a(projectSeed + ":" + barIndex)` (first 32 bits). Bar
+  index derives from the step position modulo the pattern loop — the same
+  bar produces the identical event list on every loop pass.
+- Project seed exposed in the header, stored in the project, included in
+  save/export/import; older projects backfill `seed='PSY6'`.
+- Micro timing is now full-range: `micro[-100..100] → [-0.5..+0.5]` of a
+  16th step (the previous 0.45 cap is gone); negative offsets (ahead of
+  grid) are honored end-to-end. Step editor hint updated.
+- Groove templates — named per-step offset transforms applied
+  deterministically **before** the probability gate, all randomness from
+  the per-bar RNG: `straight` (default — existing feel preserved),
+  `mpc54` (54–58 % swing on odd 16ths), `psy-push` (odd bass 16ths pushed
+  +6..+8 ticks against the kick; 1 tick = 1/64 of a 16th-step ≈ 10–13 ms
+  at 145 BPM), `humanize` (seeded gaussian-ish micro, ±3 % of a step).
+  Selection stored per project and in save/export; swing slider unchanged.
+- Tests: `tests/determinism.test.ts` — 18 pass / 0 fail.
+
+### Added — 2x oversampled master saturation (`feat: 2x oversampled master saturation`)
+
+- Worklet `MasterChain` stage 3 (tanh saturation) now runs at twice the
+  native rate: zero-stuffing + 33-tap halfband polyphase FIR (Blackman,
+  cutoff = Nyquist/2 at the 2x rate) → saturate both 2x samples →
+  anti-alias halfband → decimate. Linear phase, 16-sample delay, zero
+  allocation. The true-peak limiter stays at native rate.
+- Togglable for A/B: `processorOptions { masterOversample }` or a `config`
+  port message.
+- **Benchmark** (`tests/master-oversampling.test.ts`; run
+  `bun test tests/master-oversampling.test.ts`): sawtooth sweep 12 → 16 kHz
+  @ 44.1 kHz through the real MasterChain (satDrive 4.0, satMix 1.0),
+  alias-only band 16.5–22.05 kHz (above the sweep fundamental, below
+  Nyquist — pure foldback of the 2f/3f harmonics):
+
+  | Configuration | Alias-band energy |
+  | --- | --- |
+  | Before — native saturation | **68.5 dB** |
+  | After — 2x oversampled saturation | **−11.0 dB** |
+  | **Reduction** | **79.6 dB** |
+
+### Changed — foundation is the single source of truth (`refactor: device consumes foundation as single source of truth`)
+
+- `js/model.js` imports `mulberry32`, `fnv1a` and the scale table from
+  `foundation/` via native ESM relative imports (no bundler). The device's
+  local PRNG/hash/scale-interval copies are deleted; device scale keys
+  (`minor`, `major`, `dorian`, `phrygian`) are aliases onto
+  `foundation/music/context.mjs` SCALES — interval data lives only in the
+  foundation.
+- `fnv1a` was **added to the foundation** (with pinned-vector tests) rather
+  than duplicated. Pinned vectors prove behavior-neutrality (same PRNG
+  sequence, same hashes, same per-bar event streams).
+- Runtime lookahead scheduling stays device-local (the foundation scheduler
+  is the offline plan→events primitive — the purpose boundary documented in
+  FOUNDATION_STATUS.md; building the runtime adapter was out of scope for
+  this brief). `foundation/learning` has no device consumer yet.
+- `package.json` added (`psy6`, private, ESM) with `test` / `verify` /
+  `benchmark` scripts.
+- `soundBank.js` was TypeScript with a `.js` extension — renamed
+  `soundBank.ts` and given a runtime smoke test
+  (`tests/soundbank.test.ts`, 4 tests).
+- Removed five legacy test files (`music/dsp/learning/transport/analysis
+  .test.ts`) that were copied in "from psy-foundation family": they import
+  `@psy-foundation/*` and `../src/index.ts` — paths that never existed in
+  this repository — so they were never runnable here. Replaced by
+  `tests/foundation-primitives.test.ts` (13 tests) which tests the
+  foundation packages this repo actually ships.
+
+### Verified state (this release)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Test suite | `bun test` | **49 pass / 0 fail**, 5 files, 917 expect() calls |
+| Repo gates | `node tools/verify.mjs` | **GREEN (0 failures)** |
+| Aliasing benchmark | `bun test tests/master-oversampling.test.ts` | 68.5 dB → −11.0 dB (**79.6 dB reduction**) |
+| Device Self-Gate | Self-Gate tab → RUN SELF-GATE | **9/9 passed** |
+| Playground | open `playground/index.html` | boots, worklets load, no console errors |

@@ -29,11 +29,11 @@ LOCAL · DETERMINISTIC · NO SERVER · NO TELEMETRY · NO BUILD STEP
 ## Run it
 
 ```bash
-# Device: open index.html directly in a browser, or
+# Device (ES modules — needs an HTTP origin, not file://):
 npx serve .          # then visit /
 
 # Playground (what Cloudflare Pages deploys):
-open playground/index.html
+npx serve .          # then visit /playground/
 ```
 
 No bundler, no install, no account. Everything runs locally in your browser.
@@ -41,13 +41,34 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # foundation suite
-node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy)
+bun test             # 49 tests across 5 files — 49 pass / 0 fail (917 expect() calls)
+node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 ```
 
-Current verified test counts and benchmark numbers live in
-[CHANGELOG.md](CHANGELOG.md) — every claim there is reproducible with the
-commands shown next to it.
+Suite breakdown (all runnable with `bun test`):
+
+| File | Tests | Covers |
+| --- | --- | --- |
+| `tests/voice-stealing.test.ts` | 11 | worklet priority-tier voice allocation |
+| `tests/determinism.test.ts` | 18 | per-bar seeding, groove templates, micro timing |
+| `tests/master-oversampling.test.ts` | 3 | 2x oversampled master saturation + aliasing benchmark |
+| `tests/foundation-primitives.test.ts` | 13 | foundation PRNG / fnv1a / scale tables (pinned vectors) |
+| `tests/soundbank.test.ts` | 4 | sound bank coherence |
+
+## Benchmarks
+
+`bun test tests/master-oversampling.test.ts` prints the numbers it asserts
+against. Latest run — sawtooth sweep 12→16 kHz @ 44.1 kHz through the real
+worklet MasterChain, alias-only band 16.5–22.05 kHz:
+
+- native saturation: **68.5 dB** alias-band energy
+- 2x oversampled saturation: **−11.0 dB**
+- **reduction: 79.6 dB**
+
+Device Self-Gate (Self-Gate tab → RUN SELF-GATE): **9/9 passed**, including
+G9 — 64 consecutive hats + kick on every 4th step under deliberate pool
+overload: `kicks=16/16 hats=64/64 tier0Steals=0 steals=70/0/2 peak=0.752`
+(the kick is never dropped, zero tier-0 voice starvation).
 
 ## Device identity
 
