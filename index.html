@@ -19,6 +19,8 @@
 <div><label>BPM</label><input id="bpm" type="number" min="40" max="300" style="width:56px"></div>
 <div style="width:80px"><label>Swing <span id="swV" class="mono"></span></label><input id="swing" type="range" min="0" max="66"></div>
 <div style="width:80px"><label>Velocity</label><input id="padVel" type="range" min="10" max="100" value="90"></div>
+<div style="width:96px"><label>Groove</label><select id="grooveSel"></select></div>
+<div style="width:84px"><label>Seed</label><input id="seedIn" type="text" style="width:78px" title="Project seed — same seed + bar = identical events every loop"></div>
 </div>
 <div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><canvas id="meter" width="90" height="26"></canvas></div>
 <div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><input type="file" id="impF" accept=".json" style="display:none"></div>

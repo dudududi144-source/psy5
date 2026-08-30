@@ -12,7 +12,7 @@ const PERF={toggleLayer(which){const p=I.p;pushHist();if(which==='drums')for(let
 const K_MAIN='psy6.main.v1',K_TMP='psy6.tmp.v1';
 function saveProject(){try{const j=JSON.stringify(I.p);localStorage.setItem(K_TMP,j);localStorage.setItem(K_MAIN,j);localStorage.removeItem(K_TMP);I.dirty=false;return{ok:true}}catch(e){return{ok:false,err:String(e)}}}
 function loadStored(){try{let j=localStorage.getItem(K_MAIN);if(!j)j=localStorage.getItem(K_TMP);if(!j)return null;const p=JSON.parse(j);if(!p||p.version!==3||!p.tracks)return null;return p}catch(e){return null}}
-function loadProjectObj(p){I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;if(I.eng)I.eng.syncMix(p);I.renderDirty=true}
+function loadProjectObj(p){if(p.seed==null)p.seed='PSY6';if(!p.groove)p.groove='straight';I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;if(I.eng)I.eng.syncMix(p);I.renderDirty=true}
 function recHit(track,note,vel){if(!I.recOn||I.fsm!=='RECORDING')return;const grid=I.p.recQ||1,sc=I.sched;let best=null,bd=1e9;for(const r of sc.recent){const d=Math.abs(r.t-I.ctx.currentTime);if(d<bd){bd=d;best=r}}if(!best)return;const rem=best.s%grid,sAdj=rem>grid/2?best.s+(grid-rem):best.s-rem;const pat=I.p.patterns[I.p.currentPattern],d=pat.data[track];if(!d)return;const len=d.len,idx=((sAdj%len)+len)%len;pushHist();const st=d.steps[idx];st.on=1;st.vel=clamp(vel,.05,1);if(note!=null)st.note=note;I.dirty=true;I.renderDirty=true}
 
 export { $, toast, I, pushHist, after, resolveMacros, PERF, K_MAIN, K_TMP, saveProject, loadStored, loadProjectObj, recHit };
