@@ -98,10 +98,20 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full specification and
 
 ## Deployment
 
-- `.github/workflows/pages-deployment.yaml` — pushes to `main` that touch
-  `playground/**` first run the `verify` gates, then deploy `playground/` to
-  Cloudflare Pages (project `psy6`). Requires the repository secrets
-  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to be configured.
+Three options — the device needs no build step and no secrets:
+
+1. **GitHub Pages (live, zero secrets)** — `.github/workflows/deploy-gh-pages.yml`
+   deploys the repo root on every push to `main`. Live URL:
+   **https://dudududi144-source.github.io/psy5/** (device at `/`,
+   playground at `/playground/`). No repository secrets required.
+2. **Cloudflare Pages (needs the two secrets)** —
+   `.github/workflows/pages-deployment.yaml` — pushes to `main` that touch
+   `playground/**` first run the `verify` gates, then deploy `playground/` to
+   Cloudflare Pages (project `psy6`). Requires the repository secrets
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to be configured.
+3. **Local (HTTP origin required for ES modules — not `file://`)**:
+   `npx serve .` — then visit `/` for the device and `/playground/` for the
+   playground.
 
 ## Non-negotiable rules
 
