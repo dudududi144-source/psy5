@@ -15,11 +15,11 @@ LOCAL · DETERMINISTIC · NO SERVER · NO TELEMETRY · NO BUILD STEP
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | **The PSY6 device** — standalone groovebox (power-on screen, Perform/Sequencer/Sound/Mixer/Self-Gate tabs). Self-contained by design. |
+| `index.html` | **The PSY6 device** — standalone groovebox (power-on screen, Perform/Sequencer/Sound/Mixer/Self-Gate tabs, CO-PILOT panel, section arranger). Self-contained by design. |
 | `worklets/psy-engine.js` | PSY6 real-time audio engine — single `AudioWorkletProcessor` (transport, ring-buffer event queue, preallocated voice pool, master chain). |
 | `worklets/psy-dsp.js` | PSY6 DSP primitives — Moog ladder, polyBLEP saw/square, saturation, phaser, bus EQ (`AudioWorkletProcessor`s). |
 | `soundBank.js`, `factory-presets.js` | Factory preset data used by the device. |
-| `foundation/` | **psy-foundation** — shared packages (music, material, learning, dsp, scheduler, transport, protocol, device-sdk, analysis, fixtures, composition). Single source of truth for musical primitives. See `FOUNDATION_API.md`. |
+| `foundation/` | **psy-foundation** — shared packages (music, material, learning, dsp, scheduler, transport, protocol, device-sdk, analysis, fixtures, composition). Single source of truth for musical primitives. The device consumes `foundation/learning/bandit.mjs` (contextual bandit with abstention) for the CO-PILOT. See `FOUNDATION_API.md`. |
 | `tests/` | Bun test suite for foundation packages. |
 | `playground/` | The PSY6 browser playground (deployed to Cloudflare Pages as project `psy6`). |
 | `data/` | scales / motifs / rhythms / presets / styles JSON. |
@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 49 tests across 5 files — 49 pass / 0 fail (917 expect() calls)
+bun test             # 74 tests across 7 files — 74 pass / 0 fail (1004 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 ```
 
@@ -54,6 +54,8 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/master-oversampling.test.ts` | 3 | 2x oversampled master saturation + aliasing benchmark |
 | `tests/foundation-primitives.test.ts` | 13 | foundation PRNG / fnv1a / scale tables (pinned vectors) |
 | `tests/soundbank.test.ts` | 4 | sound bank coherence |
+| `tests/copilot.test.ts` | 18 | co-pilot contextual bandit: context building, reward mapping, serialization round-trip, determinism, foundation extension |
+| `tests/arranger.test.ts` | 7 | section arranger: bar-quantized advance, persistence, manual override, paused transport |
 
 ## Benchmarks
 
@@ -65,10 +67,13 @@ worklet MasterChain, alias-only band 16.5–22.05 kHz:
 - 2x oversampled saturation: **−11.0 dB**
 - **reduction: 79.6 dB**
 
-Device Self-Gate (Self-Gate tab → RUN SELF-GATE): **9/9 passed**, including
+Device Self-Gate (Self-Gate tab → RUN SELF-GATE): **10/10 passed**, including
 G9 — 64 consecutive hats + kick on every 4th step under deliberate pool
 overload: `kicks=16/16 hats=64/64 tier0Steals=0 steals=70/0/2 peak=0.752`
-(the kick is never dropped, zero tier-0 voice starvation).
+(the kick is never dropped, zero tier-0 voice starvation), and G10 — the
+CO-PILOT learner ranks a consistently rewarded action above a zero-reward one
+(`fillAvg=1.00(n=45) > varAvg=0.00(n=2)`, probe `exploit fill`) and abstains
+(DO_NOTHING) when every candidate's expected reward is below the threshold.
 
 ## Device identity
 

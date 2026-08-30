@@ -3,6 +3,49 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.2.0] — Run 3: GO LIVE + BRAIN
+
+### Added
+
+- **GitHub Pages deployment, zero secrets** (`ci: add GitHub Pages deployment`)
+  — `.github/workflows/deploy-gh-pages.yml` deploys the repo root on every
+  push to `main`. Live URL: https://dudududi144-source.github.io/psy5/
+  (device at `/`, playground at `/playground/`). Asset-reference audit: all
+  ES-module imports, worklet `addModule` URLs and links are relative paths
+  (verified over HTTP: both pages boot, Self-Gate passes from the live URL).
+- **CO-PILOT** (`feat: co-pilot learner wired to device`) — consent-driven
+  contextual bandit connecting `foundation/learning` to the device:
+  - `foundation/learning/bandit.mjs`: dependency-free port of the learning
+    package semantics (epsilon-greedy + cold-start + abstention; DO_NOTHING
+    always legal; injected seeded RNG; full JSON round-trip).
+  - Decision loop every 4 bars while playing (scheduler bar hooks); context =
+    energy, scene, active layers, density, bars-since-variation, macros,
+    gesture counts; candidates mapped onto existing device paths (FILL,
+    VARIATION, groove toggle, layer toggle, scene nudge, DO_NOTHING).
+  - Rewards: explicit 👍/👎 (+1/−1); implicit +0.5 (user FILL/VAR/scene within
+    2 bars of APPLY); −0.5 (PANIC/UNDO or dismiss within 2 bars); 0 (window
+    closed with no signal). Suggestions NEVER auto-apply — APPLY/DISMISS in
+    the Perform-tab panel, LEARN toggle is fully inert when OFF.
+  - Learner state persisted inside the project (`p.copilot` v1); absent on
+    import → fresh learner. Exploration seeded from projectSeed+decision
+    counter — same seed+history reproduces the same suggestions.
+- **Section arranger** (`feat: section arranger`) — project-level
+  [scene, bars] chain with bar-quantized auto-advance reusing the existing
+  scene-launch transition, upcoming-section indicator in the Perform tab,
+  manual override stops auto-advance; stored in save/export.
+- Self-Gate **G10** (device now 10/10): scripted 50-decision session —
+  `fillAvg=1.00(n=45) > varAvg=0.00(n=2)`, probe exploits fill, abstention
+  fires under all-low rewards.
+- Bun suite: **74 tests across 7 files — 74 pass / 0 fail** (18 co-pilot +
+  7 arranger tests added; 49 pre-existing all green).
+
+### Verified
+
+- `bun test` 74/74 · `node tools/verify.mjs` GREEN · device Self-Gate 10/10
+  (G9 evidence unchanged: `kicks=16/16 hats=64/64 tier0Steals=0`).
+- Device boots from https://dudududi144-source.github.io/psy5/ and passes the
+  Self-Gate from the live URL in a headless browser.
+
 ## [1.0.0] — PSY6 stabilization, engine and groove release
 
 ### Fixed — deploy pipeline (`fix: repair failing deploy pipeline`)
