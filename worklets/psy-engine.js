@@ -14,7 +14,7 @@
  *     ├── Preallocated voice pool (kick, bass, lead, acid, pad, hats, ...)
  *     ├── Voice DSP (Moog ladder, BL saw, envelopes — all inline)
  *     ├── Bus mixing (drum/bass/music/atmos/fx → master)
- *     └── Master chain (saturation + limiter)
+ *     └── Master chain (2x oversampled saturation + limiter)
  *     ↓ stereo output
  *   Speakers
  *
@@ -1414,6 +1414,38 @@ class BusProcessor {
     this.gain = config.gain || 1.0;
   }
 
+  // ─── 2x oversampled saturation (PSY6) ───
+  // Per native input sample: upsample to 2x via the halfband polyphase
+  // phases, saturate both 2x samples, downsample with the anti-alias
+  // halfband. Zero allocation — all state in preallocated Float32Arrays.
+  // Polyphase math (halfband: h[even≠16]=0, h[16]=0.5):
+  //   even 2x sample = 0.5·x[n-8]
+  //   odd  2x sample = Σ_j hOdd[j]·x[n-j]
+  //   output        = 0.5·se[n-8] + Σ_j hOdd[j]·so[n-j]
+  // (se/so = saturated even/odd phases). Linear phase, 16-sample delay.
+  processSat(x) {
+    const drive = this.satDrive, mix = this.satMix;
+    if (!this.osEnabled) {
+      const saturated = fastTanh(x * drive);
+      return saturated * mix + x * (1 - mix);
+    }
+    const ih = this.osIn, iw = this.osInIdx;
+    ih[iw] = x;
+    const even2x = 0.5 * ih[(iw - 8) & 15];
+    let odd2x = 0;
+    const ho = this.osHOdd;
+    for (let j = 0; j < 16; j++) odd2x += ho[j] * ih[(iw - j) & 15];
+    const se = fastTanh(even2x * drive) * mix + even2x * (1 - mix);
+    const so = fastTanh(odd2x * drive) * mix + odd2x * (1 - mix);
+    const eh = this.osSe, ew = this.osSeIdx;
+    eh[ew] = se; this.osSeIdx = (ew + 1) & 15;
+    const oh = this.osSo, ow = this.osSoIdx;
+    oh[ow] = so; this.osSoIdx = (ow + 1) & 15;
+    let out = 0.5 * eh[(ew - 8) & 15];
+    for (let j = 0; j < 16; j++) out += ho[j] * oh[(ow - j) & 15];
+    return out;
+  }
+
   process(sample, sr) {
     const dt = 1 / sr;
 
@@ -1517,6 +1549,38 @@ class MultibandComp {
     this.lowThr = 0.5;  this.lowRatio = 3;   this.lowAtt = 0.005; this.lowRel = 0.15;  this.lowMakeup = 1.3;
     this.midThr = 0.5;  this.midRatio = 2;   this.midAtt = 0.004; this.midRel = 0.12;  this.midMakeup = 1.2;
     this.highThr = 0.45; this.highRatio = 2.5; this.highAtt = 0.002; this.highRel = 0.08; this.highMakeup = 1.2;
+  }
+
+  // ─── 2x oversampled saturation (PSY6) ───
+  // Per native input sample: upsample to 2x via the halfband polyphase
+  // phases, saturate both 2x samples, downsample with the anti-alias
+  // halfband. Zero allocation — all state in preallocated Float32Arrays.
+  // Polyphase math (halfband: h[even≠16]=0, h[16]=0.5):
+  //   even 2x sample = 0.5·x[n-8]
+  //   odd  2x sample = Σ_j hOdd[j]·x[n-j]
+  //   output        = 0.5·se[n-8] + Σ_j hOdd[j]·so[n-j]
+  // (se/so = saturated even/odd phases). Linear phase, 16-sample delay.
+  processSat(x) {
+    const drive = this.satDrive, mix = this.satMix;
+    if (!this.osEnabled) {
+      const saturated = fastTanh(x * drive);
+      return saturated * mix + x * (1 - mix);
+    }
+    const ih = this.osIn, iw = this.osInIdx;
+    ih[iw] = x;
+    const even2x = 0.5 * ih[(iw - 8) & 15];
+    let odd2x = 0;
+    const ho = this.osHOdd;
+    for (let j = 0; j < 16; j++) odd2x += ho[j] * ih[(iw - j) & 15];
+    const se = fastTanh(even2x * drive) * mix + even2x * (1 - mix);
+    const so = fastTanh(odd2x * drive) * mix + odd2x * (1 - mix);
+    const eh = this.osSe, ew = this.osSeIdx;
+    eh[ew] = se; this.osSeIdx = (ew + 1) & 15;
+    const oh = this.osSo, ow = this.osSoIdx;
+    oh[ow] = so; this.osSoIdx = (ow + 1) & 15;
+    let out = 0.5 * eh[(ew - 8) & 15];
+    for (let j = 0; j < 16; j++) out += ho[j] * oh[(ow - j) & 15];
+    return out;
   }
 
   process(sample, sr) {
@@ -1639,9 +1703,31 @@ class MasterChain {
     this.glueRelease = 0.12;
     this.glueMakeup = 1.3;     // PSY3 makeup
 
-    // Saturation (PSY3: drive=1.15, mix=0.15)
+    // Saturation (PSY3: drive=1.15, mix=0.15) — 2x oversampled (PSY6)
     this.satDrive = 1.15;
     this.satMix = 0.15;
+
+    // ── 2x oversampled saturation state (PSY6, preallocated) ──
+    // 33-tap halfband FIR (cutoff = Nyquist/2 at the 2x rate), Blackman
+    // window. Halfband property: only the center even tap (h[16]=0.5) and
+    // the 16 odd taps are non-zero. The same filter is used anti-imaging
+    // (after zero-stuffing) and anti-aliasing (before the 2:1 decimation),
+    // so tanh harmonics above the original Nyquist are removed before they
+    // can fold back into the audible band.
+    this.osEnabled = true;
+    this.osH = new Float32Array(33);
+    for (let n = 0; n < 33; n++) {
+      const m = n - 16;
+      const sinc = m === 0 ? 1 : Math.sin(Math.PI * m / 2) / (Math.PI * m / 2);
+      const w = 0.42 - 0.5 * Math.cos(2 * Math.PI * n / 32) + 0.08 * Math.cos(4 * Math.PI * n / 32);
+      this.osH[n] = 0.5 * sinc * w;
+    }
+    this.osH[16] = 0.5;
+    this.osHOdd = new Float32Array(16);
+    for (let j = 0; j < 16; j++) this.osHOdd[j] = this.osH[2 * j + 1];
+    this.osIn = new Float32Array(16);  this.osInIdx = 0;  // input history (upsample phases)
+    this.osSe = new Float32Array(16);  this.osSeIdx = 0;  // saturated even-phase history
+    this.osSo = new Float32Array(16);  this.osSoIdx = 0;  // saturated odd-phase history
 
     // LUFS targeting (simplified K-weighted loudness → makeup gain)
     this.lufsMs = 0;           // running mean square
@@ -1657,6 +1743,38 @@ class MasterChain {
     this.tpRelease = 0.06;     // moderate release
 
     this.sr = sampleRate;
+  }
+
+  // ─── 2x oversampled saturation (PSY6) ───
+  // Per native input sample: upsample to 2x via the halfband polyphase
+  // phases, saturate both 2x samples, downsample with the anti-alias
+  // halfband. Zero allocation — all state in preallocated Float32Arrays.
+  // Polyphase math (halfband: h[even≠16]=0, h[16]=0.5):
+  //   even 2x sample = 0.5·x[n-8]
+  //   odd  2x sample = Σ_j hOdd[j]·x[n-j]
+  //   output        = 0.5·se[n-8] + Σ_j hOdd[j]·so[n-j]
+  // (se/so = saturated even/odd phases). Linear phase, 16-sample delay.
+  processSat(x) {
+    const drive = this.satDrive, mix = this.satMix;
+    if (!this.osEnabled) {
+      const saturated = fastTanh(x * drive);
+      return saturated * mix + x * (1 - mix);
+    }
+    const ih = this.osIn, iw = this.osInIdx;
+    ih[iw] = x;
+    const even2x = 0.5 * ih[(iw - 8) & 15];
+    let odd2x = 0;
+    const ho = this.osHOdd;
+    for (let j = 0; j < 16; j++) odd2x += ho[j] * ih[(iw - j) & 15];
+    const se = fastTanh(even2x * drive) * mix + even2x * (1 - mix);
+    const so = fastTanh(odd2x * drive) * mix + odd2x * (1 - mix);
+    const eh = this.osSe, ew = this.osSeIdx;
+    eh[ew] = se; this.osSeIdx = (ew + 1) & 15;
+    const oh = this.osSo, ow = this.osSoIdx;
+    oh[ow] = so; this.osSoIdx = (ow + 1) & 15;
+    let out = 0.5 * eh[(ew - 8) & 15];
+    for (let j = 0; j < 16; j++) out += ho[j] * oh[(ow - j) & 15];
+    return out;
   }
 
   process(sample, sr) {
@@ -1682,10 +1800,12 @@ class MasterChain {
     }
     sample *= glueGain * this.glueMakeup;
 
-    // 3. SATURATION (PSY3: drive=1.15, mix=0.15)
-    //    Mix of dry + tanh-saturated (adds harmonic richness + warmth)
-    const saturated = fastTanh(sample * this.satDrive);
-    sample = saturated * this.satMix + sample * (1 - this.satMix);
+    // 3. SATURATION (PSY3: drive=1.15, mix=0.15) — 2x oversampled (PSY6)
+    //    Mix of dry + tanh-saturated (adds harmonic richness + warmth).
+    //    tanh is run at twice the native rate through a halfband polyphase
+    //    pair so the harmonics it generates above the original Nyquist are
+    //    filtered out instead of aliasing back into the audible band.
+    sample = this.processSat(sample);
 
     // 4. LUFS TARGETING (simplified K-weighted loudness → makeup gain)
     //    Measures running mean square, converts to LUFS approximation,
@@ -1960,6 +2080,11 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
     this.rebuildTierPools();
     this._voiceSeq = 0;          // monotonic trigger order (oldest-active tracking)
     this.stealCount = new Uint32Array(4);  // evidence: steals per victim tier
+    if (po.masterOversample !== undefined) {
+      const v = !!po.masterOversample;
+      this.masterL.osEnabled = v;
+      this.masterR.osEnabled = v;
+    }
 
     // Command handler
     this.port.onmessage = (e) => this.handleMessage(e.data);
@@ -2009,6 +2134,8 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
         break;
       case 'config': {
         // Preset-tunable engine configuration (PSY6).
+        // msg.masterOversample: true/false — toggle the 2x oversampled
+        // master saturation (benchmark A/B).
         // msg.poolSizes: { kick, bass, lead, ... } — pools are rebuilt in place
         // (voicePoolTable keeps pointing at the same arrays).
         // msg.tiers: { [voiceId]: 0..3 } — per-voice tier reassignment.
@@ -2035,6 +2162,11 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
             const id = +k;
             if (id >= 0 && id < 32 && msg.tiers[k] >= 0 && msg.tiers[k] <= 3) this.voiceTier[id] = msg.tiers[k];
           }
+        }
+        if (msg.masterOversample !== undefined) {
+          const v = !!msg.masterOversample;
+          this.masterL.osEnabled = v;
+          this.masterR.osEnabled = v;
         }
         this.rebuildTierPools();
         break;
