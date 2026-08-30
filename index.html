@@ -22,7 +22,7 @@
 <div style="width:96px"><label>Groove</label><select id="grooveSel"></select></div>
 <div style="width:84px"><label>Seed</label><input id="seedIn" type="text" style="width:78px" title="Project seed — same seed + bar = identical events every loop"></div>
 </div>
-<div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><canvas id="meter" width="90" height="26"></canvas></div>
+<div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><span class="chip" id="copChip" title="CO-PILOT — consent-driven suggestions">✦ CO-PILOT</span><canvas id="meter" width="90" height="26"></canvas></div>
 <div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><input type="file" id="impF" accept=".json" style="display:none"></div>
 </header>
 <nav>
@@ -38,6 +38,7 @@
 <div class="panel"><h3>Macros — resolve to REAL engine state</h3><div class="macros" id="macros"></div></div>
 </div><div>
 <div class="panel"><h3>Layers</h3><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px" id="layers"></div></div>
+<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">CO-PILOT — suggestions need APPLY (never auto)</h3><button id="bLearn">LEARN ON</button></div><div id="copBody" style="margin-top:6px"></div><div id="copStats" class="mono" style="font-size:9px;color:var(--dim);margin-top:5px"></div></div>
 <div class="panel"><h3>Tracks</h3><div id="tracks"></div></div>
 </div></div></section>
 <section class="tab" id="tab-seq"><div class="panel">
