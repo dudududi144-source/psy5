@@ -30,6 +30,19 @@ export function subSeed(parentSeed, label) {
 }
 export function rngFor(parentSeed, label) { return mulberry32(subSeed(parentSeed, label)); }
 
+// FNV-1a 64-bit hash (hex string). Canonical deterministic string hashing for
+// the PSY device family — used for per-bar event seeding (seed = fnv1a(projectSeed + ":" + barIndex))
+// and for byte-exact evidence hashes in device self-gates. Consumed by PSY6.
+export function fnv1a(str) {
+  if (typeof str !== "string") throw new FoundationError("fnv1a input must be a string");
+  let h = 0xcbf29ce484222325n;
+  for (let i = 0; i < str.length; i++) {
+    h ^= BigInt(str.charCodeAt(i));
+    h = (h * 0x100000001b3n) & 0xFFFFFFFFFFFFFFFFn;
+  }
+  return h.toString(16);
+}
+
 /* ---------------- scales ---------------- */
 export const SCALES = {
   naturalMinor: [0, 2, 3, 5, 7, 8, 10],

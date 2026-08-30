@@ -1,0 +1,13 @@
+{
+  "name": "psy6",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PSY6 — browser-based psytrance groovebox built on psy-foundation. Local, deterministic, no server.",
+  "scripts": {
+    "test": "bun test",
+    "verify": "node tools/verify.mjs",
+    "benchmark": "bun test tests/master-oversampling.test.ts"
+  },
+  "license": "MIT"
+}

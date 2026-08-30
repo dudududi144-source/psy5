@@ -32,7 +32,6 @@ function ok(msg) {
 console.log('== standalone JS ==');
 const standalone = [
   ...readdirSync('worklets').filter(f => f.endsWith('.js')).map(f => 'worklets/' + f),
-  'soundBank.js',
   'factory-presets.js',
 ];
 for (const f of standalone) {

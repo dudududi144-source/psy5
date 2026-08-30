@@ -1,12 +1,22 @@
 /* ============ core constants + model ============ */
+/* psy-foundation is the SINGLE SOURCE OF TRUTH for shared musical primitives.
+   The device imports scales, the canonical PRNG and string hashing from
+   foundation/ — it does not re-implement them. Device-facing scale key names
+   ('minor' etc.) are aliases onto the foundation table. */
+import { mulberry32, fnv1a } from '../foundation/foundation.mjs';
+import { SCALES as FOUNDATION_SCALES } from '../foundation/music/context.mjs';
+const fnv = fnv1a;
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const deep=o=>JSON.parse(JSON.stringify(o));
-function mulberry32(s){let a=s>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function fnv(str){let h=0xcbf29ce484222325n;for(let i=0;i<str.length;i++){h^=BigInt(str.charCodeAt(i));h=(h*0x100000001b3n)&0xFFFFFFFFFFFFFFFFn}return h.toString(16)}
 const MAX_TRACKS=8,MAX_STEPS=32,MAX_SCENES=8;
 /* GLOBAL VOICE CAPS — pre-allocated pools. The memory/latency budget knobs. */
 const SYNTH_VOICES=20,DRUM_VOICES=24;
-const SCALES={minor:[0,2,3,5,7,8,10],major:[0,2,4,5,7,9,11],dorian:[0,2,3,5,7,9,10],phrygian:[0,1,3,5,7,8,10]};
+const SCALES={
+  minor: FOUNDATION_SCALES.naturalMinor,
+  major: FOUNDATION_SCALES.major,
+  dorian: FOUNDATION_SCALES.dorian,
+  phrygian: FOUNDATION_SCALES.phrygian,
+};
 const M_ENERGY=0,M_DRIVE=1,M_SPACE=2,M_MOVE=3;
 function gcd(a,b){while(b){const t=a%b;a=b;b=t}return a}
 function mkStep(on){return {on:on?1:0,vel:0.9,prob:1,micro:0,note:48,lock:{}}}
