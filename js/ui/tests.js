@@ -1,5 +1,5 @@
 import { $, I, PERF, saveProject, loadStored, resolveMidiParam } from '../state.js';
-import { sceneSetFollow, resolveFollow } from '../scenes.js';
+import { sceneSetFollow, resolveFollow, sceneSetMix, applySceneMix } from '../scenes.js';
 import { songMidi } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
 import { createMidiCore, emptyMidiMap } from '../midi.js';
@@ -10,7 +10,7 @@ import { recordPoint, quantStep, applyLanes } from '../autorec.js';
 import { compose, minVariantDiff, VARIANT_DIFF_MIN, COMPOSER_STYLES } from '../composer.js';
 import { paramApply } from '../params.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
-import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, evHash } from '../bounce.js';
+import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, evHash, songSteps, SONG_LEAD } from '../bounce.js';
 import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
@@ -38,8 +38,8 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
-/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene) ─────────────────
- * MAIN engine, 24 entries on device — 22 hard (offline/pure, CI-asserted in
+/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 25 entries as of v0.8.0) ──
+ * MAIN engine, 25 entries on device — 23 hard (offline/pure, CI-asserted in
  * tools/e2e.mjs) + 2 evidence-only realtime gates (G17 live capture, G25
  * record song — ScriptProcessor tap on wall-clock; pass on-device, reported
  * as info in CI, never asserted there).
@@ -53,13 +53,15 @@ function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(
  *   G19 share (pure)                       · G21 long patterns (offline)
  *   G22 automation (pure)                  · G23 composer (offline)
  *   G24 song render (offline)              · G25 record song (REALTIME·evidence)
+ *   G26 MIDI export (pure)                 · G27 follow actions (pure)
+ *   G28 scene mix snapshots (offline, v0.8.0)
  * WORKLET reduced set: 3 entries (G2, G14w, G15w) — offline worklet renders.
  * NUMBERING GAPS (documented, never renumbered — all historical evidence
  * cites these ids): G3, G4, G7 and G20 have NEVER existed in any shipped
  * commit (git log -S across all history); the sequence was assigned
  * topically and the gaps were left reserved-but-unused.
- * The device summary line "N/24" counts entries; the honest hard-pass count
- * cited in README/CI is 22 (24 − G17 − G25). */
+ * The device summary line "N/25" counts entries; the honest hard-pass count
+ * cited in README/CI is 23 (25 − G17 − G25). */
 async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;if(I.engine==='worklet'){logLine('info','== PSY6 SELF-GATE — WORKLET engine (reduced but real: G2 + G14w + G15w) ==');await gateWorklet()}else{logLine('info','== PSY6 SELF-GATE — MAIN pooled engine (OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner
@@ -488,6 +490,36 @@ const fb27=sim27(p27,2,8);
 let fbOk=fb27.length===9;for(let i=0;i<9;i++)if(fb27[i]!==2+i)fbOk=false;
 const ok27=seqOk&&replay27&&nextOk&&prevOk&&sceneOk&&fbOk;
 gate('G27','follow actions (chain only): seeded random sequence == pinned walk, replay-identical, next/prev wrap exact, scene lock, prob=0 → next fallback',ok27,'seq='+r27.join(',')+' replay='+replay27+' next='+nextOk+' prev='+prevOk+' lock='+sceneOk+' fallback='+fbOk)}catch(e){gate('G27','follow actions',false,'ERR '+e.message)}
+/* G28 — scene mix snapshots (offline — CI-asserted): a scripted 2-section
+ * song (both sections play the SAME pattern; only bass plays — every other
+ * track muted — so the full-mix ratio is the pure gain law g=vol²). Scene 2
+ * carries a bass-vol 0.5 snapshot vs the live 0.8 → per-section RMS ratio
+ * must land in [2.0, 2.6] (target (0.8/0.5)²=2.56). Null-mix control: two
+ * identical snapshot-less sections → ratio ≈ 1.0. Also: null-mix renders are
+ * BIT-IDENTICAL to each other (the snapshot layer is opt-in). */
+try{
+const p28=buildStyle('PSYTRANCE',42);
+p28.tracks.forEach((t,i)=>{t.mix.mute=i!==4});           /* bass-only fixture */
+p28.tracks[4].mix.vol=.8;p28.tracks[4].mix.mute=false;
+p28.scenes=[{name:'FULL',pattern:'A',color:0,bars:4,fill:false},{name:'DUCKED',pattern:'A',color:1,bars:4,fill:false}];
+p28.arranger={v:1,on:true,steps:[{scene:0,bars:4},{scene:1,bars:4}],idx:0,barsIn:0};
+p28.lanes=[];
+sceneSetMix(p28,1,{tracks:{4:{vol:.5,pan:0,sendA:0,sendB:0,scAmount:0}}});
+const r28a=await renderSong(p28);
+const p28b=JSON.parse(JSON.stringify(p28));delete p28b.scenes[1].mix; /* null-mix control */
+const r28b=await renderSong(p28b);
+const sd28=60/p28.bpm/4,sr28=44100;
+const rmsWin=(buf,s0,s1)=>{let sum=0,n=0;const a=Math.max(0,Math.round(s0*sr28)),b=Math.min(buf.length,Math.round(s1*sr28));for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=a;i<b;i++){sum+=d[i]*d[i];n++}}return n?Math.sqrt(sum/n):0};
+const w0=r28a.sections[0],w1=r28a.sections[1];
+const rms0=rmsWin(r28a.buf,SONG_LEAD+w0.startStep*sd28,SONG_LEAD+w0.endStep*sd28);
+const rms1=rmsWin(r28a.buf,SONG_LEAD+w1.startStep*sd28,SONG_LEAD+w1.endStep*sd28);
+const ratio28=rms0/rms1;
+const c0b=rmsWin(r28b.buf,SONG_LEAD+r28b.sections[0].startStep*sd28,SONG_LEAD+r28b.sections[0].endStep*sd28);
+const c1b=rmsWin(r28b.buf,SONG_LEAD+r28b.sections[1].startStep*sd28,SONG_LEAD+r28b.sections[1].endStep*sd28);
+const ctrlRatio=c0b/c1b;
+const ctrlIdentical=r28a.scheduleHash===r28b.scheduleHash; /* same events both projects */
+const ok28=ratio28>=2.0&&ratio28<=2.6&&Math.abs(ctrlRatio-1)<0.02&&r28a.N===r28b.N&&rms0>0.01&&rms1>0.01;
+gate('G28','scene mix snapshots: snapshot bass-vol .5 vs live .8 → section RMS ratio in [2.0,2.6] (gain law g=vol²), null-mix control ≈1.0, opt-in (schedule unchanged)',ok28,'ratio='+ratio28.toFixed(3)+' (want 2.56) ctrlRatio='+ctrlRatio.toFixed(4)+' rms=['+rms0.toFixed(4)+','+rms1.toFixed(4)+'] schedSame='+ctrlIdentical+' N='+r28a.N)}catch(e){gate('G28','scene mix snapshots',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

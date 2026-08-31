@@ -1,17 +1,19 @@
 import { $, I, pushHist, after, PERF, recHit, toast } from '../state.js';
 import { SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, LIMITS } from '../model.js';
 import { addTrackToProject } from '../presets.js';
-import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, FOLLOW_MODES } from '../scenes.js';
+import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, sceneSetMix, captureSceneMix, FOLLOW_MODES } from '../scenes.js';
 
 /* ── SCENE BANK (v0.5.0) — scrollable list up to 64 scenes ──
    Existing snapshot model extended with color/bars/fill (see js/scenes.js
    for the documented schema; fields backfilled on load).
    Row controls: color dot (click cycles palette) · name (click = inline
    rename) · pattern label · bars override (feeds the arranger ADD default)
-   · FILL toggle (auto-FILL at launch) · ↑ ↓ reorder · ⧉ duplicate · ✕ clear.
-   Launch semantics unchanged: row click = quantized launch, alt = instant,
-   shift+click = assign. Current (.active) and queued (.pending) indicators
-   are the original classes. */
+   · FILL toggle (auto-FILL at launch) · MIX→SCENE (capture the current
+   mixer state into the scene, v0.8.0) · ×MIX (clear the snapshot) · ↑ ↓
+   reorder · ⧉ duplicate · ✕ clear. Scenes carrying a snapshot show a MIX
+   badge. Launch semantics unchanged: row click = quantized launch, alt =
+   instant, shift+click = assign. Current (.active) and queued (.pending)
+   indicators are the original classes. */
 const SCENE_COLORS = ['#e05656', '#e0a456', '#d4c95a', '#5ad46e', '#5ac8d4', '#5a8fd4', '#a05ad4', '#d45a9e'];
 function renderScenes() {
   const w = $('scenes'); w.innerHTML = ''; if (!I.p) return;
@@ -22,10 +24,13 @@ function renderScenes() {
     const dotC = sc.color != null ? SCENE_COLORS[sc.color % SCENE_COLORS.length] : 'transparent';
     b.innerHTML = '<div class="scTop"><span class="dot" title="color tag (click cycles)"></span>'
       + '<span class="nm" title="click to rename">' + sc.name + '</span>'
+      + (sc.mix ? '<span class="mixtag" title="carries a mix snapshot — applied at every launch">MIX</span>' : '')
       + '<span class="pn mono">' + pn + '</span></div>'
       + '<div class="scOps">'
       + '<input class="bars" type="number" min="1" max="64" placeholder="—" value="' + (sc.bars != null ? sc.bars : '') + '" title="bars override — pre-fills the arranger section length">'
       + '<button class="sfill' + (sc.fill ? ' on' : '') + '" title="auto-FILL at launch">F</button>'
+      + '<button class="smix" title="MIX→SCENE — write the CURRENT mixer state into this scene (snapshot applies at every launch)">M→S</button>'
+      + '<button class="smixclr" title="clear the mix snapshot (scene plays the live mixer only)"' + (sc.mix ? '' : ' disabled') + '>×M</button>'
       + '<button class="sup" title="move up"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
       + '<button class="sdn" title="move down"' + (i === I.p.scenes.length - 1 ? ' disabled' : '') + '>↓</button>'
       + '<button class="sdup" title="duplicate">⧉</button>'
@@ -55,6 +60,9 @@ function renderScenes() {
     b.querySelector('.bars').onpointerdown = e => e.stopPropagation();
     b.querySelector('.bars').onchange = function () { pushHist(); sceneSetBars(I.p, i, this.value === '' ? null : +this.value); I.renderDirty = true };
     b.querySelector('.sfill').onclick = e => { e.stopPropagation(); pushHist(); sceneToggleFill(I.p, i); I.renderDirty = true };
+    /* v0.8.0 mix snapshot row ops — capture/clear through the same validation the loader uses */
+    b.querySelector('.smix').onclick = e => { e.stopPropagation(); pushHist(); sceneSetMix(I.p, i, captureSceneMix(I.p)); toast('MIX → ' + sc.name + ' captured (applies at launch)'); I.renderDirty = true };
+    b.querySelector('.smixclr').onclick = e => { e.stopPropagation(); pushHist(); sceneSetMix(I.p, i, null); toast('MIX snapshot cleared — ' + sc.name); I.renderDirty = true };
     b.querySelector('.sup').onclick = e => { e.stopPropagation(); pushHist(); sceneMove(I.p, i, -1); I.renderDirty = true };
     b.querySelector('.sdn').onclick = e => { e.stopPropagation(); pushHist(); sceneMove(I.p, i, +1); I.renderDirty = true };
     b.querySelector('.sdup').onclick = e => { e.stopPropagation(); pushHist(); const r = sceneDuplicate(I.p, i); if (r < 0) toast('Scene bank full (' + LIMITS.MAX_SCENES + ')'); I.renderDirty = true };

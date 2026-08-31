@@ -112,6 +112,7 @@ Frame-count formula (documented, asserted in tests + G24):
 
 import { applyLanes } from './autorec.js';
 import { resolveMacros } from './state.js';
+import { applySceneMix } from './scenes.js';
 
 export const SONG_LEAD = .05;       /* s — attack headroom, matches loop bounce t0 */
 export const SONG_TAIL_STEPS = 32;  /* 2 bars of 16 steps — FX release tail */
@@ -268,6 +269,10 @@ return{cancelled:false,onProgress:null,cancel(){this.cancelled=true}};
  * (stepEvents — identical to schedTick) AND applies the per-step automation
  * player (applyLanes → syncMix(cp,stepTime) / resolveMacros), so state lanes
  * (mix AND synth-param sweeps) land on voices exactly as in live playback.
+ * v0.8.0: at every SECTION START the launched scene's mix snapshot is
+ * applied through the SAME applySceneMix primitive the live quantized
+ * launch uses (scheduler.js), glided from the exact section-start time —
+ * the offline render reflects snapshots with no parallel implementation.
  * opts.ctrl: songRenderController (progress + cancel). opts.t0 override.
  * Deep-clones p: the live project is never touched (loop-bounce guarantee).
  * Returns {buf, N, evs, sections, scheduleHash, musicSec, totalSec} or
@@ -302,6 +307,7 @@ if(!ctrl.cancelled)oc.resume().catch(()=>{/* gone */});
 const evs=[];
 for(const y of songSteps(cp)){
 if(ctrl.cancelled){if(ctrl._onCancelled)try{ctrl._onCancelled()}catch(e){/* noop */}return{cancelled:true}}
+if(y.sectionStart){const scn0=cp.scenes[y.scene];/* v0.8.0: scene mix snapshot at the section launch — same primitive as the live quantized launch */if(scn0&&scn0.pattern!=null&&applySceneMix(cp,y.scene))eng.syncMix(cp,t0+y.abs*sd)}
 if(y.fill&&y.sectionStart){const scn=cp.scenes[y.scene];
 if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)eng.trigger(cp.tracks[3],t0+y.abs*sd+k*sd/2,{track:3,off:0,vel:.5+.05*k,note:48,lock:{}},sd)}
 const list=stepEvents(cp,y.phase);

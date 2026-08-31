@@ -37,6 +37,7 @@ import { arcAt } from '../foundation/composition/form.mjs';
 import { motifFromEvents, MotifTransformer } from '../foundation/music/motif.mjs';
 import { SCALES, mkStep, deep } from './model.js';
 import { initTracks, addTrackToProject, libFind, assignPresetToTrack } from './presets.js';
+import { normalizeSceneMix } from './scenes.js';
 
 /* ── style templates ──
    v0.7.0: every style is a FULL RECIPE in this dict — section chain
@@ -379,6 +380,49 @@ const VARIANT_LANES = {
   BUILD: { track: 4, param: 'cutoff', pts: k => [[0, 500 + 400 * k], [127, 1800 + 1200 * k]] },
 };
 
+/* ── SCENE MIX SNAPSHOTS (v0.8.0) — from the section energy curve ──
+   Pure function of (section id, energy mid, variant index) — no rng, so
+   compose output stays byte-identical for a fixed seed. The KICK (track 0)
+   NEVER appears in a composer snapshot: kick is sacred — its LEVEL, like
+   its pattern, is not arrangement material. Curves:
+     INTRO        — low melodic level, light space (sends ≈ .18/.22)
+     BUILD        — levels rise with energy, bass duck ramps in
+     DROP / DROP2 — full level, dry punch, bass duck materialized (sc 55)
+     BREAK        — SPATIAL: sendA/sendB up, ducking off (sc 0)
+     RISER        — swell: pad/lead up, no ducking anywhere, FX track full
+     OUTRO        — fall: levels drop, space stays airy
+   Variant k alternates a ±0.12 pan lean on hat/perc/lead so arranger
+   repeats move in stereo as well. Applied on every launch path (see
+   scenes.js SCENE MIX SNAPSHOTS). */
+function mixForSection(sec, k) {
+  const e = sec.energyMid, id = sec.id;
+  const r = v => Math.round(v * 1000) / 1000;
+  const pan = k ? (k % 2 ? 0.12 : -0.12) : 0;
+  const T = {};
+  const set = (i, vol, sendA, sendB, sc, pn) => {
+    const e2 = { vol: r(vol), pan: r(pn || 0), sendA: r(sendA || 0), sendB: r(sendB || 0) };
+    if (sc != null) e2.scAmount = Math.round(sc);
+    T[i] = e2;
+  };
+  if (id === 'INTRO') {
+    set(2, .7, 0, .12); set(3, .6, .1, .1); set(4, .8, 0, 0); set(5, .5, .18, .2, 0); set(6, .6, .18, .28, 0); set(7, .4, .1, .15, 0);
+  } else if (id === 'BUILD') {
+    set(2, .75 + .2 * e, 0, .08, null, pan); set(3, .65 + .25 * e, .08, .08, null, pan); set(4, .9, 0, 0, 40);
+    set(5, .6 + .3 * e, .12, .14, 0); set(6, .6 + .2 * e, .15, .2, 0); set(7, .5 + .3 * e, .1, .1, 0);
+  } else if (id === 'DROP' || id === 'DROP2') {
+    set(1, .95); set(2, .9, 0, .05, null, pan); set(3, .85, .06, .05, null, pan); set(4, 1, 0, 0, 55);
+    set(5, 1, .08, .08, 0, pan); set(6, .8, .08, .1, 0); set(7, .85, .05, .05, 0);
+  } else if (id === 'BREAK') {
+    set(2, .6, .1, .15, null, pan); set(3, .55, .15, .15, null, pan); set(4, .7, .15, .18, 0);
+    set(5, .8, .35, .4, 0, pan); set(6, .9, .4, .5, 0); set(7, .7, .3, .35, 0);
+  } else if (id === 'RISER') {
+    set(2, .7, .1, .12, null, pan); set(4, .8, 0, 0, 0); set(5, .9, .2, .22, 0, pan); set(6, 1, .3, .35, 0); set(7, .8, .18, .2, 0); set(8, 1, 0, 0, 0);
+  } else { /* OUTRO */
+    set(2, .6, 0, .1, null, pan); set(3, .5, .08, .1); set(4, .75, .05, .05, 25); set(5, .55, .15, .2, 0, pan); set(6, .6, .2, .3, 0); set(7, .4, .12, .18, 0);
+  }
+  return { tracks: T };
+}
+
 /* compose — the pure entry point. targetMinutes ∈ {3,5,8} (any >0 works). */
 export function compose(styleId, targetMinutes, seed, seedLabel) {
   const style = COMPOSER_STYLES[styleId] || COMPOSER_STYLES['FULL-ON'];
@@ -425,6 +469,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   let sceneIdx = 0;
   const formSections = [];
   const secMotifs = {}; /* per-family fillSection motif — variants re-process it */
+  const sceneMeta = []; /* scene idx → {sec, k} for the v0.8.0 snapshot pass */
   for (let i = 0; i < sections.length; i++) {
     const sec = sections[i];
     const motif = sectionMotif(seedInt, sec.id, baseMotif);
@@ -435,6 +480,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
     fillSection(p, pat, sec, sec.bars, sec.energyMid, { style, rng, motif, scaleIv, root: p.root });
     p.patterns[patName] = pat;
     p.scenes.push({ name: sec.id, pattern: patName, color: sec.color, bars: Math.min(sec.bars, 8), fill: false });
+    sceneMeta.push({ sec, k: 0 });
     const loops = Math.max(1, Math.round(sec.bars / Math.min(sec.bars, 8)));
     for (let k = 0; k < loops; k++) arrSteps.push({ scene: sceneIdx, bars: Math.min(sec.bars, 8) });
     formSections.push({ id: sec.id, bars: sec.bars, energy: +sec.energyMid.toFixed(3), pattern: patName, scene: sceneIdx });
@@ -466,6 +512,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
         const patName = 'C' + (base + 1) + 'v' + (kk + 1);
         p.patterns[patName] = deriveVariant(p.patterns[p.scenes[base].pattern], sec, kk, vctx);
         p.scenes.push({ name: famName + ' ' + (kk + 1), pattern: patName, color: sec.color, bars: Math.min(sec.bars, 8), fill: false });
+        sceneMeta.push({ sec, k: kk });
         ids.push(p.scenes.length - 1);
         pats.push(p.patterns[patName]);
         variantCount++;
@@ -507,6 +554,15 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   }
   p.lanes = lanes.concat(variantLanes);
 
+  /* 4b. SCENE MIX SNAPSHOTS (v0.8.0) — every scene carries its section's
+     mix identity (energy-curve payload, canonicalized). Deterministic:
+     pure function of (section id, energy, variant index). Kick untouched. */
+  let snapCount = 0;
+  sceneMeta.forEach((m, i) => {
+    const mix = normalizeSceneMix(mixForSection(m.sec, m.k), p.tracks.length);
+    if (mix) { p.scenes[i].mix = mix; snapCount++ }
+  });
+
   /* 5. stats + determinism fingerprint */
   const totalSecs = formSections.reduce((a, s) => a + s.bars, 0);
   const lengthSec = totalSecs * 4 * 60 / bpm;
@@ -514,7 +570,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   return {
     project: p,
     form: { style: styleId, seed: label, bpm, sections: formSections, totalBars: totalSecs, lengthSec: +lengthSec.toFixed(2), targetSec: targetMinutes * 60 },
-    stats: { tracks: p.tracks.length, scenes: p.scenes.length, lanes: p.lanes.length, variants: variantCount, minVariantDiff: +minFamDiff.toFixed(3), lengthErr: +(((lengthSec - targetMinutes * 60) / (targetMinutes * 60)) * 100).toFixed(3), fingerprint },
+    stats: { tracks: p.tracks.length, scenes: p.scenes.length, lanes: p.lanes.length, variants: variantCount, snapshots: snapCount, minVariantDiff: +minFamDiff.toFixed(3), lengthErr: +(((lengthSec - targetMinutes * 60) / (targetMinutes * 60)) * 100).toFixed(3), fingerprint },
   };
 }
 

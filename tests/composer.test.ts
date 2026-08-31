@@ -357,13 +357,18 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
     const dPerc = dark.patterns['C3']!.data[3]!.steps.filter(s => s.on).length
     expect(hPerc).toBeGreaterThan(dPerc)          /* glitch density recipe audible */
   })
-  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical to the v0.7.0 Phase-1 hashes', () => {
+  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical to the v0.8.0 Phase-1 hashes', () => {
     /* any intentional change to the legacy recipes (or to shared code paths
-       they consume) must consciously update these pins — documented contract */
+       they consume) must consciously update these pins — documented contract.
+       v0.8.0 Phase-1 delta: the composer now populates scene.mix snapshots
+       (energy-curve payloads; kick excluded) — patterns/fingerprint are
+       UNCHANGED (form-fp still d0c5f32f032f2a88); the project JSON grows the
+       mix payloads, so the whole-project pins moved (documented in
+       CHANGELOG 0.8.0). Determinism re-proven: same seed → byte-identical. */
     const pins: Record<string, string[]> = {
-      'FULL-ON': ['e16c966e39f27f75', 'd959b7708157241d', 'c86651f7c69d6266'],
-      'DARK-PSY': ['5ca267f00ff6cd76', '6b85b900952907ef', '00cd194ee3ee5cb8'],
-      'PROGRESSIVE': ['306fa510cd5964a2', '92f34a5367613528', '08396986a9be79ed'],
+      'FULL-ON': ['338e953768eb4d67', '1d9c77e2f3a03446', '3db876a150141b7f'],
+      'DARK-PSY': ['038f8e5b27b46ab2', '62902511bfaabf9e', '766a857696b94ab5'],
+      'PROGRESSIVE': ['d8c7d9acfa7bb40a', 'c73d87559d33e59e', 'd6bb48eeade0560a'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {

@@ -102,7 +102,7 @@ describe('token format + size guards', () => {
     expect(r.tokenBytes).toBeGreaterThan(0)
     expect(r.tokenBytes).toBeLessThan(SHARE_WARN_BYTES) /* a default project must stay small */
     expect(SHARE_WARN_BYTES).toBe(6144)
-    expect(SHARE_MAX_BYTES).toBe(51200)
+    expect(SHARE_MAX_BYTES).toBe(65536) /* v0.8.0: snapshot-bearing compose output ≈ 51.6 KB b64 — cap raised 50→64 KB */
     expect(r.warn).toBe(false)
   })
 

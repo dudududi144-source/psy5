@@ -101,6 +101,9 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 .scene .scOps button:disabled{opacity:.3;cursor:default}
 .scene .rename{font-size:11px;font-weight:700;background:#11151d;border:1px solid var(--acc2);border-radius:4px;color:#fff;width:88px;padding:1px 3px}
 .scene.scAdd{justify-content:center;align-items:center;border-style:dashed;color:var(--acc2);min-height:46px}
+/* ── v0.8.0 scene mix snapshots ── */
+.scene .mixtag{font-size:7px;font-weight:700;letter-spacing:.08em;color:var(--acc);border:1px solid var(--acc);border-radius:3px;padding:0 3px;flex:none}
+.scene .scOps .smix{color:var(--acc2)}
 /* ── v0.5.0 automation editor ── */
 #laneWrap{position:relative;margin-top:6px;width:100%;max-width:900px;height:96px;border:1px solid #2c3442;border-radius:6px;overflow:hidden}
 #laneWrap canvas{position:absolute;inset:0;width:100%;height:100%}

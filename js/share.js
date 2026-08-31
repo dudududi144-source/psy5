@@ -13,7 +13,12 @@
    Consent: sharing NEVER auto-loads. The power screen shows a banner with
    LOAD SHARE / DISMISS; parsing helpers here are DOM-free (Bun-testable). */
 const SHARE_WARN_BYTES = 6144;  /* > 6 KB compressed token → warn */
-const SHARE_MAX_BYTES = 51200;  /* ~ 50 KB compressed token → hard error */
+/* v0.8.0: 51200 → 65536. The composer's snapshot-bearing projects (scene.mix
+   payloads, ~+7% raw) crossed the old cap after base64url expansion
+   (38.7 KB deflate → 51,636 b64 chars) — a share of the device's OWN
+   composed output is a first-class flow, so the hard cap moves to 64 KB.
+   Still conservative: browser address bars handle ≥ 100 KB URLs. */
+const SHARE_MAX_BYTES = 65536;  /* ~ 64 KB compressed token → hard error */
 
 /* canonical JSON: every object's keys are sorted (arrays keep their order —
    step order is musical meaning). Two structurally equal projects produce
