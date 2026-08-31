@@ -6,9 +6,12 @@
 </head><body>
 <div id="power">
 <h1>PSY6</h1>
-<div class="mono" style="color:var(--dim);font-size:10px;letter-spacing:.2em">STANDALONE GROOVEBOX · POOLED ENGINE · NO GC DROPOUTS</div>
-<div class="note" style="max-width:560px;text-align:center">Pooled voices + worker-timed scheduler. Add layers without memory blowups. Choose a genre — it plays instantly.</div>
+<div class="mono" style="color:var(--dim);font-size:10px;letter-spacing:.2em">STANDALONE GROOVEBOX · DUAL ENGINE — MAIN POOLED (DEFAULT) | WORKLET (EXPERIMENTAL)</div>
+<div class="note" style="max-width:560px;text-align:center">Pooled voices + worker-timed scheduler. Add layers without memory blowups. Choose a genre — it plays instantly. The MAIN engine is the default and the reference; the WORKLET engine is opt-in and honestly limited (see its notes below).</div>
 <div class="styles" id="stylePicker"></div>
+<div class="note mono" style="font-size:9px;color:var(--dim);letter-spacing:.12em">AUDIO ENGINE</div>
+<div class="styles" id="enginePicker"></div>
+<div class="note" id="engNote" style="max-width:560px;text-align:center"></div>
 <button id="resumeBtn" style="display:none;border-color:var(--acc2);color:var(--acc2);padding:12px 20px">RESUME LAST SESSION</button>
 </div>
 <div class="app" id="app">

@@ -3,7 +3,8 @@ import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY } from '../model.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
-import { renderBounce } from '../bounce.js';
+import { renderBounce, bounceSchedule } from '../bounce.js';
+import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
 
@@ -27,7 +28,7 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
-async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;logLine('info','== PSY6 SELF-GATE (pooled engine, OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
+async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;if(I.engine==='worklet'){logLine('info','== PSY6 SELF-GATE — WORKLET engine (reduced but real: G2 + G14w + G15w) ==');await gateWorklet()}else{logLine('info','== PSY6 SELF-GATE — MAIN pooled engine (OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner
    must rank FILL>VARIATION and exploit FILL; with ALL rewards below the
@@ -84,7 +85,67 @@ const b13a=await renderBounce(p13,2),b13b=await renderBounce(p13,2);
 const d13=b13a.buf.getChannelData(0);let s13=0;for(let i=0;i<d13.length;i++)s13+=d13[i]*d13[i];const rms13=Math.sqrt(s13/d13.length);
 const schedId=b13a.scheduleHash===b13b.scheduleHash;
 const ok13=b13a.buf.length===b13a.N&&b13b.buf.length===b13b.N&&b13a.N===b13b.N&&rms13>0.02&&schedId;
-gate('G13','offline bounce: exact sample count, non-silent render, deterministic schedule',ok13,'samples='+b13a.N+'/'+b13b.N+' rms='+rms13.toFixed(3)+' schedIdentical='+schedId)}catch(e){gate('G13','offline bounce',false,'ERR '+e.message)}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G13','offline bounce: exact sample count, non-silent render, deterministic schedule',ok13,'samples='+b13a.N+'/'+b13b.N+' rms='+rms13.toFixed(3)+' schedIdentical='+schedId)}catch(e){gate('G13','offline bounce',false,'ERR '+e.message)}
+/* G14 — the ACTIVE engine renders the default project (2 loops) non-silently
+   with every scheduled event voiced (residual = scheduled − spawned = 0). */
+try{
+const sr=44100,p14=buildStyle('PSYTRANCE',42);
+const sch14=bounceSchedule(p14,2,.05);
+const oc=new OfflineAudioContext(2,Math.ceil(sch14.total*sr),sr);
+const eng=new PooledEngine(oc);eng.syncMix(p14);
+for(const e of sch14.evs)eng.trigger(p14.tracks[e.track],e.t,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sch14.stepDur);
+const buf=await oc.startRendering();
+const residual=sch14.evs.length-eng.spawnCount;const pk=peakOf(buf);
+gate('G14','engine renders the default project non-silently, every scheduled event voiced',pk>0.05&&residual===0,'peak='+pk.toFixed(3)+' residualEvents='+residual)}catch(e){gate('G14','engine render + drain',false,'ERR '+e.message)}
+/* G15 — priority stealing at DEFAULT pools (24 drum voices): 64 open-hat
+   16ths with decay=4 (~2.6 s busy each ≈ 25 concurrent) exhaust the drum
+   pool; the kick (every 4th step) must never be dropped and tier-0 must
+   never be a steal victim. */
+try{
+const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr);
+const eng=new PooledEngine(oc);
+const p=buildStyle('PSYTRANCE',42);assignPresetToTrack(p,2,libFind('HAT-TE-O'));p.tracks[2].sound.decay=4;eng.syncMix(p);
+const pat=p.patterns['A'];const put=(ti,i)=>{const d=pat.data[ti],L=d.len,s=d.steps[((i%L)+L)%L];s.on=1;s.vel=ti===0?.95:.6;s.prob=1};
+for(let i=0;i<64;i++){put(2,i);if(i%4===0)put(0,i)}
+p.currentPattern='A';const sd=60/p.bpm/4;let t=.05;
+for(let s=0;s<64;s++){for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}
+const buf=await oc.startRendering();
+const kicks=eng.trackCount[0],hatSteals=eng.stealCount[1],pk=peakOf(buf);
+gate('G15','overload at DEFAULT pools: kick never dropped, tier-0 never stolen, hats starve among themselves',kicks===16&&eng.tier0StealAttempts===0&&hatSteals>0&&pk>0.05,'tier0Steals='+eng.tier0StealAttempts+' hatSteals='+hatSteals+' kicks='+kicks+'/16 peak='+pk.toFixed(3))}catch(e){gate('G15','overload at default pools',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+
+/* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
+   G2: deterministic model build (engine-independent).
+   G14w: boot + sample-accurate queue drain + every kick voiced + non-silent.
+   G15w: priority stealing under overload via worklet stats (kicks all voiced,
+         tier-0 never a victim, hats steal among themselves).
+   Offline renders deliver commands via processorOptions.initialMessages —
+   the offline render thread never drains its input message queue. */
+async function gateWorklet(){
+try{const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12))}catch(e){gate('G2','genre build deterministic',false,'ERR '+e.message)}
+try{
+const p14=buildStyle('PSYTRANCE',42);
+const sd14=60/p14.bpm/4,kicks=8;
+const evs=[];for(let i=0;i<kicks;i++)evs.push({tr:p14.tracks[0],when:.1+i*4*sd14,ev:{vel:.95,note:48,lock:{}},stepDur:sd14});
+const {buf,we}=await renderWorkletOffline(p14,evs,4);
+const pk=peakOf(buf);const st=we.stats;
+const residual=st?st.eventCount:-1;
+const trig=st&&st.voiceTriggers?st.voiceTriggers[0]:-1;
+gate('G14w','worklet: boot + sample-accurate queue drain + all kicks voiced + non-silent',pk>0.05&&residual===0&&trig===kicks,'peak='+pk.toFixed(3)+' residualEvents='+residual+' kicksVoiced='+trig+'/'+kicks)}catch(e){gate('G14w','worklet boot+render',false,'ERR '+e.message)}
+try{
+const p15=buildStyle('PSYTRANCE',42);
+assignPresetToTrack(p15,2,libFind('HAT-TE-O'));/* hatO → V_HAT_OPEN — 0.33 s busy each */
+const sd=60/p15.bpm/4;
+/* 3 open hats per step ×64 steps (~9.6 concurrent vs a 4-voice hat pool)
+   genuinely exhausts the pool; kick every 4th step must still voice every
+   time, tier-0 never a victim. Total events 208 ≤ MAX_EVENTS(256) — the
+   bounded queue must NOT drop anything. */
+const evs=[];for(let i=0;i<64;i++){for(let k=0;k<3;k++)evs.push({tr:p15.tracks[2],when:.1+i*sd+.0001*k,ev:{vel:.6,note:60,lock:{}},stepDur:sd});if(i%4===0)evs.push({tr:p15.tracks[0],when:.1+i*sd,ev:{vel:.95,note:48,lock:{}},stepDur:sd})}
+const {buf,we}=await renderWorkletOffline(p15,evs,7);
+const pk=peakOf(buf);const st=we.stats;
+const sc=st?st.stealCount:[-1,-1,-1,-1];const vt=st&&st.voiceTriggers?st.voiceTriggers:[-1];
+const kicks=16;
+gate('G15w','worklet: priority stealing under overload — all kicks voiced, tier-0 never a victim',vt[0]===kicks&&sc[0]===0&&sc[1]>0&&pk>0.05,'tier0Victims='+sc[0]+' hatSteals='+sc[1]+' kicksVoiced='+vt[0]+'/'+kicks+' peak='+pk.toFixed(3))}catch(e){gate('G15w','worklet overload',false,'ERR '+e.message)}
+}
 
 function wireTests(){$('bGate').onclick=runSelfGate;}
 

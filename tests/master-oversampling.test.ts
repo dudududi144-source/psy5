@@ -129,7 +129,18 @@ describe('2x oversampled master saturation', () => {
     expect(Number.isFinite(beforeDb)).toBe(true)
     expect(Number.isFinite(afterDb)).toBe(true)
     expect(afterDb).toBeLessThan(beforeDb)          // strictly better
-    expect(reduction).toBeGreaterThan(10)           // meaningful, not noise
+    expect(reduction).toBeGreaterThan(6)            // honest figure ≈ 8.2 dB (see README)
+  })
+
+  test('GUARD: the oversampled path output is non-silent (a silent output cannot claim alias reduction)', () => {
+    // Regression guard for the PSY6 osInIdx bug: the input ring cursor was
+    // never advanced, so the oversampler processed stale input and the old
+    // "79.6 dB reduction" claim was a vacuous measurement of near-silence.
+    // The real 2x path must pass substantial signal energy to the output.
+    const out = renderSweep(true)
+    let peak = 0
+    for (let i = 0; i < out.length; i++) { const a = Math.abs(out[i]); if (a > peak) peak = a }
+    expect(peak).toBeGreaterThan(0.5)               // measured 0.729 with the fix
   })
 
   test('config message toggles masterOversample on the processor', () => {

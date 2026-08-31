@@ -1431,6 +1431,7 @@ class BusProcessor {
     }
     const ih = this.osIn, iw = this.osInIdx;
     ih[iw] = x;
+    this.osInIdx = (iw + 1) & 15;  // PSY6 fix: advance the input ring cursor (was never advanced — the oversampler re-read stale input)
     const even2x = 0.5 * ih[(iw - 8) & 15];
     let odd2x = 0;
     const ho = this.osHOdd;
@@ -1568,6 +1569,7 @@ class MultibandComp {
     }
     const ih = this.osIn, iw = this.osInIdx;
     ih[iw] = x;
+    this.osInIdx = (iw + 1) & 15;  // PSY6 fix: advance the input ring cursor (was never advanced — the oversampler re-read stale input)
     const even2x = 0.5 * ih[(iw - 8) & 15];
     let odd2x = 0;
     const ho = this.osHOdd;
@@ -1762,6 +1764,7 @@ class MasterChain {
     }
     const ih = this.osIn, iw = this.osInIdx;
     ih[iw] = x;
+    this.osInIdx = (iw + 1) & 15;  // PSY6 fix: advance the input ring cursor (was never advanced — the oversampler re-read stale input)
     const even2x = 0.5 * ih[(iw - 8) & 15];
     let odd2x = 0;
     const ho = this.osHOdd;
@@ -2080,10 +2083,17 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
     this.rebuildTierPools();
     this._voiceSeq = 0;          // monotonic trigger order (oldest-active tracking)
     this.stealCount = new Uint32Array(4);  // evidence: steals per victim tier
+    this.voiceTriggers = new Uint32Array(24);  // evidence: voices actually triggered, per voice id (PSY6 self-gate: "no dropped kicks")
     if (po.masterOversample !== undefined) {
       const v = !!po.masterOversample;
       this.masterL.osEnabled = v;
       this.masterR.osEnabled = v;
+    }
+    // PSY6: construction-time message replay (offline path). The offline
+    // render thread never drains its input message queue, so commands for
+    // offline renders are delivered here — fully reliable, ordered.
+    if (po.initialMessages && Array.isArray(po.initialMessages)) {
+      for (const m of po.initialMessages) this.handleMessage(m);
     }
 
     // Command handler
@@ -2268,6 +2278,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
 
   // ─── Trigger a voice from the event queue ─────────────────────
   triggerVoice(voiceId, note, velocity, duration, param) {
+    if (voiceId >= 0 && voiceId < this.voiceTriggers.length) this.voiceTriggers[voiceId]++;  // PSY6 gate evidence
     const sr = this.sr;
     const wp = this.worldParams;
     const mc = this.macros;
@@ -2826,6 +2837,7 @@ class PsyEngineProcessor extends AudioWorkletProcessor {
         voiceBudget: this.voiceBudget,
         processMs: this.lastProcessMs,
         stealCount: [this.stealCount[0], this.stealCount[1], this.stealCount[2], this.stealCount[3]],
+        voiceTriggers: Array.from(this.voiceTriggers),
       });
     }
 
