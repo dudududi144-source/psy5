@@ -113,6 +113,49 @@ for (const doc of docs) {
   if (i === 0) fail('no <script> blocks found');
 }
 
+/* ── 4. PWA release checklist (v0.6.0) ───────────────────────────────── */
+console.log('== PWA ==');
+try {
+  const changelog = readFileSync('CHANGELOG.md', 'utf8');
+  const latest = /## \[([0-9]+\.[0-9]+\.[0-9]+)\]/.exec(changelog);
+  if (!latest) fail('CHANGELOG: no [x.y.z] heading found');
+  else {
+    const sw = readFileSync('sw.js', 'utf8');
+    const ver = /const CACHE_VERSION = 'psy6-v([0-9]+\.[0-9]+\.[0-9]+)'/.exec(sw);
+    if (!ver) fail('sw.js: no CACHE_VERSION const found');
+    else if (ver[1] !== latest[1]) fail(`sw.js CACHE_VERSION (psy6-v${ver[1]}) != CHANGELOG latest (v${latest[1]}) — bump it on EVERY release`);
+    else ok(`sw.js CACHE_VERSION == CHANGELOG latest (v${latest[1]})`);
+    for (const piece of ["addEventListener('fetch'", 'caches.delete(', 'skipWaiting', 'clients.claim', "req.method !== 'GET'", "url.origin !== self.location.origin"]) {
+      if (!sw.includes(piece)) fail(`sw.js missing network-first/cleanup piece: ${piece}`);
+    }
+    if (!sw.includes('caches.delete(') || !sw.includes('skipWaiting')) { /* covered above */ }
+    else ok('sw.js: network-first + cleanup + skipWaiting/claim pieces present');
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync('manifest.webmanifest', 'utf8'));
+  } catch (e) { fail('manifest.webmanifest: invalid JSON — ' + e.message); }
+  if (manifest) {
+    for (const f of ['name', 'short_name', 'start_url', 'display', 'background_color', 'theme_color', 'icons']) {
+      if (manifest[f] === undefined) fail(`manifest missing field: ${f}`);
+    }
+    if (manifest.display !== 'standalone') fail('manifest display != standalone');
+    if (Array.isArray(manifest.icons)) {
+      for (const ic of manifest.icons) {
+        try {
+          const b = readFileSync(ic.src);
+          const w = b.readUInt32BE(16), h = b.readUInt32BE(20);
+          if (b.slice(0, 8).toString('hex') !== '89504e470d0a1a0a') fail(`${ic.src}: not a PNG`);
+          else if (`${w}x${h}` !== ic.sizes) fail(`${ic.src}: IHDR ${w}x${h} != manifest sizes ${ic.sizes}`);
+          else ok(`${ic.src}: PNG ${w}x${h} matches manifest`);
+        } catch (e) { fail(`${ic.src}: unreadable — ${e.message}`); }
+      }
+    }
+  }
+} catch (e) {
+  fail('PWA check crashed: ' + e.message);
+}
+
 rmSync(tmp, { recursive: true, force: true });
 
 console.log(failures === 0 ? '\nVERIFY: GREEN (0 failures)' : `\nVERIFY: RED (${failures} failures)`);
