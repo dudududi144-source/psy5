@@ -197,6 +197,66 @@ const bars=(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps.reduce
 return{music:bars*16*sd,withTail:(bars*16+SONG_TAIL_STEPS)*sd};
 }
 
+/* ============ SONG → MIDI EXPORT (v0.7.0) — standard interchange ============
+   songMidi(p) consumes the SAME song expansion as the offline WAV renderer:
+   the walk is the songSteps generator (identical to renderSong's loop) and
+   the events are stepEvents — the SAME deterministic per-step function the
+   live scheduler and songSchedule use. No parallel logic exists; the bun
+   tests assert note-for-note identity between songMidi's note list and the
+   songSchedule event mapping (the .mid == WAV schedule contract).
+
+   Tick mapping (documented): 1 step = ppq/4 ticks (120 @ ppq 480), one bar =
+   4·480 = 1920 ticks, total = Σbars·4·480. Per-event groove/micro offsets
+   convert from seconds to ticks at the same resolution (off/sd·ppq/4).
+   Channels (device convention, documented): melodic (kind 'synth') tracks →
+   channels 1–8 (index 0–7) in track order; every drum-kind track → channel
+   10 (index 9) with its own preset note — the GM percussion convention.
+   durTicks = 1 step (120): the export is a trigger map, the WAV is the
+   authoritative sound. Refuses (null) when the arranger is empty or more
+   than 8 melodic tracks exist (channel budget). */
+export function songMidi(p) {
+  const steps0 = (p.arranger && Array.isArray(p.arranger.steps)) ? p.arranger.steps : [];
+  if (!steps0.length) return null;
+  const cp = JSON.parse(JSON.stringify(p)); /* side-effect-free like renderSong */
+  const steps = cp.arranger.steps;
+  const melodic = [];
+  for (let t = 0; t < cp.tracks.length; t++) {
+    if (!cp.tracks[t]) continue;
+    if (cp.tracks[t].kind === 'drum') continue;
+    if (melodic.length >= 8) return null; /* channel budget: 1–8 */
+    melodic.push(t);
+  }
+  const chOf = new Map();
+  melodic.forEach((t, i) => chOf.set(t, i));      /* channels 0..7 = MIDI 1..8 */
+  const ppq = 480, stepTicks = ppq / 4, sd = 60 / cp.bpm / 4;
+  const buckets = new Map(); /* track → notes[] */
+  for (const y of songSteps(cp)) {
+    const list = stepEvents(cp, y.phase);
+    for (const e of list) {
+      if (!buckets.has(e.track)) buckets.set(e.track, []);
+      buckets.get(e.track).push({
+        tick: y.abs * stepTicks + Math.round((e.off / sd) * stepTicks),
+        durTicks: stepTicks,
+        midi: e.note,
+        vel: e.vel,
+      });
+    }
+  }
+  const tracks = [];
+  for (const [t, notes] of buckets) {
+    if (!notes.length) continue;
+    notes.sort((a, b) => a.tick - b.tick);
+    tracks.push({
+      name: (cp.tracks[t] && cp.tracks[t].name) || ('TRACK ' + (t + 1)),
+      channel: chOf.has(t) ? chOf.get(t) : 9, /* drums → channel 10 (index 9) */
+      drum: !chOf.has(t),
+      notes,
+    });
+  }
+  tracks.sort((a, b) => a.channel - b.channel);
+  const totalBars = steps.reduce((a, s) => a + (s.bars | 0), 0);
+  return { ppq, bpm: cp.bpm, name: 'PSY6 SONG ' + cp.bpm + 'BPM', tracks, totalTicks: totalBars * 4 * ppq };
+}
 /* songRenderController — cancel/progress contract for renderSong (unit-
  * testable without Web Audio; the UI drives it from the CANCEL button). */
 export function songRenderController(){

@@ -1,4 +1,6 @@
 import { $, I, PERF, saveProject, loadStored, resolveMidiParam } from '../state.js';
+import { songMidi } from '../bounce.js';
+import { writeMidi } from '../midifile.js';
 import { createMidiCore, emptyMidiMap } from '../midi.js';
 import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack, addTrackToProject } from '../presets.js';
@@ -415,7 +417,48 @@ const detOk=maxDiff===0||maxDiff<1e-5;
    interleaving). The bound 1e-5 ≈ -100dBFS is 60× below audible and the
    schedule equality above is the real determinism contract. */
 const ok24=framesOk&&secs24.length===p24.arranger.steps.length&&secs24.length>=7&&rmsBySec.every(r=>r>0.03)&&schedOk&&detOk;
-gate('G24','song render: whole arranger offline via the live machinery — frames==formula, '+secs24.length+' sections (v0.7.0: one per arranger step, variants) RMS>0.03, schedule==oracle, deterministic',ok24,'N='+rA.N+'/'+N24+' bars='+bars24+' secs='+secs24.length+' rms=['+rmsBySec.join(',')+'] sched='+schedOk+' det='+(maxDiff===0?'exact':'maxDiff='+maxDiff.toExponential(2)))}catch(e){gate('G24','song render',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G24','song render: whole arranger offline via the live machinery — frames==formula, '+secs24.length+' sections (v0.7.0: one per arranger step, variants) RMS>0.03, schedule==oracle, deterministic',ok24,'N='+rA.N+'/'+N24+' bars='+bars24+' secs='+secs24.length+' rms=['+rmsBySec.join(',')+'] sched='+schedOk+' det='+(maxDiff===0?'exact':'maxDiff='+maxDiff.toExponential(2)))}catch(e){gate('G24','song render',false,'ERR '+e.message)}
+/* G26 — MIDI export (offline — CI-asserted): compose FULL-ON 3min seed 424242
+   → songMidi (the SAME song expansion the WAV renderer walks: songSteps +
+   stepEvents) → writeMidi (pure format-1 writer) → parse the bytes back with
+   an in-gate minimal reader. Asserts: format 1, ppq 480, tempo == 145 BPM,
+   first kick tick == 0, per-track note counts == the expansion counts,
+   total ticks == Σbars·4·480, non-trivial size, deterministic bytes. */
+try{
+const c26=compose('FULL-ON',3,424242),p26=c26.project;
+const sm26=songMidi(p26);
+const bytes26=writeMidi(sm26);
+const bytes26b=writeMidi(songMidi(p26));
+let byteDet=true;for(let i=0;i<bytes26.length;i++){if(bytes26[i]!==bytes26b[i]){byteDet=false;break}}
+/* minimal parse-back reader: header, chunks, VLQ deltas, note on/off pairs */
+let o26=0;const u26=bytes26;
+const rd32=()=>((u26[o26]<<24)|(u26[o26+1]<<16)|(u26[o26+2]<<8)|u26[o26+3])>>>0;const rd16=()=>(u26[o26]<<8)|u26[o26+1];
+let hdrOk=u26[0]===0x4d&&u26[1]===0x54&&u26[2]===0x68&&u26[3]===0x64;o26+=4;const hl26=rd32();o26+=4;
+const fmt26=rd16();o26+=2;const nt26=rd16();o26+=2;const dv26=rd16();o26+=2;o26+=hl26-6;
+let mpqn26=0,midiTrkNotes=[],maxTick26=0;
+for(let ck=0;ck<nt26;ck++){
+const id26=String.fromCharCode(u26[o26],u26[o26+1],u26[o26+2],u26[o26+3]);o26+=4;const ln26=rd32();o26+=4;const end26=o26+ln26;
+let pp26=o26,tick26=0,run=0;const ons26=[];const notes26=[];
+while(pp26<end26){let v=0;for(;;){const b=u26[pp26++];v=(v<<7)|(b&0x7f);if(!(b&0x80))break}tick26+=v;
+let st=u26[pp26];if(st&0x80){pp26++;if(st<0xf0)run=st}else st=run;
+if(st===0xff){const ty=u26[pp26];pp26++;let ml=0;for(;;){const b=u26[pp26++];ml=(ml<<7)|(b&0x7f);if(!(b&0x80))break}
+if(ty===0x51){mpqn26=(u26[pp26]<<16)|(u26[pp26+1]<<8)|u26[pp26+2]}pp26+=ml}
+else{const a=u26[pp26++],b2=u26[pp26++];const cmd=st&0xf0,ch=st&0x0f;
+if(cmd===0x90&&b2>0)ons26.push({tick:tick26,ch,midi:a});
+else if(cmd===0x80||(cmd===0x90&&b2===0)){const ix=ons26.findIndex(x=>x.ch===ch&&x.midi===a);if(ix>=0){const on=ons26.splice(ix,1)[0];notes26.push({on:on.tick,midi:a,ch});if(tick26>maxTick26)maxTick26=tick26}}}
+}
+midiTrkNotes.push({id:id26,notes:notes26});o26=end26;
+}
+const tempo26=Math.round(60000000/mpqn26*1000)/1000;
+const kickName=p26.tracks[0].name;
+const kickTrk=midiTrkNotes.find(t=>t.notes.length&&t.notes.every(n=>n.ch===9));
+const kickFromSm=sm26.tracks.find(t=>(p26.tracks.find(x=>x.name===t.name)||{}).idx===0);
+const firstKick26=kickTrk?Math.min.apply(null,kickTrk.notes.map(n=>n.on)):-1;
+const countsOk=midiTrkNotes.slice(1).every((t,i)=>{const smt=sm26.tracks[i];return smt&&t.notes.length===smt.notes.length});
+const total26=p26.arranger.steps.reduce((a,s)=>a+s.bars,0)*4*480;
+const ok26=hdrOk&&fmt26===1&&dv26===480&&nt26===sm26.tracks.length+1&&Math.abs(tempo26-145)<0.01&&firstKick26===0&&countsOk&&maxTick26>total26-4*480&&maxTick26<=total26&&bytes26.length>1000&&byteDet;
+gate('G26','MIDI export: songMidi==WAV expansion, format-1 parse-back (tempo/channels/counts/total ticks), deterministic bytes',ok26,'bytes='+bytes26.length+' fmt='+fmt26+' ppq='+dv26+' trks='+nt26+' tempo='+tempo26+' firstKick='+firstKick26+' notes='+midiTrkNotes.reduce((a,t)=>a+t.notes.length,0)+' total='+total26+' det='+byteDet)}catch(e){gate('G26','MIDI export',false,'ERR '+e.message)}
+}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).
