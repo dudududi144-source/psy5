@@ -42,6 +42,28 @@ NOTE: nextVoice() -> set params -> schedule envelope -> active
 END: envelope completes -> voice returns to pool -> idle
 PANIC: cancelScheduledValues -> gain=0 -> idle
 
+### 3b. Dual engine — MAIN (default) | WORKLET (experimental)
+
+The power screen selects the audio engine. MAIN (section 3) is the default
+and the reference; nothing about it changes when WORKLET exists.
+
+**WORKLET** (`js/worklet-engine.js` + `worklets/psy-engine.js`, processor
+`psy-engine`): the MAIN thread scheduler keeps computing events; the worklet
+fires them sample-accurately on the audio thread. Mapping model→worklet:
+voice ids per track kind/type, MIDI→Hz, bpm + per-bus delay/reverb sends
+(bus send = max of member tracks). What cannot map cleanly is skipped and
+documented on the power screen (fixed delay length, fixed-shape bass duck,
+world-param synth voices, worklet-internal IR) — never approximated
+silently.
+
+Transport channels: LIVE — outbox handshake (commands buffer until the
+worklet's first `stats` message proves the port is attached; Chrome builds
+processors lazily and pre-attach posts are lost nondeterministically).
+OFFLINE — commands are replayed at construction via
+`processorOptions.initialMessages` (the offline render thread never drains
+its input message queue). Self-Gate: MAIN runs 15/15; WORKLET runs a reduced
+but real 3/3 (G2, G14w, G15w) using the worklet's own stats.
+
 ## 4. Brain Layer — Generative Composition
 
 ### ContinuousMusicalState
@@ -117,8 +139,15 @@ Web MIDI API: navigator.requestMIDIAccess()
 
 ## 9. Performance Budget
 
-Target: 60fps UI, 0 audio dropouts at 145 BPM
+Target: 60fps UI; allocation-free `process()` hot path; worker-timed
+lookahead scheduling to minimise timing jitter at 145 BPM. There is **no
+absolute "zero dropouts" guarantee** — GC-pause risk is minimised by design
+(preallocated pools, no per-note nodes), and the optional WORKLET engine
+moves rendering onto the audio thread, but real-time audio depends on the
+host machine. The Self-Gate (15/15 MAIN, 3/3 WORKLET) is the regression
+harness; it does not certify a host.
 Memory: 20 SynthVoice + 24 DrumVoice (pre-allocated), 0 runtime allocations
+in the `process()`/trigger hot path
 CPU: Scheduler < 1ms, Voice trigger < 0.1ms, UI render < 8ms
 
 ## 10. Deployment

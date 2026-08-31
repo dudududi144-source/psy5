@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 74 tests across 7 files — 74 pass / 0 fail (1004 expect() calls)
+bun test             # 102 tests across 10 files — 102 pass / 0 fail (6321 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 ```
 
@@ -51,11 +51,14 @@ Suite breakdown (all runnable with `bun test`):
 | --- | --- | --- |
 | `tests/voice-stealing.test.ts` | 11 | worklet priority-tier voice allocation |
 | `tests/determinism.test.ts` | 18 | per-bar seeding, groove templates, micro timing |
-| `tests/master-oversampling.test.ts` | 3 | 2x oversampled master saturation + aliasing benchmark |
+| `tests/master-oversampling.test.ts` | 4 | 2x oversampled master saturation + aliasing benchmark + non-silent-output guard |
 | `tests/foundation-primitives.test.ts` | 13 | foundation PRNG / fnv1a / scale tables (pinned vectors) |
 | `tests/soundbank.test.ts` | 4 | sound bank coherence |
 | `tests/copilot.test.ts` | 18 | co-pilot contextual bandit: context building, reward mapping, serialization round-trip, determinism, foundation extension |
 | `tests/arranger.test.ts` | 7 | section arranger: bar-quantized advance, persistence, manual override, paused transport |
+| `tests/sidechain.test.ts` | 10 | kick-triggered sidechain: envelope shape, overlap continuity, project round-trip |
+| `tests/sends.test.ts` | 9 | BPM-synced delay divisions, feedback clamps, deterministic IR, project round-trip |
+| `tests/bounce.test.ts` | 8 | bounce schedule determinism, WAV header/data integrity, clipping |
 
 ## Benchmarks
 
@@ -64,16 +67,67 @@ against. Latest run — sawtooth sweep 12→16 kHz @ 44.1 kHz through the real
 worklet MasterChain, alias-only band 16.5–22.05 kHz:
 
 - native saturation: **68.5 dB** alias-band energy
-- 2x oversampled saturation: **−11.0 dB**
-- **reduction: 79.6 dB**
+- 2x oversampled saturation: **60.4 dB**
+- **reduction: 8.2 dB**
 
-Device Self-Gate (Self-Gate tab → RUN SELF-GATE): **10/10 passed**, including
-G9 — 64 consecutive hats + kick on every 4th step under deliberate pool
-overload: `kicks=16/16 hats=64/64 tier0Steals=0 steals=70/0/2 peak=0.752`
-(the kick is never dropped, zero tier-0 voice starvation), and G10 — the
-CO-PILOT learner ranks a consistently rewarded action above a zero-reward one
-(`fillAvg=1.00(n=45) > varAvg=0.00(n=2)`, probe `exploit fill`) and abstains
-(DO_NOTHING) when every candidate's expected reward is below the threshold.
+**Correction (v0.3.0):** an earlier version of this document claimed a
+**79.6 dB** reduction. That claim was vacuous: the oversampler never advanced
+its input ring cursor (`osInIdx`), so the “oversampled” path re-read stale
+input and produced a heavily-attenuated (near-silent) output — the old number
+measured near-silence, not alias reduction. The cursor now advances, the
+benchmark asserts the honest figure, and a **non-silent-output guard test**
+(oversampled-path peak > 0.5, measured 0.729) prevents a silent-output
+regression from faking the number again.
+
+Device Self-Gate (Self-Gate tab → RUN SELF-GATE): **15/15 passed** in the
+default MAIN engine, including:
+
+- **G9** — 64 consecutive hats + kick on every 4th step under deliberate pool
+  overload (3-voice drum pool): `kicks=16/16 hats=64/64 tier0Steals=0
+  steals=70/0/2 peak=0.752` (the kick is never dropped, zero tier-0 voice
+  starvation).
+- **G10** — the CO-PILOT learner ranks a consistently rewarded action above a
+  zero-reward one (`fillAvg=1.00(n=45) > varAvg=0.00(n=2)`, probe `exploit
+  fill`) and abstains (DO_NOTHING) when every candidate's expected reward is
+  below the threshold.
+- **G11 (sidechain)** — kick ducks `scAmount>0` buses ≥60 % within the attack
+  window, full recovery before the next kick, zero automation when every
+  `scAmount=0`: `dipMin=72% recoveryMin=100% amt0Events=0 amt75Events=8`.
+- **G12 (sends)** — send>0 → signal in the bus output, send=0 → silent tail;
+  BPM-synced delay times at 145 BPM for 1/8 / 3/16 / 1/4 =
+  `206.9/310.3/413.8 ms`; IR byte-identical to the canonical seeded PRNG.
+- **G13 (bounce)** — offline WAV render spans the exact scheduled sample
+  count, is non-silent, and its event schedule hash is identical across
+  renders: `samples=148192/148192 rms=0.089 schedIdentical=true`.
+- **G14/G15** — full-project render with zero residual events
+  (`peak=0.785 residualEvents=0`) and overload at DEFAULT pools (`tier0Steals=0
+  hatSteals=41 kicks=16/16 peak=1.016`).
+
+In the optional WORKLET engine the Self-Gate runs a reduced but real set:
+**3/3 passed** (G2 deterministic build; G14w boot + sample-accurate queue
+drain + all kicks voiced, `peak=0.710 residualEvents=0 kicksVoiced=8/8`;
+G15w overload via worklet stats, `tier0Victims=0 hatSteals=188
+kicksVoiced=16/16 peak=0.938`).
+
+## Two engines — MAIN (default) and WORKLET (experimental)
+
+The power screen offers a choice of audio engine:
+
+- **MAIN** (default) — the pooled Web Audio engine (`js/engine.js`):
+  preallocated synth/drum voice pools, per-track bus chain with kick-triggered
+  sidechain ducking, BPM-synced delay + seeded-IR reverb sends, worker-timed
+  lookahead scheduler. Full Self-Gate (15/15).
+- **WORKLET** (experimental) — the single-processor AudioWorklet engine
+  (`worklets/psy-engine.js`, processor `psy-engine`) driven through the
+  adapter in `js/worklet-engine.js`. The MAIN thread schedules; the worklet
+  fires events sample-accurately on the audio thread. Reduced Self-Gate
+  (3/3).
+
+WORKLET limitations (also listed on the power screen — nothing is faked):
+per-track sends collapse to per-BUS max; delay division not exposed (fixed
+0.5 s buffer); per-track sidechain → single fixed bass-bus duck; synth
+editor params → worklet world params; worklet-internal reverb IR. What
+CANNOT map cleanly is skipped and documented, never approximated silently.
 
 ## Device identity
 
@@ -94,7 +148,10 @@ psy-foundation (shared musical primitives)
       PSY6 device
    ├── model        patterns, steps, scales, deterministic RNG
    ├── scheduler    worker-timer + lookahead loop
-   ├── engine       pooled voices (synth 20 / drum 24), master chain
+   ├── engine       pooled voices (synth 20 / drum 24), sidechain duck buses,
+   │                delay/reverb send buses, master chain  ← MAIN (default)
+   ├── worklet-engine  model→worklet adapter                ← WORKLET (experimental)
+   ├── bounce       offline WAV render (fresh graph, exact scheduling)
    └── UI           Perform · Sequencer · Sound · Mixer · Self-Gate
 ```
 

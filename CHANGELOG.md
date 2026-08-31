@@ -3,6 +3,106 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.3.0] — Run 4: SOUND SIGNATURE + CAPTURE
+
+### Added — kick-triggered sidechain ducking (`feat: kick-triggered sidechain ducking`)
+
+- Per-track `scAmount` 0–100 (**default 0 — zero behavior change**),
+  `scAttackMs` 12 / `scHoldMs` 0 / `scReleaseMs` 140; backfilled into projects
+  saved before sidechain existed.
+- Engine: ONE persistent `duck` GainNode per track bus (input → duck → pan),
+  created at init — **no per-hit nodes**. Kick events automate every bus whose
+  `scAmount > 0` (never the kick's own bus) using ONLY `setValueAtTime` +
+  `linearRampToValueAtTime`: dip to `1 − amount/100` → attack → [hold] →
+  linear recovery.
+- Overlap-safe: fast 16th-note kick rolls at 145 BPM start each new envelope
+  from the exact value of the previous one — value-continuous, click-free,
+  always recovers to 1.0. Envelope math lives in
+  `foundation/dsp/sidechain.mjs` (pure, deterministic, bun-testable).
+- Mixer strips: SC depth slider + attack/hold/release drawer (⋯).
+- Self-Gate **G11** (offline render; the duck is isolated as the ducked/plain
+  window-RMS ratio, removing the synth's own note envelope from the
+  measurement): `dipMin=72% recoveryMin=100% amt0Events=0 amt75Events=8`.
+- Tests: `tests/sidechain.test.ts`.
+
+### Added — per-track delay/reverb sends (`feat: per-track delay and reverb sends`)
+
+- DELAY bus: BPM-synced, division `1/8 | 3/16 (default) | 1/4`, feedback
+  0–80 % (default 35 %) with a 4.5 kHz lowpass inside the feedback loop.
+- REVERB bus: deterministic synthetic stereo IR — seeded decorrelated noise
+  (canonical `mulberry32`, one seed per channel), exponential decay over
+  ~1.8 s, generated at init. No external files, no `Math.random`; the same
+  seeds produce a byte-identical IR on every machine.
+- Per-track `mix.sendA` / `mix.sendB` 0–100 (**default 0 — zero behavior
+  change**) — post-fader taps; project `fx {delayDiv, delayFb}` + backfill.
+- Mixer: DLY/REV per strip + global DIV/FB controls.
+- Self-Gate **G12**: `sendRMS=0.0150 reverbRMS=0.0050 zeroRMS=0.0001
+  delay@145ms=206.9/310.3/413.8 irIdentical=true`.
+- Tests: `tests/sends.test.ts`.
+
+### Added — offline WAV bounce (`feat: offline WAV bounce`)
+
+- BOUNCE button → modal (loops 1/2/4/8, default 2) → offline render through a
+  FRESH engine graph (the live engine is never touched) → 16-bit PCM stereo
+  44.1 kHz WAV (44-byte RIFF header) → download `psy6-bounce-<bpm>bpm.wav`.
+- Same event function as live playback (per-bar seeded `stepEvents`) — the
+  schedule is deterministic; two renders of the same project have byte-identical
+  schedules. Documented difference vs live: no worker-timer lookahead jitter —
+  events land at mathematically exact sample positions.
+- Self-Gate **G13**: `samples=148192/148192 rms=0.089 schedIdentical=true`.
+- Tests: `tests/bounce.test.ts`.
+
+### Added — optional worklet engine mode (`feat: optional worklet engine mode (experimental, documented)`)
+
+- Power screen engine selector: **MAIN** (pooled — default and reference) |
+  **WORKLET** (experimental). MAIN is untouched by default (zero behavior
+  change).
+- `js/worklet-engine.js`: model→worklet mapping (voice ids, MIDI→Hz, bpm,
+  per-bus sends) + **documented limitations** (per-track sends collapse to
+  per-BUS max; fixed 0.5 s delay length — no division control; fixed-shape
+  bass-bus duck instead of per-track sidechain; worklet world-params drive
+  synth voices, not the synth editor; worklet-internal IR). The power screen
+  lists the limitations verbatim.
+- Transport channels: LIVE — outbox handshake (commands buffer until the
+  worklet's first `stats` message proves the processor port is attached;
+  Chrome builds processors lazily and pre-attach posts are lost
+  nondeterministically) with a 200 ms timer backstop; OFFLINE — commands are
+  replayed at construction via `processorOptions.initialMessages` because the
+  offline render thread never drains its input message queue.
+- Self-Gate is mode-aware: **15/15 in MAIN** (G1–G15), **3/3 reduced set in
+  WORKLET** (G2 + G14w + G15w — real checks on worklet stats, not skipped).
+  Evidence: G14 `peak=0.785 residualEvents=0` · G15 `tier0Steals=0
+  hatSteals=41 kicks=16/16 peak=1.016` · G14w `peak=0.710 residualEvents=0
+  kicksVoiced=8/8` · G15w `tier0Victims=0 hatSteals=188 kicksVoiced=16/16
+  peak=0.938`.
+- `fix: resume suspended AudioContext on power on` — the context is now
+  `resume()`d on power-on (autoplay-policy-safe); both engines verified
+  producing live audio in a real browser.
+
+### Fixed — the "79.6 dB" aliasing claim was vacuous
+
+- The 2x oversampled master saturation never advanced its input ring cursor
+  (`osInIdx`), so the oversampler re-read stale input: the "2x oversampled"
+  path processed a heavily-attenuated (near-silent) signal and the earlier
+  **79.6 dB reduction** claim was a measurement of near-silence — not of
+  alias reduction. The old test asserted `reduction > 10 dB`, which the
+  broken path "passed" vacuously.
+- Fixed (all three `processSat` copies): the cursor advances.
+  **Honest benchmark** (same sweep, same band): native **68.5 dB** →
+  oversampled **60.4 dB** → **reduction 8.2 dB**. A non-silent-output guard
+  test now prevents a silent-output regression from faking the number again
+  (oversampled-path peak must be > 0.5; measured 0.729).
+
+### Verified (this release)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Test suite | `bun test` | **102 pass / 0 fail**, 10 files, 6321 expect() calls |
+| Repo gates | `node tools/verify.mjs` | **GREEN (0 failures)** |
+| Aliasing benchmark | `bun test tests/master-oversampling.test.ts` | 68.5 dB → 60.4 dB (**8.2 dB reduction**, honest) |
+| Device Self-Gate, MAIN | Self-Gate tab → RUN SELF-GATE | **15/15 passed** |
+| Device Self-Gate, WORKLET | power screen → WORKLET → RUN SELF-GATE | **3/3 passed** (reduced set) |
+
 ## [0.2.0] — Run 3: GO LIVE + BRAIN
 
 ### Added
