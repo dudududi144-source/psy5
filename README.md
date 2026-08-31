@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 147 tests across 14 files — 147 pass / 0 fail (6886 expect() calls)
+bun test             # 208 tests across 19 files — 208 pass / 0 fail (29935 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -64,6 +64,11 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/capture.test.ts` | 7 | live capture: buffer growth accounting, bar-quantization math, bounce-encoder reuse |
 | `tests/stems.test.ts` | 6 | stem discovery, per-track schedule determinism, full-mix hash unchanged |
 | `tests/share.test.ts` | 12 | share links: canonical ordering, round-trip, determinism, learner survival, size guards |
+| `tests/limits.test.ts` | 14 | v0.5.0 ceilings: 16 tracks / 128 steps / 64 scenes, mixed loopLen, addTrack, step-alias regression, legacy byte-stability |
+| `tests/scenes.test.ts` | 14 | scene bank: add/duplicate/clear/reorder/rename/color/bars/fill, chain over 32+ scenes, launch semantics, persistence |
+| `tests/params.test.ts` | 12 | param registry completeness + clamps, recordPoint/quantStep math, applyLanes state-vs-lock, MIDI→lane mapping |
+| `tests/composer.test.ts` | 14 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed uniqueness, output integrity |
+| `tests/usability.test.ts` | 7 | shortcut registry (no collisions, taskbook bindings), demo recipes recompose + boot |
 
 ## Self-Gate in CI
 
@@ -146,6 +151,60 @@ In the optional WORKLET engine the Self-Gate runs a reduced but real set:
 drain + all kicks voiced, `peak=0.710 residualEvents=0 kicksVoiced=8/8`;
 G15w overload via worklet stats, `tier0Victims=0 hatSteals=188
 kicksVoiced=16/16 peak=0.938`).
+
+## Features (v0.5.0) — UNLIMIT + COMPOSER
+
+### Ceilings (raised, defaults unchanged)
+
+| Limit | v0.4.0 | v0.5.0 | How to reach it |
+| --- | --- | --- | --- |
+| Tracks | 8 | **16** | +TRACK button (Perform tab) |
+| Steps per pattern-track | 32 | **128** | length select (Sequencer) |
+| Scenes | 8 | **64** | +SCENE in the scene bank |
+| Pattern length options | 4–32 | **8/16/32/64/128** | length select |
+| Loop length cap | 96 | **1024** | automatic (LCM of track lengths) |
+| Voice pools | 20 synth + 24 drum | **unchanged** | polyphony absorbed by priority stealing |
+
+New projects still start 8 tracks / 16-step patterns / 8 scenes; legacy
+projects load and sound identically (fields backfilled; load→save
+byte-stable after one canonicalizing load).
+
+### Scene bank
+
+64 scenes with inline rename, duplicate, clear, reorder (up/down), color
+tags, per-scene bars override (pre-fills the arranger), and a per-scene
+auto-FILL toggle (fires the existing FILL op at launch — instant or at the
+quantized bar boundary). Launch semantics unchanged: click = quantized,
+alt = instant, shift+click = assign.
+
+### Full-parameter automation
+
+Every automatable parameter (23 in the registry: synth sound, mixer, sidechain,
+master, macros) has a lane. Lanes are `(track, param)` pairs; `'state'` lanes
+apply per-step through the registry (knob-equivalent), legacy `'lock'` lanes
+keep exact per-voice behavior. ARM-AUTO + per-lane arm records knob moves and
+MIDI CC into armed lanes at the quantized playhead — multiple lanes at once.
+Editor: param picker, lane list with live value readout, curve canvas + playhead.
+
+### Song composer (flagship)
+
+COMPOSE (power screen + header) generates a complete unique arrangement —
+INTRO→BUILD→DROP→BREAK→RISER→DROP2→OUTRO — from `(seed, style, minutes)`:
+FULL-ON 145 / DARK-PSY 148 / PROGRESSIVE 138 BPM, 3/5/8 minutes (length
+error < 1 % by construction, ±5 % asserted), per-section patterns with
+energy-scaled recipes, lead motif varied per section via foundation
+MotifTransformer, fills, a 9th FX riser track, filter/send lane suggestions,
+and the arranger chain pre-loaded. Same seed = byte-identical song; 20 seeds
+→ all pairwise different. Overwrite protection: composing over a non-empty
+project requires an explicit confirm and happens in a fresh in-memory project.
+
+### Usability
+
+Keyboard shortcuts from a single tested registry (Space play/stop, arrows
+scene prev/next, 1-8 pads, Shift+1-8 track select, f fill, v variation,
+b bounce, ? help overlay, Esc close), tooltips on all header controls, two
+shipped demo songs (composer recipes — deterministic recomposition), touch
+targets ≥ 40 px on primary controls, 390 px layout verified.
 
 ## Features (v0.4.0)
 

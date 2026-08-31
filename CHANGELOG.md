@@ -3,6 +3,122 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.5.0] — Run 7: UNLIMIT + COMPOSER
+
+### Added — device limits lifted (`feat: lift device limits (16 tracks, 128 steps, 64 scenes)`)
+
+- `js/limits.js` — single-source ceilings: `MAX_TRACKS 16`, `MAX_STEPS 128`,
+  `MAX_SCENES 64`, `PATTERN_LENGTHS {8,16,32,64,128}`, `LOOP_CAP 1024`.
+  `DEFAULTS` (8 tracks / 16-step patterns / 8 scenes) are unchanged since
+  v0.1.0 — raised limits are CEILINGS reached only by explicit user action.
+- `+TRACK` action grows projects to 16 (neutral INIT-SYNTH preset; pattern
+  data grows with it). Voice pools did NOT grow — polyphony is absorbed by
+  the existing priority voice stealing.
+- Sequencer: 128-step grid with zoom + horizontal scroll, O(1) playhead
+  toggling (no per-frame sweep), legacy lengths (4/12/24) surfaced in the
+  length select instead of silently mis-displaying.
+- FIX (pre-existing): lengthening a pattern SHARED step objects across
+  repeats — editing step 16 silently edited step 0. Steps are now cloned
+  (lock objects included). Regression-tested.
+- G21 (offline, CI-asserted): 128-step pattern with events at steps 0/64/127
+  — exact order on the deterministic schedule AND audible onsets in the
+  render, silent gap, `loopLen=128`; a 12-track project renders 12
+  non-silent stems (min peak 0.167).
+- Reproduce: `bun test tests/limits.test.ts` · `bun test` → 161/161 at this
+  commit · `GATE_EXTRA=G21 bun /home/z/.run6/psy7-p0-local.mjs` →
+  `SELF-GATE: 20/20 passed`.
+
+### Added — scene bank (`feat: scene bank (64 scenes, manage UI)`)
+
+- `js/scenes.js` — DOM-free scene operations + the documented scene schema:
+  `{name, pattern, color 0-7|null, bars 1-64|null, fill bool}`. Fields are
+  backfilled on load with neutral defaults and rebuilt in canonical key
+  order so load→save stays byte-stable.
+- Scene bank UI: scrollable bank up to 64 scenes, inline rename, duplicate,
+  clear, reorder (up/down), color tags, per-scene bars override (pre-fills
+  the arranger section length), per-scene auto-FILL toggle (fires the FILL
+  op at launch — instant or at the quantized bar boundary), current/queued
+  indicators, +SCENE.
+- Launch semantics unchanged: click = quantized, alt = instant,
+  shift = assign (assign no longer clobbers custom names). Chain advance
+  extracted to pure `chainNext` (32+ scene wrap tested).
+- Reproduce: `bun test tests/scenes.test.ts` (14 tests) · headless UI flow
+  10/10 (driver in worklog).
+
+### Added — automation everywhere (`feat: full-parameter automation lanes + live recording`)
+
+- `js/params.js` — param registry: 23 automatable parameters
+  (`{id,label,min,max,def,target,apply}`): synth sound (cutoff/res/atk/dec/
+  sus/rel/gate/detune/lfoRate/lfoDepth), mixer (vol/pan/sendA/sendB),
+  sidechain (scAmount/attack/hold/release), project (masterVol, 4 macros).
+  Every apply clamps; per-kind filtering (drum tracks get no synth params).
+- Lane model: `{track, param, pts, mode}` — `mode:'lock'` = legacy per-voice
+  lane (exact v0.1.0–v0.4.0 behavior; legacy lanes backfill to it),
+  `mode:'state'` = live automation applied EVERY STEP through the registry
+  (knob-equivalent writes; scheduler syncs the engine after mix/sc/master
+  and re-resolves macros).
+- Recording: ARM-AUTO + per-lane arm (multiple simultaneous); knob moves
+  (mixer, synth editor, macros) and MIDI CC via the existing midiMap land
+  in armed lanes at the quantized playhead (1/16, toggleable off).
+- Automation editor: param select, +LANE, ARM-AUTO, Q toggle, clear, lane
+  list with live value readout, curve canvas + playhead.
+- G22 (CI-asserted): scripted record session writes the EXACT expected
+  quantized points (replace on duplicate); offline apply matches laneEval
+  within 1e-9; lock lanes never touch track state.
+- Reproduce: `bun test tests/params.test.ts` (12 tests).
+
+### Added — song composer (`feat: deterministic song composer (complete unique arrangements)`)
+
+- `js/composer.js` — pure, deterministic, seeded by (seed, style, minutes).
+  Section chain INTRO→BUILD→DROP→BREAK→RISER→DROP2→OUTRO with energy arcs
+  (foundation `arcAt`); bars scale to the target as multiples of 4 and sum
+  EXACTLY to the target (3-min FULL-ON = 108 bars = 178.76 s, −0.69 %).
+- 3 style templates: FULL-ON 145 / DARK-PSY 148 / PROGRESSIVE 138 BPM, per
+  style preset maps; 9th FX track carries the riser preset.
+- Per-section patterns (≤128-step ceiling; longer sections repeat their
+  scene in the arranger). Recipes scale with section energy; fills end
+  BUILD/RISER; psy-push groove is COMPOSED INTO bass micro offsets on drops
+  (project groove is global); the lead motif is varied per section through
+  foundation `MotifTransformer` (transpose/invert/retrograde/omission/
+  fragmentation/octaveShift).
+- Lane suggestions via the registry: BUILD lead cutoff sweep, RISER pad
+  sendA/B rise (`mode:'state'`).
+- Uniqueness: 20 seeds → all 190 pairs JSON-unequal AND ≥90 % unique
+  melodic fingerprints (same seed = byte-identical, tested).
+- UI: power-screen COMPOSE row + header modal (style/length/seed editable,
+  overwrite confirm, fresh in-memory project, lands on Perform with the
+  arranger active and playing).
+- G23 (CI-asserted): fixed seed → 7 sections, length ±5 %, byte-identical
+  regenerate, EVERY section bounces non-silent — per-section RMS
+  `[0.0613, 0.0984, 0.1113, 0.0878, 0.0906, 0.1076, 0.0587]`.
+- Reproduce: `bun test tests/composer.test.ts` (14 tests).
+
+### Added — usability (`feat: usability pass (shortcuts, tooltips, demos, touch targets)`)
+
+- `js/shortcuts.js` — single shortcut registry; the keydown dispatcher AND
+  the help overlay render from it; collision finder unit-tested. Audit:
+  the only prior global handler was Space/r/z/1-8 in header.js; 1-8 moved
+  to pad triggers, track select to Shift+1-8; arrows (scene prev/next),
+  f (fill), v (variation), b (bounce), ? (help) are new.
+- Native tooltips on header controls; demo songs as composer recipes
+  (`data/demos/*.json`, 460 B each — the client recomposes byte-identically;
+  loading boots into memory only); touch targets ≥ 40 px on primary
+  controls; 390 px width verified with no horizontal page scroll.
+- Reproduce: `bun test tests/usability.test.ts` (7 tests).
+
+### Battery at release
+
+- `bun test` → **208/208 across 19 files (29 935 expects)** · `node
+  tools/verify.mjs` → GREEN (0 failures) · device Self-Gate **22/22 MAIN**
+  (G1-×4, G2, G5, G6, G8, G9, G10, G11, G12, G13, G14, G15, G16, G17, G18,
+  G19, G21, G22, G23) + **3/3 WORKLET** · `tools/e2e.mjs` CI subset = 21
+  asserted (all MAIN gates except realtime G17). The taskbook anticipated
+  "23/23"; the honest count is 22 (19 + G21/G22/G23).
+- G17 note: the realtime capture gate passes on idle sessions (skew 6 ms)
+  and may exceed its ±50 ms skew under concurrent offline-render load
+  (ScriptProcessor buffer-fill artifact) — it remains info-only in CI, as
+  documented since v0.4.0.
+
 # CHANGELOG — PSY6
 
 All notable changes to the PSY6 device repository. Every claim below is

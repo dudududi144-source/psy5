@@ -213,3 +213,80 @@ state (`p.copilot`) travels inside the project payload.
 ---
 Architecture version: 1.2
 Status: IMPLEMENTED
+
+## v0.5.0 — UNLIMIT + COMPOSER
+
+### Limits config (`js/limits.js`)
+
+Single source of truth for hard ceilings: `MAX_TRACKS 16`, `MAX_STEPS 128`,
+`MAX_SCENES 64`, `PATTERN_LENGTHS {8,16,32,64,128}`, `LOOP_CAP 1024`.
+`DEFAULTS` (8 tracks / 16 steps / 8 scenes) preserve historical behavior.
+Every consumer reads the config (no hard-coded numbers); raising a ceiling
+never grows the pre-allocated voice pools — priority voice stealing absorbs
+polyphony. Growth is always an explicit user action (+TRACK / length select /
++SCENE).
+
+### Param registry + automation (`js/params.js`, `js/autorec.js`)
+
+23 automatable parameters as `{id, label, min, max, def, target, apply}`;
+`apply(target, v)` writes through to the live state with clamping — the same
+path a knob uses. Lanes are `{track, param, pts, mode}`:
+
+- `mode:'lock'` — legacy per-voice lane: values ride `ev.lock` into voices
+  (stepEvents), no state writes. All pre-v0.5.0 lanes backfill to this for
+  sound params → byte-identical legacy behavior.
+- `mode:'state'` — live automation: the scheduler evaluates the lane
+  (linear interpolation, `laneEval`) EVERY STEP and writes through the
+  registry; mix/sidechain touches trigger an engine `syncMix`, macro lanes
+  re-resolve targets, project params (`masterVol`, `macro.N`, `track:-1`)
+  target the project.
+
+Recording: ARM-AUTO (master enable) + per-lane arm (targets; multiple
+simultaneous). Knob moves (mixer, synth editor, macros) and MIDI CC via the
+existing midiMap funnel into `autoRecMove(track, param, raw)` which lands
+points at the quantized playhead step (1/16 toggleable; exact fractional
+position when off). Points replace on identical steps, insert sorted, cap
+at 512. The automation editor (lane list + curve canvas + playhead) renders
+from the same registry.
+
+### Composer pipeline (`js/composer.js`)
+
+Pure and deterministic — no DOM, no Date.now/Math.random; every decision
+draws from `rngFor(seed, label)` sub-streams over the foundation primitives:
+
+1. **Form**: section chain INTRO→BUILD→DROP→BREAK→RISER→DROP2→OUTRO with
+   per-section energy arcs; `totalBars = minutes·bpm/4` snapped to multiples
+   of 4; weights allocate bars (min 4, multiples of 4) with the remainder
+   absorbed by the longest section — the bar sum equals the target exactly.
+2. **Patterns**: one per section, `len = min(bars,8)·16` (respects the
+   128-step ceiling; longer sections repeat their scene in the arranger).
+   All tracks share the section length so `loopLen` is exact.
+3. **Recipes**: kick/bass/hats/perc/snare/lead/pad/arp/fx scaled by the
+   section energy; snare-roll fills end BUILD and RISER; the psy-push groove
+   is composed INTO bass micro offsets on drops (project groove is global);
+   the lead motif is generated on the scale and varied per section via
+   foundation `MotifTransformer` (drops state it, BREAK inverts or
+   retrogrades, BUILD fragments, RISER shifts octaves, OUTRO omits).
+4. **Lanes**: BUILD lead cutoff sweep + RISER pad sendA/B rise, written as
+   `mode:'state'` lanes through the registry.
+5. **Output**: scenes renamed by section (color-tagged, bars override set),
+   9th FX track with the riser preset, arranger `[{scene,bars}]` pre-loaded,
+   `p.arranger.on`. Same seed+style+minutes → byte-identical project;
+   different seeds → different fingerprints (tested across 20 seeds).
+
+The UI (power-screen row + header modal) collects style/length/seed, guards
+overwrites with an explicit confirm, and lands on the Perform tab with the
+arranger active — composition happens in a fresh in-memory project the user
+keeps or discards.
+
+### Shortcut registry (`js/shortcuts.js`)
+
+Single table drives both the keydown dispatcher and the help overlay;
+`findCollisions()` is unit-tested empty. The registry is the audit record:
+before v0.5.0 the only global bindings were Space/r/z/1-8 (header.js);
+1-8 moved to pad triggers, track selection to Shift+1-8, and arrows, f, v,
+b and ? were added.
+
+---
+Architecture version: 1.3
+Status: IMPLEMENTED
