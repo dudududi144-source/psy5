@@ -1,5 +1,5 @@
 import { clamp, mulberry32, loopLen, M_ENERGY, M_SPACE } from './model.js';
-import { laneModeBackfill, paramApply, paramById } from './params.js';
+import { laneModeBackfill, paramApply, paramById, paramDenorm, ensureMaster } from './params.js';
 import { recordPoint, quantStep } from './autorec.js';
 import { normalizeSceneMix, applySceneMix } from './scenes.js';
 
@@ -28,6 +28,7 @@ const parts=String(path).split('.');
 if(parts[0]==='track'&&parts[2]==='mix')return{track:+parts[1],param:'mix.'+parts[3]};
 if(parts[0]==='track'&&parts[2]==='scAmount')return{track:+parts[1],param:'scAmount'};
 if(parts[0]==='master'&&parts[1]==='vol')return{track:-1,param:'masterVol'};
+if(parts[0]==='master'&&parts.length===2)return{track:-1,param:parts[1]};
 if(parts[0]==='macro')return{track:-1,param:'macro.'+parts[1]};
 return null}
 function recordFromMidiPath(p,path){
@@ -35,7 +36,9 @@ const map=midiPathToParam(path);if(!map||!p)return false;
 let raw=null;
 if(map.track>=0){const t=p.tracks[map.track];if(!t)return false;
 raw=map.param==='scAmount'?t.scAmount:t.mix[map.param.slice(4)]}
-else raw=map.param==='masterVol'?p.masterVol:p.macroVals[+map.param.slice(6)];
+else if(map.param==='masterVol')raw=p.masterVol;
+else if(map.param.startsWith('macro.'))raw=p.macroVals[+map.param.slice(6)];
+else raw=p.master?ensureMaster(p)[map.param]:undefined;
 if(raw==null||!isFinite(raw))return false;
 return autoRecMove(map.track,map.param,raw)}
 
@@ -44,16 +47,18 @@ const PERF={toggleLayer(which){const p=I.p;pushHist();if(which==='drums')for(let
 const K_MAIN='psy6.main.v1',K_TMP='psy6.tmp.v1';
 function saveProject(){try{if(I.copilotSnapshot&&I.p)I.copilotSnapshot();const j=JSON.stringify(I.p);localStorage.setItem(K_TMP,j);localStorage.setItem(K_MAIN,j);localStorage.removeItem(K_TMP);I.dirty=false;return{ok:true}}catch(e){return{ok:false,err:String(e)}}}
 function loadStored(){try{let j=localStorage.getItem(K_MAIN);if(!j)j=localStorage.getItem(K_TMP);if(!j)return null;const p=JSON.parse(j);if(!p||p.version!==3||!p.tracks)return null;return p}catch(e){return null}}
-function loadProjectObj(p){if(p.seed==null)p.seed='PSY6';if(!p.groove)p.groove='straight';/* sidechain backfill (PSY6): projects saved before ducking existed get the neutral defaults — zero behavior change */if(p.tracks)for(const t of p.tracks){if(t.scAmount==null)t.scAmount=0;if(t.scAttackMs==null)t.scAttackMs=12;if(t.scHoldMs==null)t.scHoldMs=0;if(t.scReleaseMs==null)t.scReleaseMs=140}/* master volume backfill — 0.85 is the historical hard-coded engine value */if(p.masterVol==null)p.masterVol=.85;/* midi map backfill — projects saved before MIDI IN existed get an empty map */if(!p.midiMap||p.midiMap.version!==1||!p.midiMap.bindings||typeof p.midiMap.bindings!=='object')p.midiMap={version:1,bindings:{}};/* send-bus backfill: delay division + feedback (defaults 3/16, 35%) */if(!p.fx)p.fx={delayDiv:'3/16',delayFb:.35};if(p.fx.delayDiv!=='1/8'&&p.fx.delayDiv!=='3/16'&&p.fx.delayDiv!=='1/4')p.fx.delayDiv='3/16';if(p.fx.delayFb==null||!isFinite(p.fx.delayFb))p.fx.delayFb=.35;p.fx.delayFb=Math.max(0,Math.min(.8,p.fx.delayFb));/* scene bank backfill (v0.5.0): color/bars/fill are new per-scene fields —
+function loadProjectObj(p){if(p.seed==null)p.seed='PSY6';if(!p.groove)p.groove='straight';/* sidechain backfill (PSY6): projects saved before ducking existed get the neutral defaults — zero behavior change */if(p.tracks)for(const t of p.tracks){if(t.scAmount==null)t.scAmount=0;if(t.scAttackMs==null)t.scAttackMs=12;if(t.scHoldMs==null)t.scHoldMs=0;if(t.scReleaseMs==null)t.scReleaseMs=140}/* master volume backfill — 0.85 is the historical hard-coded engine value */if(p.masterVol==null)p.masterVol=.85;/* v0.8.0 master-section backfill: legacy projects get the NEUTRAL defaults (EQ 0 dB, glue bypassed); existing values are clamped into the registry ranges */if(p.tracks)ensureMaster(p);/* midi map backfill — projects saved before MIDI IN existed get an empty map */if(!p.midiMap||p.midiMap.version!==1||!p.midiMap.bindings||typeof p.midiMap.bindings!=='object')p.midiMap={version:1,bindings:{}};/* send-bus backfill: delay division + feedback (defaults 3/16, 35%) */if(!p.fx)p.fx={delayDiv:'3/16',delayFb:.35};if(p.fx.delayDiv!=='1/8'&&p.fx.delayDiv!=='3/16'&&p.fx.delayDiv!=='1/4')p.fx.delayDiv='3/16';if(p.fx.delayFb==null||!isFinite(p.fx.delayFb))p.fx.delayFb=.35;p.fx.delayFb=Math.max(0,Math.min(.8,p.fx.delayFb));/* scene bank backfill (v0.5.0): color/bars/fill are new per-scene fields —
    neutral defaults keep old scenes sounding identically. Scenes are REBUILT
    in canonical key order so load→save byte-stability holds regardless of how
    the save was produced. */
 if(p.scenes)p.scenes=p.scenes.map(sc=>{const o={name:sc.name,pattern:sc.pattern==null?null:sc.pattern,color:sc.color==null?null:sc.color,bars:sc.bars==null?null:sc.bars,fill:sc.fill===true};/* v0.7.0 follow backfill: a valid non-none config is preserved in canonical form; absent/invalid/none → absent (legacy scenes behave identically) */if(sc.follow&&sc.follow.mode&&sc.follow.mode!=='none'){o.follow={mode:String(sc.follow.mode),target:(sc.follow.target==null?null:Math.max(0,sc.follow.target|0)),prob:(typeof sc.follow.prob==='number'&&isFinite(sc.follow.prob))?Math.max(0,Math.min(100,Math.round(sc.follow.prob))):100,afterBars:(sc.follow.afterBars==null?null:Math.max(1,Math.min(64,sc.follow.afterBars|0)))}}/* v0.8.0 mix-snapshot backfill: a valid payload is preserved in CANONICAL form (sorted track keys, registry field order — the load→save byte-stability contract); absent/invalid/empty → absent (legacy scenes byte-identical) */const mixN=normalizeSceneMix(sc.mix,(p.tracks||[]).length);if(mixN)o.mix=mixN;return o});/* lane backfill (v0.5.0): legacy lanes get mode 'lock' (sound params — the only thing
    that ever had a lane) or 'state' (anything else), preserving exact legacy behavior */
 if(p.lanes)for(const ln of p.lanes)ln.mode=laneModeBackfill(ln.param,ln.mode);I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;I.autoArm=new Set();I.selLane=-1;if(I.eng)I.eng.syncMix(p);I.renderDirty=true;if(I.copilotReload)I.copilotReload()}
-/* MIDI param paths (v0.4.0): macro.<0-7> | master.vol | track.<i>.mix.vol |
-   track.<i>.mix.pan | track.<i>.mix.sendA | track.<i>.mix.sendB |
-   track.<i>.mix.mute | track.<i>.scAmount.
+/* MIDI param paths (v0.4.0; v0.8.0 adds the master section): macro.<0-7> |
+   master.vol | master.eqLow|eqMid|eqHigh|compOn|compThresh|compRatio|
+   compAttack|compRelease|compMakeup (CC 0–1 → registry range via paramDenorm)
+   | track.<i>.mix.vol | track.<i>.mix.pan | track.<i>.mix.sendA |
+   track.<i>.mix.sendB | track.<i>.mix.mute | track.<i>.scAmount.
    resolveMidiParam is PURE w.r.t. the passed project (Bun-testable);
    applyMidiParam binds it to the live project + engine. mute toggles per
    received CC (CC 0 is ignored by the core, so button releases never fire). */
@@ -63,6 +68,7 @@ function resolveMidiParam(p,path,v01){
   const parts=String(path).split('.');
   if(parts[0]==='macro'){const idx=+parts[1];if(!(idx>=0&&idx<8&&p.macroVals))return false;p.macroVals[idx]=v;resolveMacros(p);return true}
   if(parts[0]==='master'&&parts[1]==='vol'){p.masterVol=clamp(v,0,1);return true}
+  if(parts[0]==='master'&&parts.length===2&&parts[1]!=='vol'){/* v0.8.0 master section: CC → full registry range */const pd=paramById(parts[1]);if(!pd||pd.target!=='project')return false;paramApply(p,parts[1],paramDenorm(parts[1],v));return true}
   if(parts[0]==='track'){
     const t=p.tracks[+parts[1]];if(!t||!t.mix)return false;
     if(parts[2]==='scAmount'){t.scAmount=Math.round(v*100);return true}

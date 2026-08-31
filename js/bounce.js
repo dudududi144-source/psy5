@@ -64,6 +64,10 @@ return {channels:ch,sampleRate:buf.sampleRate};
  * triggered (the other tracks never spawn voices → their contribution is
  * exactly 0), through the SAME deterministic graph and schedule. No opts →
  * full-mix render, byte-identical behavior to v0.3.0 (same hash).
+ * opts.engineOpts (optional): passed to the PooledEngine constructor —
+ * evidence plumbing for the G29 neutral-tolerance A/B ({masterFlat:true}
+ * = the exact pre-v0.8.0 master topology); the production render path
+ * never sets it.
  * Returns {buf, N, scheduleHash} — N is the EXACT sample count the schedule
  * spans (buffer.length === N), scheduleHash identifies the event list. */
 export async function renderBounce(p,loops,opts){
@@ -73,7 +77,7 @@ let sch=bounceSchedule(p,loops,t0);
 if(opts.trackIdx!=null)sch=Object.assign({},sch,{evs:sch.evs.filter(e=>e.track===opts.trackIdx)});
 const N=Math.ceil(sch.total*sr);
 const oc=new OfflineAudioContext(2,N,sr);
-const eng=new PooledEngine(oc);
+const eng=new PooledEngine(oc,opts.engineOpts||{});
 eng.syncMix(p);
 for(const e of sch.evs)eng.trigger(p.tracks[e.track],e.t,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sch.stepDur);
 const buf=await oc.startRendering();

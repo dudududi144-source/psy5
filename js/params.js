@@ -43,6 +43,19 @@ export const PARAMS = [
   P('scReleaseMs','SC release', 5, 1000, 140, 'track', (t, v) => { t.scReleaseMs = Math.round(v) }),
   /* ── project-level (lane.track = -1) ── */
   P('masterVol', 'Master',    0, 1, 0.85, 'project', (p, v) => { p.masterVol = v }),
+  /* ── master section (v0.8.0): EQ3 + glue comp — NEUTRAL defaults (EQ 0 dB,
+     compOn 0 = node OUT of the chain) so legacy renders are unchanged within
+     a documented tolerance. Automatable/recordable/snapshot-able like every
+     registry param. compOn apply rounds (0/1 bypass flag). ── */
+  P('eqLow',       'EQ low',      -12, 12,   0,  'project', (p, v) => { ensureMaster(p).eqLow = v }),
+  P('eqMid',       'EQ mid',      -12, 12,   0,  'project', (p, v) => { ensureMaster(p).eqMid = v }),
+  P('eqHigh',      'EQ high',     -12, 12,   0,  'project', (p, v) => { ensureMaster(p).eqHigh = v }),
+  P('compOn',      'Glue comp',    0,  1,    0,  'project', (p, v) => { ensureMaster(p).compOn = v >= 0.5 ? 1 : 0 }),
+  P('compThresh',  'Comp thresh', -40, 0,  -20,  'project', (p, v) => { ensureMaster(p).compThresh = v }),
+  P('compRatio',   'Comp ratio',    1, 20,   2,  'project', (p, v) => { ensureMaster(p).compRatio = v }),
+  P('compAttack',  'Comp attack',   1, 100, 10,  'project', (p, v) => { ensureMaster(p).compAttack = v }),
+  P('compRelease', 'Comp release', 20, 1000, 150,'project', (p, v) => { ensureMaster(p).compRelease = v }),
+  P('compMakeup',  'Comp makeup',   0, 24,   0,  'project', (p, v) => { ensureMaster(p).compMakeup = v }),
   P('macro.0', 'Macro ENERGY',    0, 1, 0.5, 'project', (p, v) => { p.macroVals[0] = v }),
   P('macro.1', 'Macro DRIVE',     0, 1, 0.5, 'project', (p, v) => { p.macroVals[1] = v }),
   P('macro.2', 'Macro SPACE',     0, 1, 0.5, 'project', (p, v) => { p.macroVals[2] = v }),
@@ -51,6 +64,26 @@ export const PARAMS = [
 
 const BY_ID = new Map(PARAMS.map(p => [p.id, p]));
 const SOUND_IDS = new Set(['cutoff', 'res', 'atk', 'dec', 'sus', 'rel', 'gate', 'detune', 'lfoRate', 'lfoDepth']);
+const MASTER_IDS = new Set(['eqLow', 'eqMid', 'eqHigh', 'compOn', 'compThresh', 'compRatio', 'compAttack', 'compRelease', 'compMakeup']);
+/* canonical master defaults + clamps (single source for ensureMaster/engine/UI) */
+const MASTER_DEFAULTS = { eqLow: 0, eqMid: 0, eqHigh: 0, compOn: 0, compThresh: -20, compRatio: 2, compAttack: 10, compRelease: 150, compMakeup: 0 };
+const MASTER_RANGES = { eqLow: [-12, 12], eqMid: [-12, 12], eqHigh: [-12, 12], compOn: [0, 1], compThresh: [-40, 0], compRatio: [1, 20], compAttack: [1, 100], compRelease: [20, 1000], compMakeup: [0, 24] };
+
+/* ensureMaster — backfill + clamp the project master section (v0.8.0).
+   Legacy projects (pre-master) get the NEUTRAL defaults; existing values
+   are clamped into their registry ranges. Used by the param apply fns,
+   the loader backfill and the mixer UI. */
+function ensureMaster(p) {
+  if (!p.master || typeof p.master !== 'object') p.master = {};
+  const m = p.master;
+  for (const k of Object.keys(MASTER_DEFAULTS)) {
+    const v = m[k];
+    if (v == null || !isFinite(v)) { m[k] = MASTER_DEFAULTS[k]; continue }
+    const [lo, hi] = MASTER_RANGES[k];
+    m[k] = k === 'compOn' ? (v >= 0.5 ? 1 : 0) : cl(v, lo, hi);
+  }
+  return m;
+}
 
 function paramById(id) { return BY_ID.get(id) || null }
 /* clamped write-through; returns the clamped value, or null for unknown ids */
@@ -72,4 +105,4 @@ function laneModeBackfill(param, mode) {
   if (mode === 'lock' || mode === 'state') return mode;
   return SOUND_IDS.has(param) ? 'lock' : 'state';
 }
-export { paramById, paramApply, paramNorm, paramDenorm, paramsForTrack, laneModeBackfill, SOUND_IDS };
+export { paramById, paramApply, paramNorm, paramDenorm, paramsForTrack, laneModeBackfill, SOUND_IDS, ensureMaster, MASTER_IDS, MASTER_DEFAULTS, MASTER_RANGES };

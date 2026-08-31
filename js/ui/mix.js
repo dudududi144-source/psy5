@@ -1,4 +1,5 @@
 import { $, I, pushHist, after, autoRecMove } from '../state.js';
+import { ensureMaster } from '../params.js';
 
 /* Mixer strips — volume / mute / solo, sidechain (SC) ducking controls and
    the two per-track FX sends. Sends: DLY (mix.sendA → BPM-synced delay bus)
@@ -21,7 +22,26 @@ bar.innerHTML='<span class="mono" style="font-size:9px;color:var(--acc2)">DELAY 
 $('fxDiv').onchange=e=>{pushHist();if(!I.p.fx)I.p.fx={delayDiv:'3/16',delayFb:.35};I.p.fx.delayDiv=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
 $('fbF').oninput=e=>{$('fbV').textContent=e.target.value+'%'};$('fbF').onchange=e=>{pushHist();if(!I.p.fx)I.p.fx={delayDiv:'3/16',delayFb:.35};I.p.fx.delayFb=(+e.target.value)/100;if(I.eng)I.eng.syncMix(I.p);I.dirty=true}}
 
-function renderMixer(){const w=$('strips');w.innerHTML='';renderFxBar();I.p.tracks.forEach((t,i)=>{const d=document.createElement('div');d.style.cssText='background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px';
+/* ── MASTER panel (v0.8.0): EQ3 + glue comp — the automation-ready master
+   section. Every control writes through ensureMaster + autoRecMove(-1, id)
+   (ARM-AUTO recordable, MIDI-learnable, lane-automatable, snapshot-able).
+   GLUE toggle = compOn (bypass removes the node from the chain). ── */
+function renderMasterBar(){const bar=$('masterBar');if(!bar||!I.p)return;const m=ensureMaster(I.p);
+const rows=[['eqLow','LOW','−12..+12 dB low shelf @ 100 Hz',-12,12,.5],['eqMid','MID','−12..+12 dB peak @ 1 kHz (Q 0.8)',-12,12,.5],['eqHigh','HIGH','−12..+12 dB high shelf @ 8 kHz',-12,12,.5],
+['compThresh','THRESH','glue comp threshold −40..0 dB (GLUE ON to hear it)',-40,0,1],['compRatio','RATIO','glue comp ratio 1..20:1',1,20,.5],['compAttack','ATK ms','glue comp attack 1..100 ms',1,100,1],['compRelease','REL ms','glue comp release 20..1000 ms',20,1000,5],['compMakeup','MAKEUP','glue comp makeup gain 0..24 dB',0,24,.5]];
+bar.innerHTML='<span class="mono" style="font-size:9px;color:var(--acc2)">MASTER</span>'
++'<button id="mCompOn" class="'+(m.compOn?'on':'')+'" title="glue compressor — bypass removes the node from the chain (guaranteed neutral)" style="font-size:9px;padding:2px 6px">GLUE '+(m.compOn?'ON':'OFF')+'</button>'
++rows.map(([id,lb,tt,mn,mx,st])=>'<label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dim)" title="'+tt+' ('+id+' — automatable)">'+lb+' <input class="mParam" data-p="'+id+'" type="range" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+m[id]+'" style="width:70px"><span class="mVal mono" data-v="'+id+'" style="font-size:8px;width:34px;text-align:right">'+m[id]+'</span></label>').join('')
++'<span class="note" style="margin-left:auto">EQ3 + glue feed the existing master bus — recordable via ARM-AUTO</span>';
+bar.querySelectorAll('input.mParam').forEach(inp=>{
+const pid=inp.dataset.p,val=bar.querySelector('.mVal[data-v="'+pid+'"]');
+inp.oninput=()=>{const v=+inp.value;ensureMaster(I.p)[pid]=v;if(val)val.textContent=v;if(I.eng)I.eng.syncMix(I.p);I.dirty=true;autoRecMove(-1,pid,v)};
+inp.onchange=()=>pushHist();
+});
+const cog=$('mCompOn');if(cog)cog.onclick=()=>{pushHist();const mm=ensureMaster(I.p);mm.compOn=mm.compOn?0:1;cog.classList.toggle('on',!!mm.compOn);cog.textContent='GLUE '+(mm.compOn?'ON':'OFF');if(I.eng)I.eng.syncMix(I.p);I.dirty=true;autoRecMove(-1,'compOn',mm.compOn)};
+}
+
+function renderMixer(){const w=$('strips');w.innerHTML='';renderMasterBar();renderFxBar();I.p.tracks.forEach((t,i)=>{const d=document.createElement('div');d.style.cssText='background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px';
 d.innerHTML='<div class="nm" style="font-size:10px">'+t.name.split(' ')[0]+'</div>'
 +'<input class="vol" type="range" min="0" max="100" value="'+Math.round(Math.sqrt(t.mix.vol)*100)+'" style="width:100%;margin:6px 0">'
 +'<div class="sendLine" style="display:flex;align-items:center;gap:4px"><span class="mono" style="font-size:8px;color:var(--dim)">DLY</span><input class="sendA" type="range" min="0" max="100" value="'+Math.round((t.mix.sendA||0)*100)+'" style="flex:1" title="Delay send (post-fader)"><span class="sendAv mono" style="font-size:8px;width:20px;text-align:right">'+Math.round((t.mix.sendA||0)*100)+'</span></div>'

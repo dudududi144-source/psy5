@@ -38,6 +38,7 @@ describe('param registry', () => {
       /* the value actually landed in the state path */
       if (pd.target === 'project') {
         if (pd.id === 'masterVol') expect(p.masterVol).toBe(pd.min)
+        else if ((p as any).master && pd.id in (p as any).master) expect((p as any).master[pd.id]).toBe(pd.min) /* v0.8.0 master section */
         else expect(p.macroVals[+pd.id.slice(6)]).toBe(pd.min)
       } else if (pd.id.startsWith('mix.')) {
         expect(t.mix[pd.id.slice(4)]).toBe(pd.min)

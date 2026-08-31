@@ -57,6 +57,7 @@ export const WORKLET_LIMITATIONS=[
 'delay division (1/8 | 3/16 | 1/4) not exposed by the worklet delay (fixed 0.5 s buffer)',
 'per-track sidechain (scAmount/attack/hold/release) → single fixed bass-bus duck',
 'synth editor params (wave/cutoff/res/ADSR) → worklet world params + macros only',
+'master EQ3 + glue comp (v0.8.0) not mapped — the worklet master has its own saturation/limiter',
 'reverb IR is the worklet’s internal noise IR (not the seeded 1.8 s exponential IR)',
 'step sequencer timing: MAIN thread schedules, worklet fires sample-accurately'];
 

@@ -101,12 +101,14 @@ describe('mix snapshot application', () => {
     expect(p.tracks[4].mix.sendB).toBe(0.7)
     expect(p.tracks[4].scAmount).toBe(45)
   })
-  test('applySceneMix: master payload is inert until the master params are registered (forward compat)', () => {
+  test('applySceneMix: master payload applies through the registered master params (Phase 2 wiring)', () => {
     const p = fresh()
-    sceneSetMix(p, 0, { tracks: { 4: { vol: 0.5 } }, master: { eqLow: -6, compRatio: 4 } })
+    sceneSetMix(p, 0, { tracks: { 4: { vol: 0.5 } }, master: { eqLow: -6, compRatio: 4, compOn: 1 } })
     expect(applySceneMix(p, 0)).toBe(true)   /* track part applies */
     expect(p.tracks[4].mix.vol).toBe(0.5)
-    expect((p as any).master).toBeUndefined() /* no project master yet → skipped, no crash */
+    expect(p.master.eqLow).toBe(-6)          /* registered ids write through */
+    expect(p.master.compRatio).toBe(4)
+    expect(p.master.compOn).toBe(1)
   })
   test('walk-order trace: songSteps + applySceneMix = the section-launch sequence (shared by scheduler and renderSong)', () => {
     const r = compose('FULL-ON', 3, SEED)
