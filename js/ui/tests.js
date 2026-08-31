@@ -3,6 +3,7 @@ import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY } from '../model.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
+import { renderBounce } from '../bounce.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
 
@@ -71,7 +72,19 @@ const r0=rmsOf(silence,.7,1.15),rd=rmsOf(dly,.7,1.15),rr=rmsOf(rev,.7,1.15);
 const d8=(delaySecondsFor('1/8',145)*1000).toFixed(1),d316=(delaySecondsFor('3/16',145)*1000).toFixed(1),d4=(delaySecondsFor('1/4',145)*1000).toFixed(1);
 const eng12=silence._eng;let irOK=false;try{const ref=irChannel(Math.round(sr*IR_LEN_S),IR_SEEDS[0],IR_DECAY);const got=eng12.conv.buffer.getChannelData(0);irOK=got.length===ref.length;for(let i=0;irOK&&i<ref.length;i++)if(got[i]!==ref[i])irOK=false}catch(e){irOK=false}
 const ok12=r0<1e-4&&rd>0.001&&rr>0.001&&irOK;
-gate('G12','sends: send>0 → signal in bus output, send=0 → silent tail; BPM-synced delay; byte-identical seeded IR',ok12,'sendRMS='+rd.toFixed(4)+' reverbRMS='+rr.toFixed(4)+' zeroRMS='+r0.toFixed(4)+' delay@145ms='+d8+'/'+d316+'/'+d4+' irIdentical='+irOK)}catch(e){gate('G12','sends',false,'ERR '+e.message)}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G12','sends: send>0 → signal in bus output, send=0 → silent tail; BPM-synced delay; byte-identical seeded IR',ok12,'sendRMS='+rd.toFixed(4)+' reverbRMS='+rr.toFixed(4)+' zeroRMS='+r0.toFixed(4)+' delay@145ms='+d8+'/'+d316+'/'+d4+' irIdentical='+irOK)}catch(e){gate('G12','sends',false,'ERR '+e.message)}
+/* G13 — offline WAV bounce: default PSYTRANCE project, 2 loops through
+   renderBounce() (fresh OfflineAudioContext — the live graph is untouched).
+   Claims: the render spans the EXACT scheduled sample count, is non-silent,
+   and the event schedule hash is identical across two renders (the same
+   per-bar seeded event function the live scheduler uses). */
+try{
+const p13=buildStyle('PSYTRANCE',42);
+const b13a=await renderBounce(p13,2),b13b=await renderBounce(p13,2);
+const d13=b13a.buf.getChannelData(0);let s13=0;for(let i=0;i<d13.length;i++)s13+=d13[i]*d13[i];const rms13=Math.sqrt(s13/d13.length);
+const schedId=b13a.scheduleHash===b13b.scheduleHash;
+const ok13=b13a.buf.length===b13a.N&&b13b.buf.length===b13b.N&&b13a.N===b13b.N&&rms13>0.02&&schedId;
+gate('G13','offline bounce: exact sample count, non-silent render, deterministic schedule',ok13,'samples='+b13a.N+'/'+b13b.N+' rms='+rms13.toFixed(3)+' schedIdentical='+schedId)}catch(e){gate('G13','offline bounce',false,'ERR '+e.message)}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 function wireTests(){$('bGate').onclick=runSelfGate;}
 

@@ -23,7 +23,7 @@
 <div style="width:84px"><label>Seed</label><input id="seedIn" type="text" style="width:78px" title="Project seed — same seed + bar = identical events every loop"></div>
 </div>
 <div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><span class="chip" id="copChip" title="CO-PILOT — consent-driven suggestions">✦ CO-PILOT</span><canvas id="meter" width="90" height="26"></canvas></div>
-<div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><input type="file" id="impF" accept=".json" style="display:none"></div>
+<div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><button id="bBounce" title="Offline-render the current pattern loop ×N to a 16-bit WAV">BOUNCE</button><input type="file" id="impF" accept=".json" style="display:none"></div>
 </header>
 <nav>
 <button data-t="perform" class="on">Perform</button><button data-t="seq">Sequencer</button>
@@ -60,7 +60,7 @@
 <div id="log"></div>
 <table id="gateTab" style="margin-top:8px;display:none"><thead><tr><th>ID</th><th>Claim</th><th>Result</th><th>Evidence</th></tr></thead><tbody></tbody></table>
 </div></section>
-</main></div><div id="toast"></div>
+</main></div><div id="bounceModal" style="display:none;position:fixed;inset:0;background:#000d;z-index:150;align-items:center;justify-content:center"><div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:300px;max-width:420px;text-align:center"><h3 style="margin:0 0 8px">BOUNCE — offline WAV</h3><div class="note" style="margin-bottom:10px">Renders the current pattern loop ×N through a fresh offline engine graph. The live engine keeps running — the bounce never touches it. 16-bit PCM stereo, 44.1 kHz.</div><div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:12px;flex-wrap:wrap"><label class="mono" style="font-size:10px">LOOPS <select id="bounceLoops"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option><option value="8">8</option></select></label><span class="mono" id="bounceInfo" style="font-size:9px;color:var(--dim)"></span></div><div style="display:flex;gap:8px;justify-content:center"><button id="bounceGo">RENDER WAV</button><button id="bounceCancel">CLOSE</button></div></div></div><div id="toast"></div>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
