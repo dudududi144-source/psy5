@@ -21,7 +21,7 @@ const M_ENERGY=0,M_DRIVE=1,M_SPACE=2,M_MOVE=3;
 function gcd(a,b){while(b){const t=a%b;a=b;b=t}return a}
 function mkStep(on){return {on:on?1:0,vel:0.9,prob:1,micro:0,note:48,lock:{}}}
 function mkPattern(name,nt){const d={};for(let t=0;t<nt;t++)d[t]={len:16,steps:Array.from({length:16},()=>mkStep(false))};return {name,data:d}}
-function mkProject(){return {version:3,bpm:125,swing:0,root:33,scale:'minor',recQ:1,chain:false,seed:'PSY6',groove:'straight',
+function mkProject(){return {version:3,bpm:125,swing:0,root:33,scale:'minor',recQ:1,chain:false,seed:'PSY6',groove:'straight',fx:{delayDiv:'3/16',delayFb:.35},
 activeScene:0,currentPattern:'A',selTrack:4,macroVals:[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],
 tracks:[],patterns:{},scenes:[],lanes:[]}}
 function loopLen(p){const pat=p.patterns[p.currentPattern];let L=1;if(!pat)return 16;

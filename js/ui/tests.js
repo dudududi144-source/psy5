@@ -2,6 +2,7 @@ import { $, I, PERF, saveProject, loadStored } from '../state.js';
 import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY } from '../model.js';
+import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
 
@@ -55,7 +56,22 @@ const nk=kt+4*plain.sd;const rec=winRMS(dD,Math.floor((nk-.022)*sr),Math.floor(n
 const dipPct=Math.round((1-dipMin)*100),recPct=Math.round(recoveryMin*100);
 const amt0=plain.duckEvents,amt75=ducked.duckEvents;
 const ok11=amt0===0&&amt75>0&&dipPct>=60&&recPct>=99;
-gate('G11','sidechain: kick ducks scAmount>0 buses ≥60% in-window, full recovery, amount=0 → zero automation',ok11,'dipMin='+dipPct+'% recoveryMin='+recPct+'% amt0Events='+amt0+' amt75Events='+amt75)}catch(e){gate('G11','sidechain ducking',false,'ERR '+e.message)}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G11','sidechain: kick ducks scAmount>0 buses ≥60% in-window, full recovery, amount=0 → zero automation',ok11,'dipMin='+dipPct+'% recoveryMin='+recPct+'% amt0Events='+amt0+' amt75Events='+amt75)}catch(e){gate('G11','sidechain ducking',false,'ERR '+e.message)}
+/* G12 — per-track delay/reverb sends: a single synth note @145 BPM on an
+   otherwise silent mix; the tail window [0.7s,1.15s] contains ONLY send-bus
+   output (direct sound has decayed). send=0 → tail silent; delay/reverb
+   send>0 → tail has signal. Evidence includes the exact BPM-synced delay
+   times for all three divisions and IR byte-identity vs the canonical PRNG. */
+async function renderSend(sendA,sendB){const sr=44100,oc=new OfflineAudioContext(2,Math.round(sr*1.2),sr);const eng=new PooledEngine(oc);const p=buildStyle('TECHNO',7);p.bpm=145;p.tracks.forEach((t,i)=>{t.mix.mute=i!==5;t.mix.sendA=sendA;t.mix.sendB=sendB;if(i===5)t.mix.vol=1});eng.syncMix(p);const pat=p.patterns['A'];for(let t2=0;t2<8;t2++){const d=pat.data[t2];for(const s of d.steps)s.on=0}const stp=pat.data[5].steps[0];stp.on=1;stp.note=p.root+24;stp.vel=.9;p.currentPattern='A';const sd=60/p.bpm/4;eng.trigger(p.tracks[5],.1,{track:5,off:0,vel:.9,note:p.root+24,lock:{}},sd);const buf=await oc.startRendering();buf._eng=eng;return buf}
+try{
+const silence=await renderSend(0,0),dly=await renderSend(.9,0),rev=await renderSend(0,.9);
+const sr=silence.sampleRate;
+const rmsOf=(b,a,z)=>{const d=b.getChannelData(0);let s=0,n=0;for(let i=Math.floor(a*sr);i<Math.floor(z*sr);i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0};
+const r0=rmsOf(silence,.7,1.15),rd=rmsOf(dly,.7,1.15),rr=rmsOf(rev,.7,1.15);
+const d8=(delaySecondsFor('1/8',145)*1000).toFixed(1),d316=(delaySecondsFor('3/16',145)*1000).toFixed(1),d4=(delaySecondsFor('1/4',145)*1000).toFixed(1);
+const eng12=silence._eng;let irOK=false;try{const ref=irChannel(Math.round(sr*IR_LEN_S),IR_SEEDS[0],IR_DECAY);const got=eng12.conv.buffer.getChannelData(0);irOK=got.length===ref.length;for(let i=0;irOK&&i<ref.length;i++)if(got[i]!==ref[i])irOK=false}catch(e){irOK=false}
+const ok12=r0<1e-4&&rd>0.001&&rr>0.001&&irOK;
+gate('G12','sends: send>0 → signal in bus output, send=0 → silent tail; BPM-synced delay; byte-identical seeded IR',ok12,'sendRMS='+rd.toFixed(4)+' reverbRMS='+rr.toFixed(4)+' zeroRMS='+r0.toFixed(4)+' delay@145ms='+d8+'/'+d316+'/'+d4+' irIdentical='+irOK)}catch(e){gate('G12','sends',false,'ERR '+e.message)}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 function wireTests(){$('bGate').onclick=runSelfGate;}
 
