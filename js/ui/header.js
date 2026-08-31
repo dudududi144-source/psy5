@@ -1,7 +1,7 @@
 import { $, toast, I, pushHist, after, saveProject, loadProjectObj, PERF } from '../state.js';
 import { startSched, stopSched } from '../scheduler.js';
 import { clamp, GROOVES, loopLen } from '../model.js';
-import { renderBounce, stemTracks, wavEncode, pcmFromBuffer } from '../bounce.js';
+import { renderBounce, stemTracks, wavEncode, pcmFromBuffer, renderSong, songDurationSec, songFrames, songRenderController, SONG_MAX_SEC } from '../bounce.js';
 import { encodeShare } from '../share.js';
 import { padHit } from './perform.js';
 import { helpRows } from '../shortcuts.js';
@@ -17,16 +17,33 @@ if(!r.ok){toast('SHARE FAILED — link too large ('+((r.tokenBytes||0)/1024|0)+'
 location.hash='p='+r.token;const url=location.origin+location.pathname+'#p='+r.token;
 try{await navigator.clipboard.writeText(url);toast('SHARE LINK copied ✓ '+(r.tokenBytes/1024|0)+' KB'+(r.warn?' — large, may exceed some URL limits':''))}catch(e){toast('SHARE LINK in the address bar ('+(r.tokenBytes/1024|0)+' KB) — copy it there')}};$('bExport').onclick=()=>{if(I.copilotSnapshot)I.copilotSnapshot();const blob=new Blob([JSON.stringify(I.p)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='psy6-project.json';a.click()};$('bImport').onclick=()=>$('impF').click();$('impF').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const p=JSON.parse(rd.result);if(p&&p.version===3&&p.tracks){loadProjectObj(p);toast('imported')}else toast('invalid file')}catch(err){toast('IMPORT FAILED')}};rd.readAsText(f)};$('bChain').onclick=()=>{I.p.chain=!I.p.chain;renderHeader()};
 /* ── BOUNCE — offline WAV render (never touches the live AudioContext) ── */
-$('bBounce').onclick=()=>{if(!I.p)return;$('bounceModal').style.display='flex';bounceInfo()};
+let songCtl=null; /* active song-render controller — CANCEL aborts it cleanly */
+$('bBounce').onclick=()=>{if(!I.p)return;$('bounceModal').style.display='flex';const opt=document.querySelector('#bounceMode option[value=song]');if(opt){const has=songSteps(I.p).length>0;opt.disabled=!has;opt.textContent=has?'SONG':'SONG (arranger empty)'}if($('songProg')){$('songProg').style.display='none';$('songProgBar').style.width='0%'}bounceInfo()};
 const dlWav=(ab,name)=>{const blob=new Blob([ab],{type:'audio/wav'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000)};
-const bounceInfo=()=>{const loops=+$('bounceLoops').value;const L=loopLen(I.p);const dur=.05+L*loops*60/I.p.bpm/4;const mode=$('bounceMode')?$('bounceMode').value:'mix';if(mode==='stems'){const n=stemTracks(I.p,loops).tracks.length;$('bounceInfo').textContent=I.p.bpm+' BPM · loop '+L+' steps · '+n+' non-empty track'+(n===1?'':'s')}else{$('bounceInfo').textContent=I.p.bpm+' BPM · loop '+L+' steps · '+dur.toFixed(2)+'s · '+Math.ceil(dur*44100)+' samples'}};
+const songSteps=p=>(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps:[];
+const bounceInfo=()=>{const loops=+$('bounceLoops').value;const L=loopLen(I.p);const dur=.05+L*loops*60/I.p.bpm/4;const mode=$('bounceMode')?$('bounceMode').value:'mix';if(mode==='song'){const steps=songSteps(I.p);if(!steps.length){$('bounceInfo').textContent='SONG: arranger is empty — build [scene,bars] sections first';return}const d=songDurationSec(I.p);const secs=songSteps(I.p).reduce((a,s,i)=>{if(!i||s.scene!==songSteps(I.p)[i-1].scene)a++;return a},0);$('bounceInfo').textContent=I.p.bpm+' BPM · SONG '+secs+' sections · '+steps.reduce((a,s)=>a+s.bars,0)+' bars · music '+d.music.toFixed(1)+'s · with tail '+d.withTail.toFixed(1)+'s · '+songFrames(I.p)+' samples'}else if(mode==='stems'){const n=stemTracks(I.p,loops).tracks.length;$('bounceInfo').textContent=I.p.bpm+' BPM · loop '+L+' steps · '+n+' non-empty track'+(n===1?'':'s')}else{$('bounceInfo').textContent=I.p.bpm+' BPM · loop '+L+' steps · '+dur.toFixed(2)+'s · '+Math.ceil(dur*44100)+' samples'}};
 $('bounceLoops').onchange=bounceInfo;if($('bounceMode'))$('bounceMode').onchange=bounceInfo;
-$('bounceCancel').onclick=()=>{$('bounceModal').style.display='none';$('bounceGo').disabled=false;$('bounceGo').textContent='RENDER WAV'};
+$('bounceCancel').onclick=()=>{if(songCtl){songCtl.cancel();return}$('bounceModal').style.display='none';$('bounceGo').disabled=false;$('bounceGo').textContent='RENDER WAV';if($('songProg'))$('songProg').style.display='none'};
 $('bounceGo').onclick=async()=>{const b=$('bounceGo');b.disabled=true;b.textContent='RENDERING…';try{const loops=+$('bounceLoops').value;const mode=$('bounceMode')?$('bounceMode').value:'mix';
 if(mode==='stems'){const {tracks}=stemTracks(I.p,loops);if(!tracks.length){toast('STEMS: no notes in this pattern');b.disabled=false;b.textContent='RENDER WAV';return}
 let done=0;for(const ti of tracks){const {buf,N}=await renderBounce(I.p,loops,{trackIdx:ti});const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);const nm=(I.p.tracks[ti].name||('track-'+ti)).replace(/\s+/g,'-').toLowerCase();dlWav(ab,'psy6-stem-'+nm+'.wav');done++;await new Promise(r=>setTimeout(r,350))/* sequential downloads — browsers throttle rapid clicks */}
 toast('STEMS ✓ '+done+' file'+(done===1?'':'s')+' · '+N+' samples each');$('bounceModal').style.display='none'}
-else{const {buf,N}=await renderBounce(I.p,loops);const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);dlWav(ab,'psy6-bounce-'+I.p.bpm+'bpm.wav');toast('BOUNCED ✓ '+N+' samples · '+(ab.byteLength/1024|0)+' KB');$('bounceModal').style.display='none'}}catch(err){toast('BOUNCE FAILED — '+err.message)}b.disabled=false;b.textContent='RENDER WAV'};
+else if(mode==='song'){const steps=songSteps(I.p);
+if(!steps.length){toast('SONG: arranger is empty — build [scene,bars] sections first');b.disabled=false;b.textContent='RENDER WAV';return}
+const d=songDurationSec(I.p);
+if(d.withTail>SONG_MAX_SEC){toast('SONG: '+(d.withTail/60).toFixed(1)+' min exceeds the 10-minute render guard — shorten the arranger');b.disabled=false;b.textContent='RENDER WAV';return}
+const ctl=songRenderController();songCtl=ctl;
+ctl.onProgress=(i,n,sceneIdx)=>{const pr=$('songProg');if(!pr)return;pr.style.display='';$('songProgBar').style.width=Math.round(100*i/n)+'%';const nm=(I.p.scenes[sceneIdx]&&I.p.scenes[sceneIdx].name)||('SCENE '+(sceneIdx+1));$('songProgLabel').textContent='RENDERING SONG — section '+(i+1)+'/'+n+' · '+nm+' · '+Math.round(100*i/n)+'%'};
+ctl._onCancelled=()=>{songCtl=null;b.disabled=false;b.textContent='RENDER WAV';if($('songProg'))$('songProg').style.display='none';toast('SONG render cancelled — clean abort, live engine untouched')};
+$('songProg').style.display='';$('songProgLabel').textContent='RENDERING SONG…';
+const r=await renderSong(I.p,{ctrl:ctl});
+songCtl=null;
+if(r.cancelled){return}
+const pcm=pcmFromBuffer(r.buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);
+dlWav(ab,'psy6-song-'+I.p.bpm+'bpm.wav');
+$('songProg').style.display='none';$('bounceModal').style.display='none';
+toast('SONG ✓ music '+r.musicSec.toFixed(1)+'s · with tail '+r.totalSec.toFixed(1)+'s · '+r.N+' samples · '+(ab.byteLength/1024|0)+' KB')}
+else{const {buf,N}=await renderBounce(I.p,loops);const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);dlWav(ab,'psy6-bounce-'+I.p.bpm+'bpm.wav');toast('BOUNCED ✓ '+N+' samples · '+(ab.byteLength/1024|0)+' KB');$('bounceModal').style.display='none'}}catch(err){toast('BOUNCE FAILED — '+err.message)}songCtl=null;b.disabled=false;b.textContent='RENDER WAV'};
 /* keyboard dispatcher — bindings come from js/shortcuts.js (single source of
    truth, collision-tested; ? renders the help overlay from the same table) */
 window.addEventListener('keydown',e=>{

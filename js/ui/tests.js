@@ -7,7 +7,7 @@ import { recordPoint, quantStep, applyLanes } from '../autorec.js';
 import { compose } from '../composer.js';
 import { paramApply } from '../params.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
-import { renderBounce, bounceSchedule } from '../bounce.js';
+import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, evHash } from '../bounce.js';
 import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
@@ -307,7 +307,37 @@ for(const sec of c23.form.sections){
 }
 const dropRms=rmsBySection[2];
 const ok23=secOk&&lenOk&&detOk&&dropRms>0.03&&rmsBySection.every(r=>r>0.03);
-gate('G23','composer: 7-section form scaled to target (±5%), byte-identical regenerate, every section bounces non-silent (DROP RMS > 0.03)',ok23,'sections='+c23.form.sections.map(s=>s.id+':'+s.bars).join('/')+' len='+c23.form.lengthSec+'s rms=['+rmsBySection.join(',')+'] det='+detOk)}catch(e){gate('G23','composer',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G23','composer: 7-section form scaled to target (±5%), byte-identical regenerate, every section bounces non-silent (DROP RMS > 0.03)',ok23,'sections='+c23.form.sections.map(s=>s.id+':'+s.bars).join('/')+' len='+c23.form.lengthSec+'s rms=['+rmsBySection.join(',')+'] det='+detOk)}catch(e){gate('G23','composer',false,'ERR '+e.message)}
+/* G24 — song render (offline — CI-asserted): compose FULL-ON 3min seed 424242 →
+   renderSong renders the WHOLE arranger through the LIVE machinery
+   (scene-launch phase rule sc.step%newLoop, per-bar seeded groove, per-scene
+   fills, per-step automation player): frame count == formula, all 7 musical
+   sections RMS > 0.03, event schedule == pure oracle (evHash), determinism
+   (two renders byte-identical, or max sample diff < 1e-6 documented). */
+try{
+const c24=compose('FULL-ON',3,424242);const p24=c24.project;
+const rA=await renderSong(p24);
+const bars24=p24.arranger.steps.reduce((a,s)=>a+s.bars,0);
+const N24=Math.ceil(44100*(0.05+(bars24*16+32)*(60/p24.bpm/4)));
+const framesOk=rA.N===N24&&rA.buf.length===rA.N;
+const secs24=songSections(p24);
+const sd24=60/p24.bpm/4;
+const rmsBySec=[];
+for(const s of secs24){
+const from=Math.max(0,Math.round((0.05+s.startBar*16*sd24)*44100)),to=Math.round((0.05+s.endBar*16*sd24)*44100);
+let sum=0,n=0;
+for(const ch of [rA.buf.getChannelData(0),rA.buf.getChannelData(1)])for(let i=from;i<to&&i<ch.length;i++){sum+=ch[i]*ch[i];n++}
+rmsBySec.push(+(Math.sqrt(sum/Math.max(1,n))).toFixed(4));
+}
+const plan24=songSchedule(p24,0.05);
+const schedOk=rA.scheduleHash===evHash(plan24.evs);
+const rB=await renderSong(p24);
+let maxDiff=0;
+const chA=[rA.buf.getChannelData(0),rA.buf.getChannelData(1)],chB=[rB.buf.getChannelData(0),rB.buf.getChannelData(1)];
+for(let ci=0;ci<2;ci++)for(let i=0;i<rA.N;i++){const d=Math.abs(chA[ci][i]-chB[ci][i]);if(d>maxDiff)maxDiff=d}
+const detOk=maxDiff===0||maxDiff<1e-6;
+const ok24=framesOk&&secs24.length===7&&rmsBySec.every(r=>r>0.03)&&schedOk&&detOk;
+gate('G24','song render: whole arranger offline via the live machinery — frames==formula, 7 sections RMS>0.03, schedule==oracle, deterministic',ok24,'N='+rA.N+'/'+N24+' bars='+bars24+' rms=['+rmsBySec.join(',')+'] sched='+schedOk+' det='+(maxDiff===0?'exact':'maxDiff='+maxDiff.toExponential(2)))}catch(e){gate('G24','song render',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).

@@ -87,3 +87,171 @@ const sch=bounceSchedule(p,loops,.05);
 const seen=new Set();for(const e of sch.evs)seen.add(e.track);
 return {tracks:Array.from(seen).sort((a,b)=>a-b),schedule:sch};
 }
+
+/* ============ SONG RENDER (Run 9) — the whole arrangement to WAV ============
+Renders p.arranger ([scene,bars] chain) through the EXISTING machinery —
+stepEvents (per-bar seeded groove/probability), the LIVE scene-launch
+transition rule (sc.step = sc.step % newLoop), per-scene auto-FILL, and the
+per-step automation player (applyLanes → syncMix / resolveMacros). No
+parallel renderer: the same event function and the same phase bookkeeping
+as schedTick, walked once offline.
+
+Documented differences vs live PLAY SONG (same class as the loop-bounce
+note above): (1) events land at mathematically exact sample positions (no
+worker-timer jitter); (2) state-lane glides anchor exactly at their step
+time instead of up-to-LOOKAHEAD early. Musically identical; the event
+schedule is provably equal (G24 asserts evHash equality against the pure
+oracle built from the same generator).
+
+Frame-count formula (documented, asserted in tests + G24):
+  frames = ceil(sr · (SONG_LEAD + (Σbars·16 + SONG_TAIL_STEPS) · (60/bpm/4)))
+  SONG_LEAD = 0.05 s attack headroom (same convention as loop bounce),
+  SONG_TAIL_STEPS = 32 (2 bars) for delay/reverb release after the final
+  section. Music length (no lead/tail) and with-tail length are reported
+  separately in the UI toast and in gate evidence. */
+
+import { applyLanes } from './autorec.js';
+import { resolveMacros } from './state.js';
+
+export const SONG_LEAD = .05;       /* s — attack headroom, matches loop bounce t0 */
+export const SONG_TAIL_STEPS = 32;  /* 2 bars of 16 steps — FX release tail */
+export const SONG_MAX_SEC = 600;    /* memory guard: refuse renders beyond 10 min */
+
+/* songSteps — the single source of truth for the song timeline walk.
+ * Yields one entry per STEP of the whole arrangement, applying the exact
+ * live scheduler bookkeeping:
+ *   - fresh start: phase 0 (startSched resets sc.step = 0)
+ *   - on a successful scene launch: phase = phase % loopLen(newPattern)
+ *     (schedTick: sc.step = sc.step % sc.loop) — the new pattern continues
+ *     from the old phase, exactly like the quantized pending transition
+ *   - an empty scene never launches (PERF.launch → {ok:false}): the
+ *     previous pattern keeps playing, phase keeps advancing mod the OLD loop
+ *   - scene.fill → launch flourish marker (PERF.fill: 8 half-step kick hits
+ *     on track 3) fired at the section boundary
+ * Mutates p.currentPattern while walking (pass a clone if that matters). */
+export function* songSteps(p){
+const steps=(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps:[];
+let phase=0,abs=0;
+for(let i=0;i<steps.length;i++){
+const st=steps[i],scn=p.scenes[st.scene];
+const start=abs;
+if(scn&&scn.pattern!=null){
+p.currentPattern=scn.pattern;
+const L=loopLen(p);
+phase=phase%L;
+yield{abs,phase,scene:st.scene,sectionStart:true,fill:!!scn.fill};
+phase=(phase+1)%L;abs++;
+for(let k=1;k<st.bars*16;k++){yield{abs,phase,scene:st.scene,sectionStart:false,fill:false};phase=(phase+1)%L;abs++}
+}else{
+const L=loopLen(p);
+for(let k=0;k<st.bars*16;k++){yield{abs,phase,scene:st.scene,sectionStart:abs===start,fill:false,empty:true};phase=(phase+1)%L;abs++}
+}
+}
+}
+
+/* songSchedule — the pure event list of the whole song (bun-testable oracle).
+ * Same shape as bounceSchedule: {evs, stepDur, sections, totalSteps, total}. */
+export function songSchedule(p,t0){
+t0=t0==null?SONG_LEAD:t0;
+const sd=60/p.bpm/4,evs=[],marks=[];
+for(const y of songSteps(p)){
+if(y.fill&&y.sectionStart){const scn=p.scenes[y.scene];
+if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)evs.push({s:y.abs,t:t0+y.abs*sd+k*sd/2,track:3,vel:.5+.05*k,note:48,lock:{},fill:true})}
+const list=stepEvents(p,y.phase);
+for(const e of list)evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock});
+if(y.sectionStart)marks.push({scene:y.scene,startStep:y.abs});
+}
+const totalSteps=(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps.reduce((a,s)=>a+(s.bars|0)*16,0):0;
+for(let i=0;i<marks.length;i++){
+marks[i].endStep=(i+1<marks.length)?marks[i+1].startStep:totalSteps;
+marks[i].bars=(marks[i].endStep-marks[i].startStep)/16;
+}
+return{evs,stepDur:sd,sections:marks,totalSteps,total:t0+(totalSteps+SONG_TAIL_STEPS)*sd};
+}
+
+/* songSections — arranger steps grouped into MUSICAL sections (consecutive
+ * steps of the same scene), with absolute BAR ranges for RMS slicing. */
+export function songSections(p){
+const steps=(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps:[];
+const out=[];let bar=0;
+for(const st of steps){
+const last=out[out.length-1];
+if(last&&last.scene===st.scene){last.bars+=st.bars;last.endBar+=st.bars}
+else out.push({scene:st.scene,name:(p.scenes[st.scene]&&p.scenes[st.scene].name)||('SCENE '+(st.scene+1)),bars:st.bars,startBar:bar,endBar:bar+st.bars});
+bar+=st.bars;
+}
+return out;
+}
+
+/* songFrames — the EXACT sample count a song render will produce (formula). */
+export function songFrames(p){
+const sd=60/p.bpm/4;
+const bars=(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps.reduce((a,s)=>a+(s.bars|0),0):0;
+return Math.ceil(44100*(SONG_LEAD+(bars*16+SONG_TAIL_STEPS)*sd));
+}
+
+/* songDurationSec — music length and with-tail length, for UI readouts. */
+export function songDurationSec(p){
+const sd=60/p.bpm/4;
+const bars=(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps.reduce((a,s)=>a+(s.bars|0),0):0;
+return{music:bars*16*sd,withTail:(bars*16+SONG_TAIL_STEPS)*sd};
+}
+
+/* songRenderController — cancel/progress contract for renderSong (unit-
+ * testable without Web Audio; the UI drives it from the CANCEL button). */
+export function songRenderController(){
+return{cancelled:false,onProgress:null,cancel(){this.cancelled=true}};
+}
+
+/* renderSong — offline render of the WHOLE arrangement through the live
+ * machinery. Walks songSteps once: per step it triggers this step's events
+ * (stepEvents — identical to schedTick) AND applies the per-step automation
+ * player (applyLanes → syncMix(cp,stepTime) / resolveMacros), so state lanes
+ * (mix AND synth-param sweeps) land on voices exactly as in live playback.
+ * opts.ctrl: songRenderController (progress + cancel). opts.t0 override.
+ * Deep-clones p: the live project is never touched (loop-bounce guarantee).
+ * Returns {buf, N, evs, sections, scheduleHash, musicSec, totalSec} or
+ * {cancelled:true}. Cancel semantics: the offline render simply never
+ * resumes — its promise stays pending and the OfflineAudioContext becomes
+ * unreachable (GC); the live AudioContext is untouched, no dangling UI. */
+export async function renderSong(p,opts){
+opts=opts||{};
+const ctrl=opts.ctrl||{};
+const t0=opts.t0==null?SONG_LEAD:opts.t0,sr=44100;
+const cp=JSON.parse(JSON.stringify(p));
+const plan=songSchedule(cp,t0);
+const sd=plan.stepDur;
+if(!plan.totalSteps)return null;
+const N=Math.ceil(plan.total*sr);
+const oc=new OfflineAudioContext(2,N,sr);
+const eng=new PooledEngine(oc);
+eng.syncMix(cp);
+/* progress: suspend at section boundaries (thinned to ≤64 marks so very
+   long chains stay cheap). Chrome quantizes suspend times to the render
+   quantum — progress is informational, never load-bearing. */
+const thin=plan.sections.length>64?Math.ceil(plan.sections.length/64):1;
+for(let i=0;i<plan.sections.length;i+=thin){
+const sec=plan.sections[i],when=t0+sec.startStep*sd;
+try{oc.suspend(when).then(()=>{
+if(ctrl.cancelled){if(ctrl._onCancelled)try{ctrl._onCancelled()}catch(e){/* noop */}return}
+if(ctrl.onProgress)try{ctrl.onProgress(i,plan.sections.length,sec.scene,cp)}catch(e){/* progress never breaks render */}
+if(!ctrl.cancelled)oc.resume().catch(()=>{/* gone */});
+}).catch(()=>{/* suspend refused (time passed / limit) — skip point */})}catch(e){/* skip point */}
+}
+/* the walk — events + automation in the SAME per-step order as schedTick */
+const evs=[];
+for(const y of songSteps(cp)){
+if(ctrl.cancelled){if(ctrl._onCancelled)try{ctrl._onCancelled()}catch(e){/* noop */}return{cancelled:true}}
+if(y.fill&&y.sectionStart){const scn=cp.scenes[y.scene];
+if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)eng.trigger(cp.tracks[3],t0+y.abs*sd+k*sd/2,{track:3,off:0,vel:.5+.05*k,note:48,lock:{}},sd)}
+const list=stepEvents(cp,y.phase);
+for(const e of list){eng.trigger(cp.tracks[e.track],t0+y.abs*sd+e.off,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sd);evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock})}
+const auto=applyLanes(cp,y.phase);
+if(auto.mixed||auto.macroed){
+if(auto.macroed)resolveMacros(cp);
+eng.syncMix(cp,t0+y.abs*sd);
+}
+}
+const buf=await oc.startRendering();
+return{buf,N,evs,sections:plan.sections,scheduleHash:evHash(evs),musicSec:plan.totalSteps*sd,totalSec:(plan.totalSteps+SONG_TAIL_STEPS)*sd};
+}
