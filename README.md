@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 226 tests across 20 files — 226 pass / 0 fail (47210 expect() calls)
+bun test             # 236 tests across 21 files — 236 pass / 0 fail (47241 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -70,6 +70,7 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/composer.test.ts` | 14 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed uniqueness, output integrity |
 | `tests/usability.test.ts` | 7 | shortcut registry (no collisions, taskbook bindings), demo recipes recompose + boot |
 | `tests/song.test.ts` | 12 | v0.6.0 song render: phase rules == live-scheduler oracle, frame-count formula (pinned number), sections/fills, schedule determinism, duration guard, cancel contract |
+| `tests/pwa.test.ts` | 10 | v0.6.0 PWA: SW CACHE_VERSION == CHANGELOG latest, network-first + cleanup + claim pieces, manifest/icon integrity, deterministic icon generator |
 
 ## Self-Gate in CI
 

@@ -56,9 +56,23 @@ reproducible with the command shown next to it.
 - CI subset (`tools/e2e.mjs`): asserts all 22 hard gates (G24 joins; G17/G25
   explicitly excluded as realtime).
 
+### Added — PWA (`feat: pwa manifest + service worker (network-first, versioned)`)
+
+- `manifest.webmanifest` (standalone, device colors) + icons 192/512 generated
+  by `tools/gen-icons.mjs` (zero-dep PNG encoder, seeded `mulberry32(0x9056)`
+  sequencer motif — deterministic pixels, committed).
+- `sw.js`: **network-first** for same-origin GETs (cache = offline fallback
+  ONLY; every successful response refreshes the cached copy), `activate`
+  purges old caches, skipWaiting + clients.claim. Cache version const
+  `psy6-v0.6.0` is asserted against the latest CHANGELOG heading by BOTH
+  `tools/verify.mjs` (release gate) and `tests/pwa.test.ts` — a release that
+  forgets the bump fails verification. Rollback rule documented in
+  ARCHITECTURE §13: any served-bytes staleness under SW → remove the
+  registration, keep the manifest, document honestly.
+
 ### Evidence (reproducible)
 
-- `bun test` — **226 pass / 0 fail** across 20 files, 47,210 expect() calls
+- `bun test` — **236 pass / 0 fail** across 21 files, 47,241 expect() calls
   (incl. `tests/song.test.ts` 12: phase rules == live-scheduler oracle,
   frame formula pinned to 10,075,254, sections [16,16,24,16,16,32,16]=136
   bars, fills 3 launches × 8 hits, schedule determinism, duration guard,
