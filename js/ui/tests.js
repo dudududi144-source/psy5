@@ -1,4 +1,5 @@
 import { $, I, PERF, saveProject, loadStored, resolveMidiParam } from '../state.js';
+import { sceneSetFollow, resolveFollow } from '../scenes.js';
 import { songMidi } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
 import { createMidiCore, emptyMidiMap } from '../midi.js';
@@ -458,6 +459,35 @@ const countsOk=midiTrkNotes.slice(1).every((t,i)=>{const smt=sm26.tracks[i];retu
 const total26=p26.arranger.steps.reduce((a,s)=>a+s.bars,0)*4*480;
 const ok26=hdrOk&&fmt26===1&&dv26===480&&nt26===sm26.tracks.length+1&&Math.abs(tempo26-145)<0.01&&firstKick26===0&&countsOk&&maxTick26>total26-4*480&&maxTick26<=total26&&bytes26.length>1000&&byteDet;
 gate('G26','MIDI export: songMidi==WAV expansion, format-1 parse-back (tempo/channels/counts/total ticks), deterministic bytes',ok26,'bytes='+bytes26.length+' fmt='+fmt26+' ppq='+dv26+' trks='+nt26+' tempo='+tempo26+' firstKick='+firstKick26+' notes='+midiTrkNotes.reduce((a,t)=>a+t.notes.length,0)+' total='+total26+' det='+byteDet)}catch(e){gate('G26','MIDI export',false,'ERR '+e.message)}
+
+/* G27 — follow actions (offline simulation ONLY — CI-asserted): the scripted
+   chain (composed FULL-ON 3min seed 424242, follow on EVERY scene) walks an
+   exact seeded state sequence. Asserts: random mode's pinned 20-transition
+   sequence for the fixed seed, replay identity (same seed+start → identical),
+   next/prev walking sequences with wrap, scene-target lock, prob=0 → the
+   documented 'next' fallback, and followBars precedence. */
+try{
+const c27=compose('FULL-ON',3,424242),p27=c27.project;p27.chain=true;
+const sim27=(pp,st,n)=>{let cur=st;const q=[st];for(let k=0;k<n;k++){const nx=resolveFollow(pp,cur,k);if(nx==null)break;q.push(nx);cur=nx}return q};
+for(let i=0;i<p27.scenes.length;i++)sceneSetFollow(p27,i,{mode:'random',prob:100});
+const r27=sim27(p27,2,20);
+const pin27=[2,2,11,11,9,9,4,13,8,16,11,9,1,15,8,1,8,6,0,13,0];
+let seqOk=r27.length===pin27.length;for(let i=0;i<Math.min(r27.length,pin27.length);i++)if(r27[i]!==pin27[i])seqOk=false;
+const replay27=JSON.stringify(sim27(p27,2,20))===JSON.stringify(r27);
+for(let i=0;i<p27.scenes.length;i++)sceneSetFollow(p27,i,{mode:'next',prob:100});
+const next27=sim27(p27,2,20);
+let nextOk=next27.length===21;for(let i=0;i<21;i++)if(next27[i]!==(2+i)%17)nextOk=false;
+for(let i=0;i<p27.scenes.length;i++)sceneSetFollow(p27,i,{mode:'prev',prob:100});
+const prev27=sim27(p27,2,8);
+let prevOk=prev27.length===9;for(let i=0;i<9;i++)if(prev27[i]!==((2-i)%17+17)%17)prevOk=false;
+for(let i=0;i<p27.scenes.length;i++)sceneSetFollow(p27,i,{mode:'scene',target:4,prob:100});
+const scene27=sim27(p27,2,6);
+const sceneOk=scene27.join(',')==='2,4,4,4,4,4,4';
+for(let i=0;i<p27.scenes.length;i++)sceneSetFollow(p27,i,{mode:'random',prob:0});
+const fb27=sim27(p27,2,8);
+let fbOk=fb27.length===9;for(let i=0;i<9;i++)if(fb27[i]!==2+i)fbOk=false;
+const ok27=seqOk&&replay27&&nextOk&&prevOk&&sceneOk&&fbOk;
+gate('G27','follow actions (chain only): seeded random sequence == pinned walk, replay-identical, next/prev wrap exact, scene lock, prob=0 → next fallback',ok27,'seq='+r27.join(',')+' replay='+replay27+' next='+nextOk+' prev='+prevOk+' lock='+sceneOk+' fallback='+fbOk)}catch(e){gate('G27','follow actions',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

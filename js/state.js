@@ -47,7 +47,7 @@ function loadProjectObj(p){if(p.seed==null)p.seed='PSY6';if(!p.groove)p.groove='
    neutral defaults keep old scenes sounding identically. Scenes are REBUILT
    in canonical key order so load→save byte-stability holds regardless of how
    the save was produced. */
-if(p.scenes)p.scenes=p.scenes.map(sc=>({name:sc.name,pattern:sc.pattern==null?null:sc.pattern,color:sc.color==null?null:sc.color,bars:sc.bars==null?null:sc.bars,fill:sc.fill===true}));/* lane backfill (v0.5.0): legacy lanes get mode 'lock' (sound params — the only thing
+if(p.scenes)p.scenes=p.scenes.map(sc=>{const o={name:sc.name,pattern:sc.pattern==null?null:sc.pattern,color:sc.color==null?null:sc.color,bars:sc.bars==null?null:sc.bars,fill:sc.fill===true};/* v0.7.0 follow backfill: a valid non-none config is preserved in canonical form; absent/invalid/none → absent (legacy scenes behave identically) */if(sc.follow&&sc.follow.mode&&sc.follow.mode!=='none'){o.follow={mode:String(sc.follow.mode),target:(sc.follow.target==null?null:Math.max(0,sc.follow.target|0)),prob:(typeof sc.follow.prob==='number'&&isFinite(sc.follow.prob))?Math.max(0,Math.min(100,Math.round(sc.follow.prob))):100,afterBars:(sc.follow.afterBars==null?null:Math.max(1,Math.min(64,sc.follow.afterBars|0)))}}return o});/* lane backfill (v0.5.0): legacy lanes get mode 'lock' (sound params — the only thing
    that ever had a lane) or 'state' (anything else), preserving exact legacy behavior */
 if(p.lanes)for(const ln of p.lanes)ln.mode=laneModeBackfill(ln.param,ln.mode);I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;I.autoArm=new Set();I.selLane=-1;if(I.eng)I.eng.syncMix(p);I.renderDirty=true;if(I.copilotReload)I.copilotReload()}
 /* MIDI param paths (v0.4.0): macro.<0-7> | master.vol | track.<i>.mix.vol |

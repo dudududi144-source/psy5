@@ -1,7 +1,7 @@
 import { $, I, pushHist, after, PERF, recHit, toast } from '../state.js';
 import { SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, LIMITS } from '../model.js';
 import { addTrackToProject } from '../presets.js';
-import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill } from '../scenes.js';
+import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, FOLLOW_MODES } from '../scenes.js';
 
 /* ── SCENE BANK (v0.5.0) — scrollable list up to 64 scenes ──
    Existing snapshot model extended with color/bars/fill (see js/scenes.js
@@ -30,6 +30,14 @@ function renderScenes() {
       + '<button class="sdn" title="move down"' + (i === I.p.scenes.length - 1 ? ' disabled' : '') + '>↓</button>'
       + '<button class="sdup" title="duplicate">⧉</button>'
       + '<button class="sclr" title="clear (empty slot)">✕</button>'
+      + '</div>'
+      + '<div class="scFollow" title="FOLLOW ACTION — chain mode only. PLAY SONG always follows the arranger and ignores this. prob < 100 misses fall back to next. Random picks are seeded (replayable). afterBars overrides the section length in bars.">'
+      + '<select class="fmode" title="follow action (chain mode only)">' + FOLLOW_MODES.map(m => '<option value="' + m + '"' + (sc.follow && sc.follow.mode === m ? ' selected' : '') + '>' + (m === 'none' ? 'follow: —' : m) + '</option>').join('') + '</select>'
+      + '<select class="ftarget" style="display:' + (sc.follow && sc.follow.mode === 'scene' ? 'inline-block' : 'none') + '">'
+      + I.p.scenes.map((x, j) => '<option value="' + j + '"' + (sc.follow && sc.follow.target === j ? ' selected' : '') + '>→ ' + x.name + '</option>').join('')
+      + '</select>'
+      + '<input class="fprob" type="number" min="0" max="100" placeholder="prob" value="' + (sc.follow && sc.follow.prob != null ? sc.follow.prob : 100) + '" title="probability % — a miss falls back to next">'
+      + '<input class="fbars" type="number" min="1" max="64" placeholder="bars" value="' + (sc.follow && sc.follow.afterBars != null ? sc.follow.afterBars : '') + '" title="afterBars — overrides the section length in bars">'
       + '</div>';
     const dot = b.querySelector('.dot');
     if (sc.color != null) dot.style.background = dotC;
@@ -51,6 +59,19 @@ function renderScenes() {
     b.querySelector('.sdn').onclick = e => { e.stopPropagation(); pushHist(); sceneMove(I.p, i, +1); I.renderDirty = true };
     b.querySelector('.sdup').onclick = e => { e.stopPropagation(); pushHist(); const r = sceneDuplicate(I.p, i); if (r < 0) toast('Scene bank full (' + LIMITS.MAX_SCENES + ')'); I.renderDirty = true };
     b.querySelector('.sclr').onclick = e => { e.stopPropagation(); pushHist(); sceneClear(I.p, i); I.renderDirty = true };
+    /* follow-action row (v0.7.0) — chain mode only, seeded + replayable */
+    const fwRead = () => ({
+      mode: b.querySelector('.fmode').value,
+      target: +b.querySelector('.ftarget').value,
+      prob: b.querySelector('.fprob').value === '' ? 100 : +b.querySelector('.fprob').value,
+      afterBars: b.querySelector('.fbars').value === '' ? null : +b.querySelector('.fbars').value,
+    });
+    const fwBox = b.querySelector('.scFollow');
+    fwBox.querySelectorAll('select,input').forEach(el => { el.onpointerdown = e => e.stopPropagation(); el.onclick = e => e.stopPropagation() });
+    b.querySelector('.fmode').onchange = function () { pushHist(); b.querySelector('.ftarget').style.display = this.value === 'scene' ? 'inline-block' : 'none'; sceneSetFollow(I.p, i, fwRead()); I.renderDirty = true };
+    b.querySelector('.ftarget').onchange = function () { pushHist(); sceneSetFollow(I.p, i, fwRead()); I.renderDirty = true };
+    b.querySelector('.fprob').onchange = function () { pushHist(); sceneSetFollow(I.p, i, fwRead()); I.renderDirty = true };
+    b.querySelector('.fbars').onchange = function () { pushHist(); sceneSetFollow(I.p, i, fwRead()); I.renderDirty = true };
     b.onclick = e => { if (e.shiftKey) PERF.assign(i); else PERF.launch(i, e.altKey) };
     w.appendChild(b);
   });
