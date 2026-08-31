@@ -8,10 +8,14 @@
 import { $, I, toast } from '../state.js';
 import { wavEncode } from '../bounce.js';
 import { CaptureTap, stepsToBarBoundary } from '../capture.js';
+import { arrToggle, arrState } from '../arranger.js';
 
 let tap = null;
 let hook = null;
-let state = 'idle'; /* idle | armed-start | capturing | armed-stop */
+let state = 'idle'; /* idle | armed-start | capturing | armed-stop | song-start | song-capturing */
+let songMode = false;
+let songBarsTotal = 0;
+let songBarsDone = 0;
 let result = null;
 
 function rmsOf(ch) {
@@ -31,6 +35,11 @@ function paint() {
   const b = $('bCap'); if (!b) return;
   b.classList.toggle('rec', state === 'capturing' || state === 'armed-start' || state === 'armed-stop');
   b.textContent = state === 'armed-start' ? 'CAPTURE ⏳' : state === 'capturing' ? 'CAPTURE ■' : state === 'armed-stop' ? 'CAPTURE ⏳' : 'CAPTURE';
+  const sr = $('bSongRec');
+  if (sr) {
+    sr.classList.toggle('rec', state === 'song-start' || state === 'song-capturing');
+    sr.textContent = state === 'song-start' ? 'REC SONG ⏳' : state === 'song-capturing' ? 'REC SONG ■ ' + songBarsDone + '/' + (songBarsTotal + 1) : 'RECORD SONG';
+  }
   b.title = state === 'idle'
     ? 'Record the live master output losslessly (WAV). Starts on the next bar, stops on the next bar after that.'
     : 'armed-start: recording begins next bar · capturing: press again to arm the bar-boundary stop';
@@ -52,7 +61,12 @@ function finishCapture() {
   const blob = new Blob([ab], { type: 'audio/wav' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'psy6-capture-' + I.p.bpm + 'bpm.wav';
+  a.download = (songMode ? 'psy6-song-live-' : 'psy6-capture-') + I.p.bpm + 'bpm.wav';
+  songMode = false;
+  /* belt-and-braces: a completed capture retires its tap — the next arm
+     builds a fresh one (no residue across sessions of the same page) */
+  try { tap.dispose(); } catch (e) { /* done */ }
+  tap = null;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   toast('CAPTURED ✓ ' + frames + ' samples · ' + (ab.byteLength / 1024 | 0) + ' KB');
@@ -62,6 +76,39 @@ function finishCapture() {
 function onBar() {
   if (state === 'armed-start') { tap.start(); state = 'capturing'; paint(); }
   else if (state === 'armed-stop') finishCapture();
+  else if (state === 'song-start') { tap.start(); songBarsDone = 0; state = 'song-capturing'; paint(); }
+  else if (state === 'song-capturing') {
+    songBarsDone++;
+    paint();
+    if (songBarsDone >= songBarsTotal + 1) finishCapture(); /* final section + 1 tail bar */
+  }
+}
+
+/* armSongRecord (Run 9): record the WHOLE live song playback through the
+   EXISTING capture tap + WAV encoder. Requires a non-empty arranger. Starts
+   bar-quantized together with PLAY SONG (arranger restarts at section 0),
+   auto-stops at the end of the final section +1 bar. Panic-safe: the
+   capture path never touches the transport — pressing STOP only stops the
+   transport (the next STOP press finishes the capture, documented fallback). */
+function armSongRecord() {
+  if (!I.eng || !I.ctx) { toast('POWER ON first'); return { ok: false }; }
+  if (state !== 'idle') { toast('CAPTURE already active'); return { ok: false }; }
+  const steps = (I.p && I.p.arranger && Array.isArray(I.p.arranger.steps)) ? I.p.arranger.steps : [];
+  if (!steps.length) { toast('RECORD SONG: arranger is empty — build [scene,bars] sections first'); return { ok: false }; }
+  songBarsTotal = steps.reduce((a, s) => a + s.bars, 0);
+  songBarsDone = 0;
+  songMode = true;
+  ensureTap();
+  result = null;
+  state = 'song-start';
+  hook = onBar;
+  I.barHooks.push(hook);
+  /* PLAY SONG: restart the chain at section 0 + boot the transport when stopped */
+  arrToggle(true);
+  if (!['PLAYING', 'RECORDING', 'TRANSITIONING'].includes(I.fsm)) { const b = $('bPlay'); if (b) b.click(); }
+  paint();
+  toast('REC SONG ARMED — ' + songBarsTotal + ' bars, starts next bar');
+  return { ok: true };
 }
 
 function armCapture() {
@@ -79,12 +126,12 @@ function armCapture() {
 }
 
 function captureStop() {
-  if (state === 'armed-start') { /* never started: cancel cleanly */
-    state = 'idle';
+  if (state === 'armed-start' || state === 'song-start') { /* never started: cancel cleanly */
+    state = 'idle'; songMode = false;
     dropHook();
-    paint(); toast('CAPTURE cancelled'); return { ok: true };
+    paint(); toast(state === 'song-start' ? 'REC SONG cancelled' : 'CAPTURE cancelled'); return { ok: true };
   }
-  if (state !== 'capturing') { toast('CAPTURE: nothing to stop'); return { ok: false }; }
+  if (state !== 'capturing' && state !== 'song-capturing') { toast('CAPTURE: nothing to stop'); return { ok: false }; }
   if (!I.sched.on) { finishCapture(); return { ok: true }; } /* transport stopped mid-capture → finish now (fallback) */
   state = 'armed-stop';
   paint();
@@ -97,9 +144,10 @@ function captureResult() { return result; }
 
 function wireCapture() {
   const b = $('bCap');
-  if (!b) return;
-  b.onclick = () => { if (state === 'idle') armCapture(); else captureStop(); };
+  if (b) b.onclick = () => { if (state === 'idle') armCapture(); else captureStop(); };
+  const sr = $('bSongRec');
+  if (sr) sr.onclick = () => { if (state === 'idle') armSongRecord(); else captureStop(); };
   paint();
 }
 
-export { wireCapture, armCapture, captureStop, captureState, captureResult };
+export { wireCapture, armCapture, captureStop, armSongRecord, captureState, captureResult };

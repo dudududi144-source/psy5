@@ -67,7 +67,12 @@ class CaptureTap {
     this.proc.connect(this.sink);
     this.sink.connect(ctx.destination); /* Chrome only runs the callback when connected to a destination */
   }
-  start() { this.recording = true; }
+  start() { /* reset accumulated state so a SECOND capture in one session
+              starts clean (G25 found the residue: capture 2 included capture 1) */
+    this.chunks = [new GrowableChannel(), new GrowableChannel()];
+    this.frames = 0;
+    this.recording = true;
+  }
   stop() { this.recording = false; }
   assemble() { return [this.chunks[0].concat(), this.chunks[1].concat()]; }
   dispose() { try { this.proc.disconnect(); this.sink.disconnect(); } catch (e) { /* done */ } }

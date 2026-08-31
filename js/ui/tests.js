@@ -11,7 +11,7 @@ import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, e
 import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
-import { armCapture, captureStop, captureState, captureResult } from './capture.js';
+import { armCapture, captureStop, armSongRecord, captureState, captureResult } from './capture.js';
 import { startSched } from '../scheduler.js';
 import { canonicalProject, encodeShare, decodeShare } from '../share.js';
 
@@ -166,6 +166,28 @@ const dur17=res17.frames/res17.sampleRate;
 const hdr17=tag17(0)==='RIFF'&&tag17(8)==='WAVE'&&v17.getUint16(22,true)===2&&v17.getUint16(34,true)===16&&v17.getUint32(40,true)===res17.frames*4;
 const ok17=hdr17&&Math.abs(dur17-barSec)<=.05&&res17.rms>0.001;
 gate('G17','live capture: real tap, bar-quantized start/stop, bounce-encoder WAV, non-silent',ok17,'frames='+res17.frames+' dur='+dur17.toFixed(3)+'s bar='+barSec.toFixed(3)+'s skew='+((dur17-barSec)*1000).toFixed(0)+'ms rms='+res17.rms.toFixed(4)+' hdr='+hdr17)}catch(e){gate('G17','live capture (realtime)',false,'ERR '+e.message)}
+/* G25 — record song (REALTIME — evidence-only, classified like G17): through
+   the REAL scheduler + tap: PLAY SONG on a 4-bar two-section arrangement,
+   capture auto-stops at the end of the final section +1 bar. Assert: valid
+   WAV header, duration within ±100 ms of 5 bars, RMS > 0.001. */
+try{
+if(!I.eng||!I.ctx)throw new Error('no engine');
+I.p.arranger={v:1,on:false,idx:0,barsIn:0,steps:[{scene:0,bars:2},{scene:1,bars:2}]};
+const bar25=16*60/I.p.bpm/4;
+const arm25=armSongRecord();if(!arm25.ok)throw new Error('arm failed');
+const dl25=Date.now()+bar25*1000+8000;
+while(captureState().state!=='song-capturing'&&Date.now()<dl25)await new Promise(r=>setTimeout(r,60));
+if(captureState().state!=='song-capturing')throw new Error('song start boundary never hit');
+const dl25b=Date.now()+(5*bar25+2)*1000+8000;
+while(captureState().state!=='idle'&&Date.now()<dl25b)await new Promise(r=>setTimeout(r,60));
+if(captureState().state!=='idle')throw new Error('song auto-stop never hit');
+const res25=captureResult();if(!res25)throw new Error('no song capture result');
+const v25=new DataView(res25.wav);
+const tag25=o=>String.fromCharCode(v25.getUint8(o),v25.getUint8(o+1),v25.getUint8(o+2),v25.getUint8(o+3));
+const dur25=res25.frames/res25.sampleRate;
+const hdr25=tag25(0)==='RIFF'&&tag25(8)==='WAVE'&&v25.getUint16(22,true)===2&&v25.getUint16(34,true)===16;
+const ok25=hdr25&&Math.abs(dur25-5*bar25)<=.1&&res25.rms>0.001;
+gate('G25','record song: live PLAY SONG captured via the existing tap, auto-stop at final section +1 bar, bounce-encoder WAV, non-silent',ok25,'frames='+res25.frames+' dur='+dur25.toFixed(3)+'s want='+(5*bar25).toFixed(3)+'s skew='+((dur25-5*bar25)*1000).toFixed(0)+'ms rms='+res25.rms.toFixed(4)+' hdr='+hdr25)}catch(e){gate('G25','record song (realtime)',false,'ERR '+e.message)}
 /* G18 — per-track stems (offline — CI-asserted): a 2-track project with
    NON-OVERLAPPING events (kick @ step 4, bass @ step 12) renders each track
    through the SAME deterministic bounce graph with only that track's events.
