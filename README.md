@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 102 tests across 10 files — 102 pass / 0 fail (6321 expect() calls)
+bun test             # 147 tests across 14 files — 147 pass / 0 fail (6886 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -60,6 +60,10 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/sidechain.test.ts` | 10 | kick-triggered sidechain: envelope shape, overlap continuity, project round-trip |
 | `tests/sends.test.ts` | 9 | BPM-synced delay divisions, feedback clamps, deterministic IR, project round-trip |
 | `tests/bounce.test.ts` | 8 | bounce schedule determinism, WAV header/data integrity, clipping |
+| `tests/midi.test.ts` | 20 | MIDI IN core: note routing, CC learn + round-trip, param dispatch, CC0/CC123 rules, provider injection |
+| `tests/capture.test.ts` | 7 | live capture: buffer growth accounting, bar-quantization math, bounce-encoder reuse |
+| `tests/stems.test.ts` | 6 | stem discovery, per-track schedule determinism, full-mix hash unchanged |
+| `tests/share.test.ts` | 12 | share links: canonical ordering, round-trip, determinism, learner survival, size guards |
 
 ## Self-Gate in CI
 
@@ -73,11 +77,14 @@ Honest subset classification (v0.4.0):
 
 | Gates | Class | Where asserted |
 | --- | --- | --- |
-| `G2`, `G5`, `G6`, `G8`, `G10` | pure computation (hash/save-load/macro/pools/bandit) | CI + local |
+| `G2`, `G5`, `G6`, `G8`, `G10`, `G16`, `G19` | pure computation (hash/save-load/macro/pools/bandit/MIDI core/share codec) | CI + local |
 | `G1-TECHNO`, `G1-PSYTRANCE`, `G1-TRANCE`, `G1-PROGRESSIVE` | deterministic OfflineAudioContext render | CI + local |
-| `G9`, `G11`, `G12`, `G13`, `G14`, `G15` | deterministic OfflineAudioContext render (steal counters / sidechain / sends / bounce / drain / default-pool overload) | CI + local |
+| `G9`, `G11`, `G12`, `G13`, `G14`, `G15`, `G18` | deterministic OfflineAudioContext render (steal counters / sidechain / sends / bounce / drain / default-pool overload / stem isolation) | CI + local |
+| `G17` (live capture) | **realtime** ScriptProcessor tap + real scheduler | runs on-device; CI reports it as non-asserted info — **local-only assertion** |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
-| live-scheduler loop checks | realtime | **local-only** — by definition |
+
+CI asserts **18/19** MAIN gates (all except realtime G17); the full
+**19/19** runs on a real device / real browser session.
 
 Note: although G9/G14/G15 were originally labelled "realtime-ish", code
 inspection (js/ui/tests.js) shows that in MAIN mode they run entirely through
@@ -109,8 +116,9 @@ benchmark asserts the honest figure, and a **non-silent-output guard test**
 (oversampled-path peak > 0.5, measured 0.729) prevents a silent-output
 regression from faking the number again.
 
-Device Self-Gate (Self-Gate tab → RUN SELF-GATE): **15/15 passed** in the
-default MAIN engine, including:
+Device Self-Gate (Self-Gate tab → RUN SELF-GATE): **19/19 passed** in the
+default MAIN engine (v0.4.0: + G16 MIDI, G17 live capture, G18 stems,
+G19 share links), including:
 
 - **G9** — 64 consecutive hats + kick on every 4th step under deliberate pool
   overload (3-voice drum pool): `kicks=16/16 hats=64/64 tier0Steals=0
@@ -138,6 +146,49 @@ In the optional WORKLET engine the Self-Gate runs a reduced but real set:
 drain + all kicks voiced, `peak=0.710 residualEvents=0 kicksVoiced=8/8`;
 G15w overload via worklet stats, `tier0Victims=0 hatSteals=188
 kicksVoiced=16/16 peak=0.938`).
+
+## Features (v0.4.0)
+
+### MIDI IN (hardware play)
+
+Connect a MIDI controller in the Perform tab → notes play the currently
+selected track (velocity = note-on velocity, MIDI note = pitch), CC learn
+binds any of 57 parameters (macros, mixer incl. sendA/sendB/scAmount,
+master) to a knob/fader, CC 123 = PANIC. Bindings persist in the project
+(`midiMap`) and survive save/export/import/share. Honest scope: **no MIDI
+clock sync** (out of scope, documented in the UI); note-off releases synth
+voices only — drum one-shots are never cut mid-hit; `master.vol` is applied
+by the MAIN engine only (the WORKLET engine persists but does not apply it);
+Web MIDI needs a Chromium browser (graceful note elsewhere).
+
+### Live capture (record the jam, losslessly)
+
+CAPTURE in the transport bar records the master output losslessly: starts on
+the next bar, stops on the next bar after that (16-step quantization), and
+downloads `psy6-capture-<bpm>bpm.wav` via the same WAV encoder as bounce.
+The tap is parallel to the listening path — starting/stopping capture can
+never stop playback. Honest scope: built on `ScriptProcessorNode`
+(**deprecated** API, chosen deliberately: zero changes to the MAIN engine
+graph; universally supported in Chrome/Firefox/Safari); quantization skew is
+bounded by the 1024-frame callback (measured 6 ms on-device, tolerance
+±50 ms). Capture gate G17 is realtime and asserted on-device only.
+
+### Stem export
+
+BOUNCE → MODE: STEMS renders one WAV per **non-empty** track
+(`psy6-stem-<trackName>.wav`, sequential downloads) through the same
+deterministic offline graph as the mix bounce. Isolation semantics are
+honest: tracks with no scheduled events contribute exactly 0; a track's own
+FX-delay/reverb tail and decay tail belong to its own stem.
+
+### Share links
+
+SHARE copies a link (`#p=<token>`) containing the whole project — canonical
+JSON key order, deflate-raw compressed, base64url — including the CO-PILOT
+learner snapshot. Links are byte-identical for identical projects. A link is
+NEVER auto-loaded: the power screen shows a consent banner (LOAD SHARE /
+DISMISS). >6 KB links warn (browser URL limits), >50 KB are refused — use
+EXPORT instead.
 
 ## Two engines — MAIN (default) and WORKLET (experimental)
 

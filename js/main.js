@@ -32,10 +32,10 @@ let p=null;if(resume)p=loadStored();if(!p&&I.pendingShare){p=I.pendingShare;I.pe
 (function boot(){const sp=$('stylePicker');['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE'].forEach(st=>{const b=document.createElement('button');b.textContent='⚡ '+st;b.onclick=()=>powerOn(st,false);sp.appendChild(b)});const empty=document.createElement('button');empty.textContent='∅ EMPTY';empty.onclick=()=>powerOn('EMPTY',false);sp.appendChild(empty);
 /* engine selector — MAIN is the default (zero behavior change); WORKLET is opt-in */
 const ep=$('enginePicker');I.engineSel='main';
-const mkEng=(id,label,title)=>{const b=document.createElement('button');b.textContent=label;b.title=title;b.dataset.eng=id;b.onclick=()=>{I.engineSel=id;Array.from(ep.children).forEach(x=>x.classList.toggle('on',x.dataset.eng===id));$('engNote').textContent=id==='worklet'?'WORKLET — experimental. Honest limitations: '+WORKLET_LIMITATIONS.join(' · '):'MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (15 checks).'};ep.appendChild(b);return b};
+const mkEng=(id,label,title)=>{const b=document.createElement('button');b.textContent=label;b.title=title;b.dataset.eng=id;b.onclick=()=>{I.engineSel=id;Array.from(ep.children).forEach(x=>x.classList.toggle('on',x.dataset.eng===id));$('engNote').textContent=id==='worklet'?'WORKLET — experimental. Honest limitations: '+WORKLET_LIMITATIONS.join(' · '):'MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (19 checks).'};ep.appendChild(b);return b};
 mkEng('main','⬤ MAIN (default)','Pooled engine — default').classList.add('on');
 mkEng('worklet','⚙ WORKLET (experimental)','AudioWorklet engine — reduced feature set, reduced self-gate');
-$('engNote').textContent='MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (15 checks).';
+$('engNote').textContent='MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (19 checks).';
 try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$('resumeBtn').onclick=()=>powerOn(null,true);
 /* share-link consent (v0.4.0): #p= present → banner with LOAD SHARE / DISMISS.
    NEVER auto-load — the shared project replaces the in-memory project only on

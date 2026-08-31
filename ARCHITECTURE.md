@@ -178,6 +178,38 @@ never bit-exact audio), so CI has no realtime dependency. The WORKLET reduced
 set (G14w/G15w) and live-scheduler loop checks stay local-only; they are
 exercised from the live site at each release. See README "Self-Gate in CI".
 
+## 12. MIDI / Capture / Stems / Share (v0.4.0)
+
+**MIDI layer** — `js/midi.js` is a DOM-free core: bytes in (0x90/0x80/0xB0)
+→ host callbacks out (`noteOn/noteOff/panic/dispatch`). Web MIDI access is
+injected via a settable provider, so Bun tests drive a MockMIDIAccess
+through the same code path as a real device. CC learn binds the next
+received CC to a parameter path stored in `project.midiMap` (versioned);
+dispatch resolves paths (`macro.N`, `master.vol`, `track.i.mix.*`,
+`track.i.scAmount`) through pure `resolveMidiParam(p, path, v01)`. CC 0 is
+ignored (bank select); CC 123 = PANIC. No MIDI clock sync — out of scope.
+
+**Capture tap** — `js/capture.js`: a ScriptProcessorNode (deprecated but
+universal; zero graph changes to the MAIN engine) taps the analyser output
+in parallel (analyser → tap → zero-gain sink). Samples accumulate in
+preallocated growable Float32 chunks (262144 frames); per-callback work is
+one `.set()`; frame totals are Float64-tracked. Start/stop are quantized to
+the scheduler's 16-step bar grid via `I.barHooks`; encoding reuses the
+bounce `wavEncode` (no duplicate encoder). Stopping capture never touches
+the transport.
+
+**Stems** — `renderBounce(p, loops, {trackIdx})` reuses the exact bounce
+graph; only track `i`'s events are scheduled, so every other track
+contributes exactly 0 samples. The full-mix path is unchanged (same
+schedule hash). `stemTracks()` reports the non-empty tracks.
+
+**Share format** — project → canonical JSON (object keys sorted; array
+order preserved) → `CompressionStream('deflate-raw')` → base64url →
+`#p=<token>`. Canonicalization makes identical projects byte-identical
+links. Guards: warn > 6 KB, refuse > 50 KB. Boot with `#p=` shows a consent
+banner — the project is never loaded without an explicit click. Learner
+state (`p.copilot`) travels inside the project payload.
+
 ---
-Architecture version: 1.1
+Architecture version: 1.2
 Status: IMPLEMENTED

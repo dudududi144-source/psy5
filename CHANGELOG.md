@@ -3,6 +3,130 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+# CHANGELOG — PSY6
+
+All notable changes to the PSY6 device repository. Every claim below is
+reproducible with the command shown next to it.
+
+## [0.4.0] — Run 6: EVIDENCE + PLAY + CAPTURE + STEMS + SHARE
+
+### Added — CI gate evidence (`ci: run self-gate evidence in CI`)
+
+- `tools/e2e.mjs` — zero-dependency CDP driver (bun/node>=22 native
+  WebSocket): ephemeral no-store static server, fresh-profile headless
+  Chrome with the autoplay-policy bypass, boots the MAIN engine via real UI
+  clicks, presses RUN SELF-GATE, reads `window.__psy6Gates`, emits
+  machine-readable `{gate, pass, evidence}` JSON, exits nonzero on failure.
+- `.github/workflows/ci-gates.yml` — job `verify` (`node tools/verify.mjs` +
+  `bun test`) → job `gates` (headless Chrome e2e). `gates` is **blocking**
+  with ONE automatic retry of the driver before going red; no
+  `continue-on-error` anywhere. Gate evidence uploaded as a CI artifact.
+- Subset honesty: all MAIN-mode gates are pure computation or deterministic
+  OfflineAudioContext renders (fixed schedules; inequality/integer criteria —
+  never bit-exact audio) → CI has no realtime dependency. The WORKLET
+  reduced set (G14w/G15w), the realtime capture gate (G17) and live-loop
+  checks stay local-only (G17 runs on-device and is reported in CI as
+  non-asserted info). See README "Self-Gate in CI".
+- Reproduce: `bun tools/e2e.mjs --out gates-evidence.json` →
+  `E2E GATES: GREEN (18/18 asserted)` (G1×4, G2, G5, G6, G8–G16, G18, G19).
+
+### Added — MIDI IN with CC learn (`feat: midi input with cc learn`)
+
+- `js/midi.js` — DOM-free MIDI IN core; Web MIDI access injected via a
+  settable provider (tests drive a MockMIDIAccess through the same byte
+  path as a real device).
+- Note On (0x90, vel>0) → triggers the currently-selected track, velocity =
+  vel/127, MIDI note = pitch; Note Off (0x80 or 0x90-vel-0) → releases that
+  track's synth voices (new `PooledEngine.killTrack` + voice ownership;
+  drum one-shots are never cut mid-hit — documented semantics).
+- CC learn: pick one of 57 mappable targets (macros 0–7, master.vol,
+  per-track mix.vol/pan/sendA/sendB/mute/scAmount), press LEARN, move a
+  control → binding stored in `project.midiMap` (versioned, save/export/
+  import round-trip; absent → empty map, backfilled).
+- CC 0 ignored (bank select); CC 123 → PANIC. Dispatch resolves paths via
+  pure `resolveMidiParam(p, path, v01)`; macros resolve against the PASSED
+  project (a real bug the Bun tests caught: `resolveMacros` previously read
+  the global project — fixed with an optional target argument).
+- UI: Perform-tab MIDI section (device selector, LEARN mode + indicator,
+  bound-CC list with clear buttons); graceful "Web MIDI unsupported" note
+  on non-Chromium — no crash. **No MIDI clock sync — out of scope.**
+- Self-Gate **G16** (pure, scripted MockMIDI session, exact assertions):
+  `note=60/vel=100@t4 offs=2 learn=45→track.2.scAmount sc=55 cc0kept=true
+  panic=1 rt=true`.
+- Tests: `tests/midi.test.ts` (20 tests).
+
+### Added — live capture to WAV (`feat: live capture to wav`)
+
+- Master-output tap: `ScriptProcessorNode` (**deprecated but universally
+  supported — chosen deliberately**: zero changes to the MAIN engine graph,
+  no worklet module reload). Growable preallocated Float32 chunks
+  (262144 frames ≈ 5.9 s): per-callback cost is one `.set()` — no
+  per-callback allocation; frame counts tracked in Float64.
+- The tap is parallel (analyser → tap → zero-gain sink) — it never inserts
+  itself into the live path. CAPTURE button (distinct from sequencer REC):
+  ARM → recording starts on the next 16-step bar boundary (scheduler
+  `I.barHooks`) → STOP arms a bar-quantized stop → encoded by the EXISTING
+  bounce WAV encoder (no duplicate encoder) → downloads
+  `psy6-capture-<bpm>bpm.wav`. Panic-safe: capture never touches the
+  transport; transport-stop mid-capture finishes immediately (documented).
+- Self-Gate **G17** (REALTIME — local-only; CI reports info, never
+  asserts): real tap + real scheduler, one bar captured:
+  `frames=82944 dur=1.881s bar=1.875s skew=6ms` (tolerance ±50 ms)
+  `rms=0.0798 hdr=valid`.
+- Tests: `tests/capture.test.ts` (growth accounting, quantization math,
+  encoder-reuse WAV round-trip).
+
+### Added — per-track stem export (`feat: per-track stem export`)
+
+- `renderBounce(p, loops, {trackIdx})` renders a stem through the SAME
+  deterministic offline graph — only that track's events trigger, so the
+  other tracks contribute exactly 0 (no voices spawn). No options →
+  full-mix render byte-identical to v0.3.0 (same schedule hash).
+- Bounce modal MODE select (MIX | STEMS): STEMS renders N files for
+  non-empty tracks only, sequential downloads (350 ms apart — browsers
+  throttle rapid clicks), named `psy6-stem-<trackName>.wav`.
+- Self-Gate **G18** (offline, CI-asserted). Isolation semantics stated
+  honestly: no-voice regions are EXACTLY 0 (the bass stem's silence spans
+  the kick's whole timeframe); the residual after a track's own voice is
+  its own exponential decay tail — physics, not bleed (bounded ≤ 1e-3):
+  `kickRMS=0.0696 bassRMS=0.0675 silentRegions=0/0 kickOwnTail=0.000034
+  N=84893 det=true`.
+- Tests: `tests/stems.test.ts` (discovery, per-track determinism, full-mix
+  hash unchanged).
+
+### Added — share links via URL hash (`feat: share links via url hash`)
+
+- `js/share.js` (DOM-free): project → canonical JSON (key order pinned —
+  arrays keep order) → `CompressionStream('deflate-raw')` → base64url →
+  `location.hash` (`#p=<token>`). Same project ⇒ byte-identical link.
+  No Date.now / Math.random.
+- Guards: compressed token > 6 KB → warn (Chrome URL limits); > 50 KB →
+  hard error with clear toast. Environments without CompressionStream are
+  told to use file EXPORT — never a silently degraded link.
+- Consent: `#p=` on boot shows a power-screen banner — LOAD SHARE (explicit
+  click; replaces the in-memory project, learner snapshot included) or
+  DISMISS. **Never auto-loads.**
+- Self-Gate **G19** (pure, CI-asserted): default PSYTRANCE round-trip
+  deep-equal, learner (`p.copilot`) survives, byte-identical determinism:
+  `json=21944B token=1960B warn=false det=true learner=true`.
+- Tests: `tests/share.test.ts`.
+
+### Fixed
+
+- `resolveMacros(target)` — macro resolution now resolves the project it is
+  given (Bun tests caught it reading the global project).
+- Power-screen engine note: gate count text corrected to the real number.
+
+### Evidence (v0.4.0, local runs)
+
+- `bun test` → **147 pass / 0 fail** across **14 files**, **6886** `expect()`
+  calls (~175 ms).
+- `node tools/verify.mjs` → **GREEN** (0 failures).
+- `bun tools/e2e.mjs` → **E2E GATES: GREEN (18/18 asserted)** + G17 info
+  (realtime capture) PASS on-device.
+- Device Self-Gate (MAIN): **19/19** (G1×4, G2, G5, G6, G8–G16, G17, G18,
+  G19). WORKLET reduced set unchanged: **3/3** (G2 + G14w + G15w).
+
 ## [0.3.0] — Run 4: SOUND SIGNATURE + CAPTURE
 
 ### Added — kick-triggered sidechain ducking (`feat: kick-triggered sidechain ducking`)
