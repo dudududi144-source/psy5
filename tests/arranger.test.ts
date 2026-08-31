@@ -110,3 +110,84 @@ describe('section arranger', () => {
     expect(I.pending).toBe(0)
   })
 })
+
+/* ── Run 9 P2: timeline editor ops + PLAY SONG ─────────────────────────── */
+import { arrMoveStep, arrInsertStep, arrSongInfo } from '../js/arranger.js'
+import { encodeShare, decodeShare } from '../js/share.js'
+import { compose } from '../js/composer.js'
+
+describe('timeline editor ops (Run 9)', () => {
+  test('arrMoveStep swaps neighbors; playing idx follows its step; bounds respected', () => {
+    freshDevice()
+    arrAddStep(0, 4); arrAddStep(1, 2); arrAddStep(2, 8)
+    arrToggle(true) /* idx=0, pending=0 */
+    for (let i = 0; i < 4; i++) arrBarHook() /* section 0 (4 bars) completes */
+    expect(arrState().idx).toBe(1)
+    const r = arrMoveStep(1, 1) /* swap 1↔2 */
+    expect(r.ok).toBe(true)
+    expect(arrState().steps[2].scene).toBe(1)
+    expect(arrState().idx).toBe(2) /* the playing step moved with the swap */
+    expect(arrMoveStep(0, -1).ok).toBe(false) /* out of bounds */
+    expect(arrMoveStep(2, 1).ok).toBe(false)
+  })
+  test('arrInsertStep inserts with scene-bars default, clamps 1..64', () => {
+    freshDevice()
+    arrAddStep(0, 4)
+    /* scenes[1] in TECHNO factory has no bars override → default 4 */
+    arrInsertStep(1, 1, 0)
+    expect(arrState().steps.length).toBe(2)
+    expect(arrState().steps[1].scene).toBe(1)
+    expect(arrState().steps[1].bars).toBeGreaterThanOrEqual(1)
+    arrInsertStep(99, 2, 999) /* append + clamp */
+    expect(arrState().steps.length).toBe(3)
+    expect(arrState().steps[2].bars).toBe(64)
+    arrInsertStep(1, 2, 0) /* middle insert */
+    expect(arrState().steps[1].scene).toBe(2)
+  })
+  test('edits persist across a JSON project round-trip', () => {
+    freshDevice()
+    arrAddStep(0, 4); arrAddStep(1, 2)
+    arrMoveStep(0, 1)
+    arrSetStep(0, { bars: 6 })
+    const snap = JSON.parse(JSON.stringify(I.p))
+    I.p = JSON.parse(JSON.stringify(snap))
+    expect(arrState().steps.map(s => s.scene)).toEqual([1, 0])
+    expect(arrState().steps[0].bars).toBe(6) /* set hit the swapped step 0 */
+  })
+  test('arranger edits survive a share-link round-trip', async () => {
+    freshDevice()
+    arrAddStep(0, 4); arrAddStep(1, 2)
+    arrMoveStep(1, -1) /* [1,0] */
+    const p = I.p
+    const r = await encodeShare(p)
+    expect(r.token).toBeTruthy()
+    const d = await decodeShare(r.token!)
+    const q: any = d.project
+    expect(q.arranger.steps.map((s: any) => [s.scene, s.bars])).toEqual([[1, 2], [0, 4]])
+  })
+  test('arrSongInfo: sections/bars/durations match the song-render view', () => {
+    I.p = compose('FULL-ON', 3, 424242).project
+    const info = arrSongInfo()
+    expect(info.sections).toBe(7)
+    expect(info.bars).toBe(136)
+    expect(info.bpm).toBe(145)
+    const sd = 60 / 145 / 4
+    expect(info.music).toBeCloseTo(136 * 16 * sd, 9)
+    expect(info.withTail).toBeCloseTo(info.music + 32 * sd, 9)
+  })
+  test('PLAY SONG offline-sim: reaches section 2 within expected wall bars', () => {
+    freshDevice()
+    arrAddStep(0, 4); arrAddStep(1, 2); arrAddStep(2, 4)
+    /* PLAY SONG = arrToggle(true) + transport start; sim drives the hook */
+    expect(arrToggle(true)).toBe(true)
+    expect(arrState().idx).toBe(0)
+    for (let i = 0; i < 4; i++) arrBarHook() /* section 0: 4 bars */
+    expect(arrState().idx).toBe(1)
+    for (let i = 0; i < 2; i++) arrBarHook() /* section 1: 2 bars */
+    expect(arrState().idx).toBe(2) /* section 2 reached after exactly 6 bars */
+    expect(arrState().barsIn).toBe(0)
+    for (let i = 0; i < 3; i++) arrBarHook()
+    expect(arrState().idx).toBe(2) /* still in section 2 (4 bars) */
+    expect(arrState().barsIn).toBe(3)
+  })
+})

@@ -13,6 +13,7 @@
  */
 import { I } from './state.js';
 import { PERF } from './state.js';
+import { songSections, songDurationSec } from './bounce.js';
 
 function arrState() {
   const p = I.p;
@@ -69,6 +70,36 @@ function arrSetStep(i, patch) {
   render();
 }
 
+/* arrMoveStep — reorder via left/right (no drag-drop, consistent with the
+   scene bank). Swaps steps i and i+dir; the playing idx follows its step. */
+function arrMoveStep(i,dir){
+const a=arrState();
+const j=i+(dir<0?-1:1);
+if(i<0||j<0||j>=a.steps.length)return{ok:false};
+const t=a.steps[i];a.steps[i]=a.steps[j];a.steps[j]=t;
+if(a.idx===i)a.idx=j;else if(a.idx===j)a.idx=i;
+render();
+return{ok:true};
+}
+/* arrInsertStep — insert-from-scene before index i (append when i>=len).
+   Bars default to the scene's own bars override, then 4 (same as ADD). */
+function arrInsertStep(i,scene,bars){
+const a=arrState();
+const p=I.p;
+const def=(p&&p.scenes[scene]&&p.scenes[scene].bars)||4;
+a.steps.splice(Math.max(0,Math.min(a.steps.length,i|0)),0,{scene:scene|0,bars:Math.min(64,Math.max(1,(bars|0)||def))});
+render();
+}
+/* arrSongInfo — total bars / musical sections / durations for the readout.
+   Reuses the song-render section grouping (single source of truth). */
+function arrSongInfo(){
+const a=arrState();
+const p=I.p;
+if(!p)return{bars:0,sections:0,music:0,withTail:0,bpm:120};
+const d=songDurationSec(p);
+return{bars:d.music>0?a.steps.reduce((x,s)=>x+s.bars,0):0,sections:songSections(p).length,music:d.music,withTail:d.withTail,bpm:p.bpm};
+}
+
 /* per-bar hook (registered on I.barHooks by the UI wiring) */
 function arrBarHook() {
   const a = arrState();
@@ -109,4 +140,4 @@ function arrView() {
   };
 }
 
-export { arrState, arrToggle, arrAddStep, arrRemoveStep, arrSetStep, arrBarHook, arrInstrument, arrView };
+export { arrState, arrToggle, arrAddStep, arrRemoveStep, arrSetStep, arrMoveStep, arrInsertStep, arrSongInfo, arrBarHook, arrInstrument, arrView };
