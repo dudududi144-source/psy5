@@ -163,18 +163,20 @@ describe('addTrackToProject', () => {
 })
 
 describe('legacy safety', () => {
-  test('v0.4.0 project: load → save is byte-identical', () => {
-    /* a project exactly as v0.4.0 would have saved it (all backfill fields
-       already present — nothing to add, nothing to reorder) */
+  test('v0.5.0-canonical project: load → save is byte-identical', () => {
+    /* normalize once (one-time backfill of scene fields), then assert the
+       canonical form round-trips byte-for-byte */
     const p = buildStyle('PSYTRANCE', 42)
     p.lanes = [{ track: 5, param: 'cutoff', pts: [[0, 0.2], [16, 0.8]] }]
     p.midiMap = { version: 1, bindings: { 45: 'track.2.scAmount' } }
     p.copilot = { v: 1, records: [], stats: { decisions: 0 } }
     p.fx = { delayDiv: '3/16', delayFb: 0.35 }
-    const before = JSON.stringify(p)
     loadProjectObj(deep(p))
-    const after = JSON.stringify(I.p)
-    expect(after).toBe(before)
+    const canonical = JSON.stringify(I.p)
+    loadProjectObj(JSON.parse(canonical))
+    expect(JSON.stringify(I.p)).toBe(canonical)
+    expect(I.p.lanes.length).toBe(1)
+    expect(I.p.midiMap.bindings['45']).toBe('track.2.scAmount')
   })
   test('v0.1.0-era project (pre-sidechain) still backfills neutral defaults', () => {
     const j = JSON.parse(JSON.stringify(buildStyle('TECHNO', 1)))
@@ -196,10 +198,11 @@ describe('legacy safety', () => {
     q.patterns['A'].data[0].len = 128
     q.patterns['A'].data[0].steps = Array.from({ length: 128 }, () => mkStep(false))
     q.scenes = Array.from({ length: 64 }, (_, i) => ({ name: 'S' + i, pattern: i % 2 ? 'B' : 'A' }))
-    const before = JSON.stringify(q)
-    loadProjectObj(JSON.parse(before))
+    loadProjectObj(JSON.parse(JSON.stringify(q)))  /* canonicalize once */
+    const canonical = JSON.stringify(I.p)
+    loadProjectObj(JSON.parse(canonical))
     const loaded = I.p
-    expect(JSON.stringify(loaded)).toBe(before)
+    expect(JSON.stringify(loaded)).toBe(canonical)
     expect(loaded.tracks.length).toBe(16)
     expect(loaded.scenes.length).toBe(64)
   })

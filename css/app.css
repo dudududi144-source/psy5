@@ -82,3 +82,22 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 #strips{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:8px;max-height:600px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
 #strips::-webkit-scrollbar{width:8px}
 #strips::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
+/* ── v0.5.0 scene bank ── */
+#scenes{display:flex;flex-wrap:wrap;gap:5px;max-height:340px;overflow-y:auto;align-content:flex-start;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
+#scenes::-webkit-scrollbar{width:8px}
+#scenes::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
+.scene{display:flex;flex-direction:column;gap:3px;min-width:118px;text-align:left;padding:6px 8px;border-radius:8px;background:#171c25;border:1px solid #2c3442;cursor:pointer}
+.scene:hover{border-color:#3d485c}
+.scene .scTop{display:flex;align-items:center;gap:5px}
+.scene .dot{width:9px;height:9px;border-radius:50%;border:1px solid #3d485c;flex:none;cursor:pointer}
+.scene .nm{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:86px}
+.scene .nm:hover{color:var(--acc2)}
+.scene .pn{font-size:8px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px}
+.scene .scOps{display:flex;gap:3px;align-items:center}
+.scene .scOps button,.scene .scOps .bars{font-size:8px;padding:1px 4px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer;min-width:0}
+.scene .scOps .bars{width:30px;text-align:center}
+.scene .scOps button:hover{color:#fff;border-color:#3d485c}
+.scene .scOps button.on{color:var(--acc);border-color:var(--acc)}
+.scene .scOps button:disabled{opacity:.3;cursor:default}
+.scene .rename{font-size:11px;font-weight:700;background:#11151d;border:1px solid var(--acc2);border-radius:4px;color:#fff;width:88px;padding:1px 3px}
+.scene.scAdd{justify-content:center;align-items:center;border-style:dashed;color:var(--acc2);min-height:46px}

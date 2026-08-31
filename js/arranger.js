@@ -46,7 +46,11 @@ function arrToggle(on) {
 }
 function arrAddStep(scene, bars) {
   const a = arrState();
-  a.steps.push({ scene: scene | 0, bars: Math.min(64, Math.max(1, bars | 0 || 4)) });
+  /* v0.5.0 scene bank: a scene's own bars override pre-fills the section
+     length when it is added to the arranger (explicit bars still win) */
+  const p = I.p;
+  const def = (p && p.scenes[scene] && p.scenes[scene].bars) || 4;
+  a.steps.push({ scene: scene | 0, bars: Math.min(64, Math.max(1, (bars | 0) || def)) });
   render();
 }
 function arrRemoveStep(i) {

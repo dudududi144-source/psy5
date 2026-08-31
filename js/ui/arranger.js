@@ -38,7 +38,7 @@ function renderArranger() {
   body.querySelectorAll('.arrBars').forEach((inp) => { inp.onchange = function () { arrSetStep(+this.dataset.i, { bars: +this.value }); }; });
   body.querySelectorAll('.arrDel').forEach((b) => { b.onclick = function () { arrRemoveStep(+this.dataset.i); }; });
   const add = body.querySelector('#arrAdd');
-  if (add) add.onclick = function () { arrAddStep(I.p.activeScene, 4); };
+  if (add) add.onclick = function () { arrAddStep(I.p.activeScene, 0); }; /* 0 = use the scene's bars override, else 4 */
 }
 
 function wireArranger() {
