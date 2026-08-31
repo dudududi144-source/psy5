@@ -72,7 +72,8 @@ tr.presetId=pr.id;tr.name=pr.name;
 function initTracks(p){
 p.tracks=[];const names=['KICK','SNARE','HATS','PERC','BASS','LEAD','PAD','ARP'];
 for(let t=0;t<MAX_TRACKS;t++)p.tracks.push({idx:t,kind:t<4?'drum':'synth',name:names[t],
-sound:{},presetId:'',mix:{vol:.8,pan:0,mute:false,solo:false,sendA:0,sendB:0}});
+sound:{},presetId:'',mix:{vol:.8,pan:0,mute:false,solo:false,sendA:0,sendB:0},
+scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
 }
 function buildStyle(style,seed){
 const rng=mulberry32(seed||1);

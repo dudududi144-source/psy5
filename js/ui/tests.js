@@ -16,6 +16,15 @@ async function renderGenre(style){const sr=44100,oc=new OfflineAudioContext(2,sr
    kick is never dropped (dedicated tier-0 voice retriggers), tier-0 is never
    stolen, and the hats starve among themselves (steal evidence > 0). */
 async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr);const eng=new PooledEngine(oc,{drumVoices:3,synthVoices:4});const p=buildStyle('PSYTRANCE',42);assignPresetToTrack(p,2,libFind('HAT-TE-O'));eng.syncMix(p);const pat=p.patterns['A'];const put=(ti,i)=>{const d=pat.data[ti],L=d.len,s=d.steps[((i%L)+L)%L];s.on=1;s.vel=ti===0?.95:.6;s.prob=1};for(let i=0;i<64;i++){put(2,i);if(i%4===0)put(0,i)}p.currentPattern='A';const sd=60/p.bpm/4;let t=.05;for(let s=0;s<64;s++){for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,eng}}
+/* G11 — kick-triggered sidechain ducking (offline render, real graph):
+   bass audible, EVERYTHING else muted (mute silences the bus but the kick
+   events still fire and still duck). Render A: all scAmount=0 (plain).
+   Render B: bass scAmount=75. Window-RMS the bass envelope; the RATIO
+   B/A isolates the duck from the synth's own note envelope.
+   Claims: dip ≥60% within the attack window, full recovery (≥99%) before
+   the next kick, and zero automation events when every scAmount=0. */
+async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
+function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
 async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;logLine('info','== PSY6 SELF-GATE (pooled engine, OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner
@@ -32,7 +41,21 @@ for(let i=0;i<12;i++){const d=L2.decide(g2ctx,'copilot',[{type:'fill'},{type:'va
 const ab=new BanditPolicy({epsilon:0,minTrials:1,abstainThreshold:0.2,confidenceGrowth:0.1}).decide(contextKey(g2ctx),'copilot',[{type:'fill'},{type:'variation'}],L2.store,mulberry32(subSeed(g10int,'g10ab')));
 const st10=L10.stats();
 const ok10=!!(fR&&vR&&fR.avgReward>vR.avgReward&&fR.avgReward===1&&probe.action.type==='fill'&&probe.reason==='exploit'&&ab.action.type==='do-nothing'&&ab.reason==='abstain');
-gate('G10','co-pilot learns fill>variation preference and abstains under all-low rewards',ok10,'fillAvg='+(fR?fR.avgReward.toFixed(2):'?')+'(n='+(fR?fR.trials:0)+') varAvg='+(vR?vR.avgReward.toFixed(2):'?')+'(n='+(vR?vR.trials:0)+') probe='+probe.action.type+'/'+probe.reason+' abstain='+ab.reason+' dec='+st10.decisions)}catch(e){gate('G10','co-pilot learner preference + abstention',false,'ERR '+e.message)}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G10','co-pilot learns fill>variation preference and abstains under all-low rewards',ok10,'fillAvg='+(fR?fR.avgReward.toFixed(2):'?')+'(n='+(fR?fR.trials:0)+') varAvg='+(vR?vR.avgReward.toFixed(2):'?')+'(n='+(vR?vR.trials:0)+') probe='+probe.action.type+'/'+probe.reason+' abstain='+ab.reason+' dec='+st10.decisions)}catch(e){gate('G10','co-pilot learner preference + abstention',false,'ERR '+e.message)}
+/* G11 — see renderSidechain above. */
+try{
+const plain=await renderSidechain(0),ducked=await renderSidechain(75);
+const sr=plain.buf.sampleRate,dP=plain.buf.getChannelData(0),dD=ducked.buf.getChannelData(0);
+const W=Math.floor(sr*.01);let dipMin=1,recoveryMin=1;const kicks=plain.kickT.slice(1,7);
+for(const kt of kicks){const i0=Math.floor(kt*sr);
+const pre=winRMS(dP,i0-W*3,i0)/Math.max(winRMS(dD,i0-W*3,i0),1e-9);if(pre<=0)continue;
+let m=1;for(let w=0;w<8;w++){const r=winRMS(dD,i0+w*W/2,i0+w*W/2+W)/Math.max(winRMS(dP,i0+w*W/2,i0+w*W/2+W),1e-9);if(r<m)m=r}
+dipMin=Math.min(dipMin,m);
+const nk=kt+4*plain.sd;const rec=winRMS(dD,Math.floor((nk-.022)*sr),Math.floor(nk*sr))/Math.max(winRMS(dP,Math.floor((nk-.022)*sr),Math.floor(nk*sr)),1e-9);recoveryMin=Math.min(recoveryMin,rec)}
+const dipPct=Math.round((1-dipMin)*100),recPct=Math.round(recoveryMin*100);
+const amt0=plain.duckEvents,amt75=ducked.duckEvents;
+const ok11=amt0===0&&amt75>0&&dipPct>=60&&recPct>=99;
+gate('G11','sidechain: kick ducks scAmount>0 buses ≥60% in-window, full recovery, amount=0 → zero automation',ok11,'dipMin='+dipPct+'% recoveryMin='+recPct+'% amt0Events='+amt0+' amt75Events='+amt75)}catch(e){gate('G11','sidechain ducking',false,'ERR '+e.message)}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 function wireTests(){$('bGate').onclick=runSelfGate;}
 
