@@ -56,7 +56,7 @@ function buildContext() {
   const activeLayers = LAYERS.filter((k) => {
     if (k === 'drums') return !p.tracks.slice(0, 4).every((t) => t.mix.mute);
     if (k === 'bass') return !p.tracks[4].mix.mute;
-    if (k === 'music') return !p.tracks.slice(5, 8).every((t) => t.mix.mute);
+    if (k === 'music') return !p.tracks.slice(5).every((t) => t.mix.mute);
     return p.tracks[4].mix.sendA > 0;
   }).length;
   let on = 0, total = 0;
@@ -80,7 +80,7 @@ function candidateActions(p) {
   const out = [{ type: 'fill' }, { type: 'variation' }];
   out.push({ type: 'groove-toggle', to: p.groove === 'psy-push' ? 'straight' : 'psy-push' });
   for (const k of ['music', 'bass']) {
-    const muted = k === 'bass' ? p.tracks[4].mix.mute : p.tracks.slice(5, 8).every((t) => t.mix.mute);
+    const muted = k === 'bass' ? p.tracks[4].mix.mute : p.tracks.slice(5).every((t) => t.mix.mute);
     if (!muted) out.push({ type: 'layer-toggle', layer: k });
   }
   if (p.scenes.length > 1) out.push({ type: 'scene-nudge', to: (p.activeScene + 1) % p.scenes.length });

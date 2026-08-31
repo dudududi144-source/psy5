@@ -51,8 +51,8 @@
 </div></div></section>
 <section class="tab" id="tab-seq"><div class="panel">
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><h3 style="margin:0" id="seqT">Step Sequencer</h3>
-<div style="display:flex;gap:6px;align-items:center"><select id="seqTrack"></select><select id="lenSel"></select><button id="bClr">CLEAR</button><button id="bDup">DUP</button></div></div>
-<div id="stepGrid"></div>
+<div style="display:flex;gap:6px;align-items:center"><select id="seqTrack"></select><select id="lenSel"></select><select id="zoomSel" title="Step width / zoom — AUTO stretches cells; larger sizes scroll for 64/128-step patterns"><option value="0">ZOOM AUTO</option><option value="14">XS 14px</option><option value="18">S 18px</option><option value="24">M 24px</option><option value="34">L 34px</option><option value="48">XL 48px</option></select><button id="bClr">CLEAR</button><button id="bDup">DUP</button></div></div>
+<div id="seqScroll"><div id="stepGrid"></div></div>
 <div class="note" style="margin-top:6px">click=toggle · shift+click=step editor (vel/prob/micro/lock). Blue dot=parameter lock.</div>
 </div></section>
 <section class="tab" id="tab-sound"><div class="cols">
@@ -61,7 +61,7 @@
 <div class="mono" style="font-size:10px;color:var(--dim);margin:5px 0" id="libMeta"></div><div id="libList" style="max-height:420px;overflow:auto"></div></div>
 <div class="panel"><h3>Synth editor — selected track</h3><div id="synthEd" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div></div>
 </div></section>
-<section class="tab" id="tab-mix"><div class="panel"><h3>Mixer</h3><div id="fxBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px"></div><div id="strips" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"></div></div></section>
+<section class="tab" id="tab-mix"><div class="panel"><h3>Mixer</h3><div id="fxBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px"></div><div id="strips"></div></div></section>
 <section class="tab" id="tab-tests"><div class="panel">
 <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Self-Gate — pooled engine, no device needed</h3><button id="bGate">RUN SELF-GATE</button></div>
 <div id="log"></div>

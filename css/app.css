@@ -69,3 +69,16 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 #power .styles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 #power .styles button{padding:16px 24px;font-size:13px;letter-spacing:.08em}
 .app{display:none}
+/* ── v0.5.0 UNLIMIT: 16 tracks / 128 steps / 64 scenes ── */
+#seqScroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:4px}
+#seqScroll::-webkit-scrollbar{height:10px}
+#seqScroll::-webkit-scrollbar-track{background:#11151d;border-radius:5px}
+#seqScroll::-webkit-scrollbar-thumb{background:#2c3442;border-radius:5px}
+#seqScroll::-webkit-scrollbar-thumb:hover{background:#3d485c}
+#tracks{display:flex;flex-direction:column;gap:5px;max-height:560px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
+#tracks::-webkit-scrollbar{width:8px}
+#tracks::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
+.trkAdd{border-style:dashed;color:var(--acc2);padding:8px;font-size:10px}
+#strips{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:8px;max-height:600px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
+#strips::-webkit-scrollbar{width:8px}
+#strips::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}

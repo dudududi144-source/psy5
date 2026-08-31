@@ -5,10 +5,13 @@
    ('minor' etc.) are aliases onto the foundation table. */
 import { mulberry32, fnv1a } from '../foundation/foundation.mjs';
 import { SCALES as FOUNDATION_SCALES } from '../foundation/music/context.mjs';
+import { LIMITS } from './limits.js';
 const fnv = fnv1a;
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const deep=o=>JSON.parse(JSON.stringify(o));
-const MAX_TRACKS=8,MAX_STEPS=32,MAX_SCENES=8;
+/* Ceilings come from limits.js (v0.5.0 UNLIMIT) — no hard-coded numbers here.
+   Defaults (8 tracks / 16 steps / 8 scenes) live in presets.initTracks/buildStyle. */
+const MAX_TRACKS=LIMITS.MAX_TRACKS,MAX_STEPS=LIMITS.MAX_STEPS,MAX_SCENES=LIMITS.MAX_SCENES;
 /* GLOBAL VOICE CAPS — pre-allocated pools. The memory/latency budget knobs. */
 const SYNTH_VOICES=20,DRUM_VOICES=24;
 const SCALES={
@@ -25,7 +28,9 @@ function mkProject(){return {version:3,bpm:125,swing:0,root:33,scale:'minor',rec
 activeScene:0,currentPattern:'A',selTrack:4,macroVals:[0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5],
 tracks:[],patterns:{},scenes:[],lanes:[]}}
 function loopLen(p){const pat=p.patterns[p.currentPattern];let L=1;if(!pat)return 16;
-for(let t=0;t<MAX_TRACKS;t++){const l=(pat.data[t]&&pat.data[t].len)||16;L=L/gcd(L,l)*l}return Math.min(L,96)}
+/* iterate over the tracks actually present in the pattern data — works for
+   any track count; cap raised 96→LIMITS.LOOP_CAP (1024) in v0.5.0 */
+for(const k of Object.keys(pat.data)){const l=(pat.data[k]&&pat.data[k].len)||16;L=L/gcd(L,l)*l}return Math.min(L,LIMITS.LOOP_CAP)}
 function laneEval(ln,step){const pts=ln.pts;if(!pts.length)return 0;
 if(step<=pts[0][0])return pts[0][1];
 for(let i=0;i<pts.length-1;i++){const s0=pts[i][0],v0=pts[i][1],s1=pts[i+1][0],v1=pts[i+1][1];
@@ -71,4 +76,4 @@ evs.push({track:t,off,vel:clamp(st.vel,0.05,1),note:st.note,lock});
 return evs;
 }
 
-export { clamp, deep, mulberry32, fnv, barSeed, GROOVES, MAX_TRACKS, MAX_STEPS, MAX_SCENES, SYNTH_VOICES, DRUM_VOICES, SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, gcd, mkStep, mkPattern, mkProject, loopLen, laneEval, stepEvents };
+export { clamp, deep, mulberry32, fnv, barSeed, GROOVES, MAX_TRACKS, MAX_STEPS, MAX_SCENES, SYNTH_VOICES, DRUM_VOICES, SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, gcd, mkStep, mkPattern, mkProject, loopLen, laneEval, stepEvents, LIMITS };

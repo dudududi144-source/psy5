@@ -1,8 +1,9 @@
-import { mulberry32, SCALES, mkProject, mkPattern, mkStep, deep, MAX_TRACKS, MAX_SCENES } from './model.js';
+import { mulberry32, SCALES, mkProject, mkPattern, mkStep, deep, LIMITS } from './model.js';
+import { DEFAULTS } from './limits.js';
 
 
 /* ============ factory presets ============ */
-const LIB={drum:[],bass:[],lead:[],pad:[],pluck:[],arp:[],fx:[]};
+const LIB={drum:[],bass:[],lead:[],pad:[],pluck:[],arp:[],fx:[],synth:[]};
 function DP(id,name,genre,p){LIB.drum.push(Object.assign({id,name,genre,cat:'drum',engine:'DRUM',type:'kick',tune:1,decay:1,tone:1,punch:0},p))}
 function SP(cat,id,name,genre,p){LIB[cat].push(Object.assign({id,name,genre,cat,engine:'SYNTH',
 wave1:'sawtooth',wave2:'sawtooth',oct2:0,detune:8,cutoff:1500,res:3,fType:'lowpass',
@@ -59,6 +60,7 @@ SP('arp','PS-ARP-ACID','Psy Acid Arp','PSYTRANCE',{wave1:'square',wave2:'sawtoot
 SP('arp','TR-ARP-ROLL','Trance Rolling Arp','TRANCE',{wave1:'sawtooth',wave2:'sawtooth',detune:12,cutoff:2600,gate:.28,dec:.12,sus:.2,poly:6});
 SP('arp','PR-ARP-MELODIC','Prog Melodic Arp','PROGRESSIVE',{wave1:'triangle',wave2:'sawtooth',detune:7,cutoff:2200,gate:.4,dec:.2,sus:.4,poly:6});
 SP('fx','FX-SWEEP','Noise Sweep FX','ANY',{wave1:'sawtooth',wave2:'sawtooth',oct2:1,detune:24,cutoff:500,res:10,atk:.9,rel:.6,gate:2.5,lfoRate:.4,lfoDepth:.6,lfoDest:'cutoff',poly:2});
+SP('synth','INIT-SYNTH','Init Synth','ANY',{wave1:'sawtooth',wave2:'triangle',cutoff:3200,gate:.5,dec:.3,sus:.5,poly:4});
 function libFind(id){for(const cat in LIB){const f=LIB[cat].find(x=>x.id===id);if(f)return f}return null}
 function libCount(){let n=0;for(const c in LIB)n+=LIB[c].length;return n}
 function libFilter(cat,genre){const out=[];for(const c in LIB){if(cat!=='all'&&c!==cat)continue;
@@ -71,19 +73,35 @@ tr.presetId=pr.id;tr.name=pr.name;
 }
 function initTracks(p){
 p.tracks=[];const names=['KICK','SNARE','HATS','PERC','BASS','LEAD','PAD','ARP'];
-for(let t=0;t<MAX_TRACKS;t++)p.tracks.push({idx:t,kind:t<4?'drum':'synth',name:names[t],
+/* DEFAULTS.TRACKS (8) — the historical default; LIMITS.MAX_TRACKS (16) is only
+   a ceiling reachable via the explicit +TRACK action */
+for(let t=0;t<DEFAULTS.TRACKS;t++)p.tracks.push({idx:t,kind:t<4?'drum':'synth',name:names[t],
 sound:{},presetId:'',mix:{vol:.8,pan:0,mute:false,solo:false,sendA:0,sendB:0},
 scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
+}
+/* +TRACK (v0.5.0 UNLIMIT): grows a project by one track up to LIMITS.MAX_TRACKS.
+   Every existing pattern gets a default 16-step entry for the new index (a
+   pattern only sounds where steps are on, so this is inaudible); the new track
+   starts with the neutral INIT-SYNTH preset. Returns the new index or -1 at cap. */
+function addTrackToProject(p){
+if(!p||p.tracks.length>=LIMITS.MAX_TRACKS)return -1;
+const t=p.tracks.length;
+p.tracks.push({idx:t,kind:'synth',name:'TRACK '+(t+1),
+sound:Object.assign({},libFind('INIT-SYNTH')),presetId:'INIT-SYNTH',
+mix:{vol:.8,pan:0,mute:false,solo:false,sendA:0,sendB:0},
+scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
+for(const k in p.patterns){const d=p.patterns[k].data;if(!d[t])d[t]={len:DEFAULTS.PATTERN_LEN,steps:Array.from({length:DEFAULTS.PATTERN_LEN},()=>mkStep(false))}}
+return t;
 }
 function buildStyle(style,seed){
 const rng=mulberry32(seed||1);
 const p=mkProject();initTracks(p);
 const A=mkPattern('A',8),B=mkPattern('B',8);
 p.patterns={};p.patterns['A']=A;p.patterns['B']=B;
-p.scenes=Array.from({length:MAX_SCENES},(_,i)=>({name:i<2?('SCENE '+(i+1)):'-',pattern:i===0?'A':(i===1?'B':null)}));
+p.scenes=Array.from({length:DEFAULTS.SCENES},(_,i)=>({name:i<2?('SCENE '+(i+1)):'-',pattern:i===0?'A':(i===1?'B':null)}));
 p.currentPattern='A';p.activeScene=0;
 const put=(pat,t,i,vel,note)=>{const d=pat.data[t],L=d.len,s=d.steps[((i%L)+L)%L];s.on=1;if(vel)s.vel=vel;if(note!=null)s.note=note};
-const setLen=(pat,t,l)=>{const d=pat.data[t];const old=d.steps;d.len=l;d.steps=Array.from({length:l},(_,k)=>old[k%old.length]||mkStep(false))};
+const setLen=(pat,t,l)=>{const d=pat.data[t];const old=d.steps;d.len=l;d.steps=Array.from({length:l},(_,k)=>{const o=old[k%old.length];/* v0.5.0 UNLIMIT fix: lengthening used to SHARE step objects across repeats — editing step 16 silently edited step 0. Clone so every step is independent. */return o?{on:o.on,vel:o.vel,prob:o.prob,micro:o.micro,note:o.note,lock:Object.assign({},o.lock)}:mkStep(false)})};
 const root=p.root;
 if(style==='TECHNO'){
 p.bpm=128;p.scale='minor';
@@ -167,4 +185,4 @@ p.tracks.forEach(t=>t.base=deep({sound:t.sound,mix:{sendA:t.mix.sendA,sendB:t.mi
 p.style=style;return p;
 }
 
-export { libFind, libCount, libFilter, assignPresetToTrack, initTracks, buildStyle };
+export { libFind, libCount, libFilter, assignPresetToTrack, initTracks, addTrackToProject, buildStyle };

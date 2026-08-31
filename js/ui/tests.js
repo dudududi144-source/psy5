@@ -1,8 +1,8 @@
 import { $, I, PERF, saveProject, loadStored, resolveMidiParam } from '../state.js';
 import { createMidiCore, emptyMidiMap } from '../midi.js';
 import { PooledEngine } from '../engine.js';
-import { buildStyle, libFind, assignPresetToTrack } from '../presets.js';
-import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY } from '../model.js';
+import { buildStyle, libFind, assignPresetToTrack, addTrackToProject } from '../presets.js';
+import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen } from '../model.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
 import { renderBounce, bounceSchedule } from '../bounce.js';
 import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
@@ -209,7 +209,49 @@ const eq19=canonicalProject(dec19.project)===canonicalProject(p19);
 const cop19=!!(dec19.project.copilot&&dec19.project.copilot.records&&dec19.project.copilot.records.length===1&&dec19.project.copilot.stats.decisions===1);
 const det19=(await encodeShare(p19)).token===enc19.token;
 const ok19=eq19&&cop19&&det19;
-gate('G19','share link: canonical round-trip deep-equal, learner snapshot survives, byte-identical determinism',ok19,'json='+enc19.jsonBytes+'B token='+enc19.tokenBytes+'B warn='+enc19.warn+' det='+det19+' learner='+cop19)}catch(e){gate('G19','share links',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G19','share link: canonical round-trip deep-equal, learner snapshot survives, byte-identical determinism',ok19,'json='+enc19.jsonBytes+'B token='+enc19.tokenBytes+'B warn='+enc19.warn+' det='+det19+' learner='+cop19)}catch(e){gate('G19','share links',false,'ERR '+e.message)}
+/* G21 — UNLIMIT (offline — CI-asserted): the raised ceilings are real.
+   (a) 128-step pattern: events at steps 0/64/127 exist on the deterministic
+       schedule at their exact times in ascending order AND land as audible
+       onsets in the rendered audio (windowed RMS at each expected time,
+       silence in an event-free gap — no vacuous pass).
+   (b) 12-track project (addTrackToProject ×4): loopLen correct, every
+       pattern grew a data entry, and all 12 per-track stems render
+       non-silent (RMS > 0.01). */
+try{
+const p21=buildStyle('TECHNO',42);p21.bpm=140;
+const pat21=p21.patterns['A'];
+for(let t=0;t<8;t++){for(const s of pat21.data[t].steps)s.on=0}
+const setL21=(t,l)=>{const old=pat21.data[t].steps;pat21.data[t].len=l;pat21.data[t].steps=Array.from({length:l},(_,k)=>{const o=old[k%old.length];return o?{on:o.on,vel:o.vel,prob:o.prob,micro:o.micro,note:o.note,lock:Object.assign({},o.lock)}:{on:0,vel:.9,prob:1,micro:0,note:48,lock:{}}})};
+setL21(0,128);
+pat21.data[0].steps[0].on=1;pat21.data[0].steps[0].vel=.95;
+pat21.data[0].steps[64].on=1;pat21.data[0].steps[64].vel=.9;
+pat21.data[0].steps[127].on=1;pat21.data[0].steps[127].vel=.85;
+p21.tracks[0].mix.sendA=0;p21.tracks[0].mix.sendB=0;
+p21.currentPattern='A';
+const sd21=60/p21.bpm/4;
+const sch21=bounceSchedule(p21,1,0.05);
+const wantSteps=[0,64,127];
+const gotSteps=wantSteps.map(ws=>sch21.evs.find(e=>e.s===ws));
+const schedOk=gotSteps.every(e=>!!e)&&gotSteps.every((e,i)=>i===0||gotSteps[i-1].t<e.t)&&gotSteps.every((e,i)=>Math.abs(e.t-(0.05+wantSteps[i]*sd21))<1e-9);
+const ll21=loopLen(p21);
+const b21=await renderBounce(p21,1);
+const b21d=(()=>{const dd=b21.buf.getChannelData(0);let nan=0,fi=-1,mn=1e9,mx=-1e9;for(let i=0;i<dd.length;i++){const v=dd[i];if(Number.isNaN(v)){nan++;if(fi<0)fi=i}else{if(v<mn)mn=v;if(v>mx)mx=v}}return {nan,fi,mn:+mn.toFixed(3),mx:+mx.toFixed(3)}})();
+const rmsWin=(ct,hw)=>{const d=b21.buf.getChannelData(0);const c=Math.floor(ct*44100),h=Math.floor(hw*44100);let s=0,n=0;for(let i=Math.max(0,c-h),e2=Math.min(d.length,c+h);i<e2;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0};
+const hw21=0.4*sd21;
+const onRms=wantSteps.map(ws=>rmsWin(0.05+ws*sd21,hw21));
+const gapRms=rmsWin(0.05+32*sd21,hw21);
+/* (b) 12 tracks */
+const p21b=buildStyle('TECHNO',7);p21b.bpm=140;
+const pb=p21b.patterns['A'];for(let t=0;t<8;t++){for(const s of pb.data[t].steps)s.on=0}
+let grown=0;while(p21b.tracks.length<12){const r=addTrackToProject(p21b);if(r>=0){grown++;for(const k in p21b.patterns)if(p21b.patterns[k].data[r])p21b.patterns[k].data[r].len=16}else break}
+const stepAt=[];
+for(let t=0;t<12;t++){p21b.tracks[t].mix.sendA=0;p21b.tracks[t].mix.sendB=0;const d=pb.data[t];if(d){const si=(t*3)%d.len;stepAt.push(si);d.steps[si].on=1;d.steps[si].vel=.9;if(p21b.tracks[t].kind==='synth')d.steps[si].note=p21b.root+24}else stepAt.push(-1)}
+const stemPk=[];const sd21b=60/p21b.bpm/4;
+for(let t=0;t<12;t++){const st=await renderBounce(p21b,1,{trackIdx:t});const d=st.buf.getChannelData(0);/* peak over [event, event+1.2s] — dilution-free non-silence proof; a ±40ms window misses slow-attack sounds (the pad's 0.8s attack) */const evT=0.05+stepAt[t]*sd21b;const c=Math.floor(evT*44100),e2=Math.min(d.length,c+Math.floor(1.2*44100));let mx=0;for(let i=c;i<e2;i++){const v=Math.abs(d[i]);if(v>mx)mx=v}stemPk.push(mx)}
+const minStem=Math.min.apply(null,stemPk);
+const ok21=schedOk&&ll21===128&&onRms.every(r=>r>0.02)&&gapRms<0.005&&b21d.nan===0&&p21b.tracks.length===12&&grown===4&&Object.keys(pb.data).length===12&&stemPk.every(r=>r>0.05);
+gate('G21','UNLIMIT: 128-step events at 0/64/127 in exact order on schedule AND in audio (gap silent, buffer NaN-free), loopLen=128, 12-track project renders 12 non-silent stems',ok21,'evT=['+gotSteps.map(e=>e?e.t.toFixed(4):'x')+']s onRms=['+onRms.map(r=>r.toFixed(3))+'] gapRms='+gapRms.toFixed(5)+' loop='+ll21+' N='+b21.N+' stemsPk=['+stemPk.map(r=>r.toFixed(2))+'] stepAt=['+stepAt+'] minPk='+minStem.toFixed(3)+' dataEntries='+Object.keys(pb.data).length+' bufNaN='+b21d.nan)}catch(e){gate('G21','UNLIMIT',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).
