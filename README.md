@@ -43,6 +43,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ```bash
 bun test             # 102 tests across 10 files — 102 pass / 0 fail (6321 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
+bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
 
 Suite breakdown (all runnable with `bun test`):
@@ -59,6 +60,35 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/sidechain.test.ts` | 10 | kick-triggered sidechain: envelope shape, overlap continuity, project round-trip |
 | `tests/sends.test.ts` | 9 | BPM-synced delay divisions, feedback clamps, deterministic IR, project round-trip |
 | `tests/bounce.test.ts` | 8 | bounce schedule determinism, WAV header/data integrity, clipping |
+
+## Self-Gate in CI
+
+The on-device Self-Gate (`RUN SELF-GATE` button, Tests tab) is also run by CI:
+`.github/workflows/ci-gates.yml` job `gates` boots the real device in headless
+Chrome (`tools/e2e.mjs`, autoplay bypass + fresh profile + no-store server) and
+asserts the **deterministic offline subset** — machine-readable JSON per gate
+(id, pass, evidence numbers) is uploaded as a CI artifact.
+
+Honest subset classification (v0.4.0):
+
+| Gates | Class | Where asserted |
+| --- | --- | --- |
+| `G2`, `G5`, `G6`, `G8`, `G10` | pure computation (hash/save-load/macro/pools/bandit) | CI + local |
+| `G1-TECHNO`, `G1-PSYTRANCE`, `G1-TRANCE`, `G1-PROGRESSIVE` | deterministic OfflineAudioContext render | CI + local |
+| `G9`, `G11`, `G12`, `G13`, `G14`, `G15` | deterministic OfflineAudioContext render (steal counters / sidechain / sends / bounce / drain / default-pool overload) | CI + local |
+| `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
+| live-scheduler loop checks | realtime | **local-only** — by definition |
+
+Note: although G9/G14/G15 were originally labelled "realtime-ish", code
+inspection (js/ui/tests.js) shows that in MAIN mode they run entirely through
+`OfflineAudioContext` with fixed event schedules — they are deterministic
+offline renders, and their criteria are inequalities/integer counters
+(peak/rms thresholds, `kicks===16`), never bit-exact audio, so they are
+stable across Chrome versions. CI has no realtime dependency.
+
+CI layout: job `verify` (verify.mjs + `bun test`) → job `gates`
+(headless Chrome e2e; **blocking**, one automatic retry of the driver before
+going red — no `continue-on-error` anywhere).
 
 ## Benchmarks
 

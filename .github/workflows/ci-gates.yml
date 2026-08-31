@@ -1,0 +1,60 @@
+name: CI Gates
+
+# Evidence automation (v0.4.0):
+#   verify — static structure gate (tools/verify.mjs) + full unit battery (bun test).
+#   gates  — drives the real device in headless Chrome (tools/e2e.mjs) and
+#            asserts the deterministic offline Self-Gate subset. Runs AFTER
+#            verify and is BLOCKING: a red gate is a red run — no
+#            continue-on-error anywhere. One automatic retry of e2e.mjs on
+#            failure before going red (transient browser infra, not gates).
+#
+# Honest scope (see README "Self-Gate in CI"): every MAIN-mode gate is pure
+# computation or a deterministic OfflineAudioContext render — none touch the
+# live realtime scheduler. The WORKLET reduced set (G14w/G15w) and live-loop
+# checks remain local-only.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Static structure gate (tools/verify.mjs)
+        run: node tools/verify.mjs
+      - name: Unit battery (bun test)
+        run: bun test
+
+  gates:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Chrome stable
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+      - uses: oven-sh/setup-bun@v2
+      - name: E2E self-gate evidence (one automatic retry)
+        env:
+          PSY6_CHROME: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          bun tools/e2e.mjs --out gates-evidence.json || \
+          bun tools/e2e.mjs --out gates-evidence.json
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gates-evidence
+          path: gates-evidence.json

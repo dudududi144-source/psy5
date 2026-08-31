@@ -159,6 +159,25 @@ Option B: Deploy to Cloudflare Pages / Netlify / GitHub Pages
 
 No build step. No dependencies. No server required.
 
+## 11. Evidence Layer — CI Gates (v0.4.0)
+
+The device verifies ITSELF in CI, using the same code paths a human presses:
+
+- `tools/e2e.mjs` — zero-dependency CDP driver (bun/node>=22 native
+  WebSocket): ephemeral no-store static server, fresh-profile headless Chrome
+  with the autoplay-policy bypass, boots the MAIN engine via real UI clicks,
+  presses RUN SELF-GATE, reads `window.__psy6Gates` (machine-readable), and
+  emits `{gate, pass, evidence}` JSON. Exit code nonzero on any failure.
+- `.github/workflows/ci-gates.yml` — job `verify` (verify.mjs + bun test)
+  then job `gates` (headless Chrome e2e). `gates` is blocking; one automatic
+  retry of the driver before going red; never `continue-on-error`.
+
+Subset honesty: all MAIN-mode gates are pure computation or deterministic
+OfflineAudioContext renders (fixed schedules; inequality/integer criteria —
+never bit-exact audio), so CI has no realtime dependency. The WORKLET reduced
+set (G14w/G15w) and live-scheduler loop checks stay local-only; they are
+exercised from the live site at each release. See README "Self-Gate in CI".
+
 ---
-Architecture version: 1.0
+Architecture version: 1.1
 Status: IMPLEMENTED
