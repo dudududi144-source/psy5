@@ -2,7 +2,9 @@ import { $, I, PERF, saveProject, loadStored, resolveMidiParam } from '../state.
 import { createMidiCore, emptyMidiMap } from '../midi.js';
 import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack, addTrackToProject } from '../presets.js';
-import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen } from '../model.js';
+import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval } from '../model.js';
+import { recordPoint, quantStep, applyLanes } from '../autorec.js';
+import { paramApply } from '../params.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
 import { renderBounce, bounceSchedule } from '../bounce.js';
 import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
@@ -251,7 +253,38 @@ const stemPk=[];const sd21b=60/p21b.bpm/4;
 for(let t=0;t<12;t++){const st=await renderBounce(p21b,1,{trackIdx:t});const d=st.buf.getChannelData(0);/* peak over [event, event+1.2s] — dilution-free non-silence proof; a ±40ms window misses slow-attack sounds (the pad's 0.8s attack) */const evT=0.05+stepAt[t]*sd21b;const c=Math.floor(evT*44100),e2=Math.min(d.length,c+Math.floor(1.2*44100));let mx=0;for(let i=c;i<e2;i++){const v=Math.abs(d[i]);if(v>mx)mx=v}stemPk.push(mx)}
 const minStem=Math.min.apply(null,stemPk);
 const ok21=schedOk&&ll21===128&&onRms.every(r=>r>0.02)&&gapRms<0.005&&b21d.nan===0&&p21b.tracks.length===12&&grown===4&&Object.keys(pb.data).length===12&&stemPk.every(r=>r>0.05);
-gate('G21','UNLIMIT: 128-step events at 0/64/127 in exact order on schedule AND in audio (gap silent, buffer NaN-free), loopLen=128, 12-track project renders 12 non-silent stems',ok21,'evT=['+gotSteps.map(e=>e?e.t.toFixed(4):'x')+']s onRms=['+onRms.map(r=>r.toFixed(3))+'] gapRms='+gapRms.toFixed(5)+' loop='+ll21+' N='+b21.N+' stemsPk=['+stemPk.map(r=>r.toFixed(2))+'] stepAt=['+stepAt+'] minPk='+minStem.toFixed(3)+' dataEntries='+Object.keys(pb.data).length+' bufNaN='+b21d.nan)}catch(e){gate('G21','UNLIMIT',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G21','UNLIMIT: 128-step events at 0/64/127 in exact order on schedule AND in audio (gap silent, buffer NaN-free), loopLen=128, 12-track project renders 12 non-silent stems',ok21,'evT=['+gotSteps.map(e=>e?e.t.toFixed(4):'x')+']s onRms=['+onRms.map(r=>r.toFixed(3))+'] gapRms='+gapRms.toFixed(5)+' loop='+ll21+' N='+b21.N+' stemsPk=['+stemPk.map(r=>r.toFixed(2))+'] stepAt=['+stepAt+'] minPk='+minStem.toFixed(3)+' dataEntries='+Object.keys(pb.data).length+' bufNaN='+b21d.nan)}catch(e){gate('G21','UNLIMIT',false,'ERR '+e.message)}
+/* G22 — automation (pure + state — CI-asserted): a scripted record session
+   writes the EXACT expected points at the expected quantized steps (replace
+   on duplicate included); offline apply through the param registry matches
+   laneEval at every sampled step within 1e-9; the curve is non-trivial
+   (>=4 points, span > 0.3); legacy 'lock' lanes never touch track state. */
+try{
+const p22=buildStyle('TECHNO',42);
+const lane22={track:2,param:'mix.sendA',mode:'state',pts:[]};
+p22.lanes.push(lane22);
+const moves=[[0,.05],[4,.35],[8,.6],[12,.85],[14,.5]]; /* steps stay inside the 16-step loop (points wrap modulo) */
+for(const mv of moves)recordPoint(lane22,quantStep(mv[0],16,true),mv[1]);
+const ptsOk=JSON.stringify(lane22.pts)===JSON.stringify(moves);
+recordPoint(lane22,quantStep(8,16,true),.65);/* duplicate step replaces */
+const moves2=[[0,.05],[4,.35],[8,.65],[12,.85],[14,.5]];
+const replaceOk=JSON.stringify(lane22.pts)===JSON.stringify(moves2);
+const vals=lane22.pts.map(pt=>pt[1]);
+const nonTrivial=lane22.pts.length>=4&&(Math.max.apply(null,vals)-Math.min.apply(null,vals))>0.3;
+const qOk=quantStep(3.6,16,true)===4&&Math.abs(quantStep(3.6,16,false)-3.6)<1e-9;
+let maxErr=0;
+for(let s=0;s<16;s++){const want=laneEval(lane22,s);paramApply(p22.tracks[2],'mix.sendA',want);maxErr=Math.max(maxErr,Math.abs(p22.tracks[2].mix.sendA-want))}
+const interpWant=.05+(.35-.05)*2/4;/* linear interpolation at step 2 */
+applyLanes(p22,2);
+const interpOk=Math.abs(p22.tracks[2].mix.sendA-interpWant)<1e-9;
+const p22b=buildStyle('TECHNO',42);
+const lockLane={track:5,param:'cutoff',mode:'lock',pts:[[0,500],[16,5000]]};
+p22b.lanes.push(lockLane);
+const cutoffBefore=p22b.tracks[5].sound.cutoff;
+applyLanes(p22b,8);
+const lockSkip=p22b.tracks[5].sound.cutoff===cutoffBefore;
+const ok22=ptsOk&&replaceOk&&nonTrivial&&qOk&&maxErr<=1e-9&&interpOk&&lockSkip;
+gate('G22','automation: scripted record session writes exact quantized points (replace on duplicate), offline apply matches laneEval within 1e-9, lock lanes never touch state',ok22,'pts='+lane22.pts.length+' exact='+ptsOk+' replace='+replaceOk+' qOk='+qOk+' maxErr='+maxErr+' interp='+interpWant.toFixed(3)+' lockSkip='+lockSkip)}catch(e){gate('G22','automation',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).

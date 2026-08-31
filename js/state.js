@@ -1,14 +1,44 @@
 import { clamp, mulberry32, loopLen, M_ENERGY, M_SPACE } from './model.js';
+import { laneModeBackfill, paramApply, paramById } from './params.js';
+import { recordPoint, quantStep } from './autorec.js';
 
 const $=id=>document.getElementById(id);
 function toast(m,ms){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),ms||2200)}
 
 const I={p:null,ctx:null,eng:null,fsm:'OFF',recOn:false,dirty:false,hist:[],redo:[],pending:null,selLib:null,padMode:'DRUM',selTrack:4,upAt:0,sched:{on:false,step:0,next:0,loop:16,recent:[]},rng:mulberry32(42),timer:null,renderDirty:true,
-cop:null,barHooks:[],copilotSnapshot:null,copilotReload:null,copilotRender:null,copilotToast:null,copilotSyncGroove:null};
+cop:null,barHooks:[],copilotSnapshot:null,copilotReload:null,copilotRender:null,copilotToast:null,copilotSyncGroove:null,
+autoOn:false,autoQuant:true,autoArm:new Set(),selLane:-1};
 function pushHist(){I.hist.push(JSON.stringify(I.p));if(I.hist.length>60)I.hist.shift();I.redo.length=0;I.dirty=true}
 function after(){if(I.eng)I.eng.syncMix(I.p);if(I.sched.on)I.sched.loop=loopLen(I.p);I.renderDirty=true}
 function resolveMacros(target){const p=target||I.p,mv=p.macroVals,e=mv[M_ENERGY],sp=mv[M_SPACE];p.tracks.forEach((t,i)=>{if(!t.base)return;const b=t.base;if(t.kind==='synth'){t.sound.cutoff=clamp(b.sound.cutoff*(0.35+2.2*e),60,14000);t.mix.sendA=clamp(b.mix.sendA+0.45*sp,0,1);t.mix.sendB=clamp(b.mix.sendB+0.4*sp,0,1);if(i===4)t.mix.vol=clamp(b.mix.vol*(0.4+0.8*e),0,1)}else{if(i<4)t.mix.vol=clamp(b.mix.vol*(0.5+0.7*e),0,1)}});if(I.eng&&p===I.p)I.eng.syncMix(p)}
-const PERF={toggleLayer(which){const p=I.p;pushHist();if(which==='drums')for(let t=0;t<4;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='bass')p.tracks[4].mix.mute=!p.tracks[4].mix.mute;else if(which==='music')for(let t=5;t<p.tracks.length;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='fx')for(let t=4;t<p.tracks.length;t++)p.tracks[t].mix.sendA=p.tracks[t].mix.sendA>0?0:.35;after()},macro(idx,val){I.p.macroVals[idx]=clamp(val,0,1);resolveMacros();I.dirty=true},launch(i,instant){const p=I.p,sc=p.scenes[i];if(!sc||sc.pattern==null)return{ok:false};if(instant||!I.sched.on){pushHist();p.activeScene=i;p.currentPattern=sc.pattern;I.pending=null;after();/* per-scene auto-FILL: instant launch fires the FILL op right away (quantized launches fire it at the bar boundary — see scheduler) */if(sc.fill&&I.eng)PERF.fill()}else{I.pending=i;if(I.fsm==='PLAYING'||I.fsm==='RECORDING')I.fsm='TRANSITIONING';I.renderDirty=true}return{ok:true}},assign(i){pushHist();I.p.scenes[i].pattern=I.p.currentPattern;after()},fill(){const p=I.p;if(!I.eng||!I.ctx)return;const sd=60/p.bpm/4;for(let k=0;k<8;k++)I.eng.trigger(p.tracks[3],I.ctx.currentTime+k*sd/2,{vel:.5+.05*k,note:48,lock:{}},sd)},variation(){const p=I.p;pushHist();const rng=mulberry32((Date.now()%100000)|0);const pat=p.patterns[p.currentPattern];[2,3].forEach(t=>{const d=pat.data[t];if(!d)return;for(let i=0;i<d.len;i++){const s=d.steps[i];if(s.on&&rng()<.15)s.on=0;else if(!s.on&&rng()<.12){s.on=1;s.vel=.45+rng()*.35}}});const d7=pat.data[7];if(d7)for(let i=0;i<d7.len;i++){const s=d7.steps[i];if(s.on)s.prob=rng()<.1?.6:1}after()}};
+/* ── automation recording glue (v0.5.0) — knob-equivalent moves land in the
+   armed lane(s) at the quantized playhead step. Sources: mixer/synth knobs,
+   macros, and MIDI CC via the existing midiMap paths. */
+function autoRecMove(trackIdx,paramId,value){
+if(!I.autoOn||!I.sched.on||!I.p||!I.autoArm.size)return false;
+const loop=loopLen(I.p);const s=quantStep(I.sched.step,loop,I.autoQuant);
+let hit=false;
+I.p.lanes.forEach((ln,li)=>{if(!I.autoArm.has(li))return;if(ln.track!==trackIdx||ln.param!==paramId)return;recordPoint(ln,s,value);hit=true});
+if(hit)I.dirty=true;
+return hit}
+/* MIDI path → (track, paramId) for the recorder; null for unmapped shapes */
+function midiPathToParam(path){
+const parts=String(path).split('.');
+if(parts[0]==='track'&&parts[2]==='mix')return{track:+parts[1],param:'mix.'+parts[3]};
+if(parts[0]==='track'&&parts[2]==='scAmount')return{track:+parts[1],param:'scAmount'};
+if(parts[0]==='master'&&parts[1]==='vol')return{track:-1,param:'masterVol'};
+if(parts[0]==='macro')return{track:-1,param:'macro.'+parts[1]};
+return null}
+function recordFromMidiPath(p,path){
+const map=midiPathToParam(path);if(!map||!p)return false;
+let raw=null;
+if(map.track>=0){const t=p.tracks[map.track];if(!t)return false;
+raw=map.param==='scAmount'?t.scAmount:t.mix[map.param.slice(4)]}
+else raw=map.param==='masterVol'?p.masterVol:p.macroVals[+map.param.slice(6)];
+if(raw==null||!isFinite(raw))return false;
+return autoRecMove(map.track,map.param,raw)}
+
+const PERF={toggleLayer(which){const p=I.p;pushHist();if(which==='drums')for(let t=0;t<4;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='bass')p.tracks[4].mix.mute=!p.tracks[4].mix.mute;else if(which==='music')for(let t=5;t<p.tracks.length;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='fx')for(let t=4;t<p.tracks.length;t++)p.tracks[t].mix.sendA=p.tracks[t].mix.sendA>0?0:.35;after()},macro(idx,val){I.p.macroVals[idx]=clamp(val,0,1);resolveMacros();I.dirty=true;autoRecMove(-1,'macro.'+idx,I.p.macroVals[idx])},launch(i,instant){const p=I.p,sc=p.scenes[i];if(!sc||sc.pattern==null)return{ok:false};if(instant||!I.sched.on){pushHist();p.activeScene=i;p.currentPattern=sc.pattern;I.pending=null;after();/* per-scene auto-FILL: instant launch fires the FILL op right away (quantized launches fire it at the bar boundary — see scheduler) */if(sc.fill&&I.eng)PERF.fill()}else{I.pending=i;if(I.fsm==='PLAYING'||I.fsm==='RECORDING')I.fsm='TRANSITIONING';I.renderDirty=true}return{ok:true}},assign(i){pushHist();I.p.scenes[i].pattern=I.p.currentPattern;after()},fill(){const p=I.p;if(!I.eng||!I.ctx)return;const sd=60/p.bpm/4;for(let k=0;k<8;k++)I.eng.trigger(p.tracks[3],I.ctx.currentTime+k*sd/2,{vel:.5+.05*k,note:48,lock:{}},sd)},variation(){const p=I.p;pushHist();const rng=mulberry32((Date.now()%100000)|0);const pat=p.patterns[p.currentPattern];[2,3].forEach(t=>{const d=pat.data[t];if(!d)return;for(let i=0;i<d.len;i++){const s=d.steps[i];if(s.on&&rng()<.15)s.on=0;else if(!s.on&&rng()<.12){s.on=1;s.vel=.45+rng()*.35}}});const d7=pat.data[7];if(d7)for(let i=0;i<d7.len;i++){const s=d7.steps[i];if(s.on)s.prob=rng()<.1?.6:1}after()}};
 
 const K_MAIN='psy6.main.v1',K_TMP='psy6.tmp.v1';
 function saveProject(){try{if(I.copilotSnapshot&&I.p)I.copilotSnapshot();const j=JSON.stringify(I.p);localStorage.setItem(K_TMP,j);localStorage.setItem(K_MAIN,j);localStorage.removeItem(K_TMP);I.dirty=false;return{ok:true}}catch(e){return{ok:false,err:String(e)}}}
@@ -17,7 +47,9 @@ function loadProjectObj(p){if(p.seed==null)p.seed='PSY6';if(!p.groove)p.groove='
    neutral defaults keep old scenes sounding identically. Scenes are REBUILT
    in canonical key order so load→save byte-stability holds regardless of how
    the save was produced. */
-if(p.scenes)p.scenes=p.scenes.map(sc=>({name:sc.name,pattern:sc.pattern==null?null:sc.pattern,color:sc.color==null?null:sc.color,bars:sc.bars==null?null:sc.bars,fill:sc.fill===true}));I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;if(I.eng)I.eng.syncMix(p);I.renderDirty=true;if(I.copilotReload)I.copilotReload()}
+if(p.scenes)p.scenes=p.scenes.map(sc=>({name:sc.name,pattern:sc.pattern==null?null:sc.pattern,color:sc.color==null?null:sc.color,bars:sc.bars==null?null:sc.bars,fill:sc.fill===true}));/* lane backfill (v0.5.0): legacy lanes get mode 'lock' (sound params — the only thing
+   that ever had a lane) or 'state' (anything else), preserving exact legacy behavior */
+if(p.lanes)for(const ln of p.lanes)ln.mode=laneModeBackfill(ln.param,ln.mode);I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;I.autoArm=new Set();I.selLane=-1;if(I.eng)I.eng.syncMix(p);I.renderDirty=true;if(I.copilotReload)I.copilotReload()}
 /* MIDI param paths (v0.4.0): macro.<0-7> | master.vol | track.<i>.mix.vol |
    track.<i>.mix.pan | track.<i>.mix.sendA | track.<i>.mix.sendB |
    track.<i>.mix.mute | track.<i>.scAmount.
@@ -43,7 +75,7 @@ function resolveMidiParam(p,path,v01){
   }
   return false;
 }
-function applyMidiParam(path,v01){if(!I.p)return false;const ok=resolveMidiParam(I.p,path,v01);if(ok){if(I.eng)I.eng.syncMix(I.p);if(I.eng&&I.eng.master&&I.p.masterVol!=null)I.eng.master.gain.value=I.p.masterVol;I.dirty=true;I.renderDirty=true}return ok}
+function applyMidiParam(path,v01){if(!I.p)return false;const ok=resolveMidiParam(I.p,path,v01);if(ok){if(I.eng)I.eng.syncMix(I.p);if(I.eng&&I.eng.master&&I.p.masterVol!=null)I.eng.master.gain.value=I.p.masterVol;I.dirty=true;I.renderDirty=true;recordFromMidiPath(I.p,path)}return ok}
 function recHit(track,note,vel){if(!I.recOn||I.fsm!=='RECORDING')return;const grid=I.p.recQ||1,sc=I.sched;let best=null,bd=1e9;for(const r of sc.recent){const d=Math.abs(r.t-I.ctx.currentTime);if(d<bd){bd=d;best=r}}if(!best)return;const rem=best.s%grid,sAdj=rem>grid/2?best.s+(grid-rem):best.s-rem;const pat=I.p.patterns[I.p.currentPattern],d=pat.data[track];if(!d)return;const len=d.len,idx=((sAdj%len)+len)%len;pushHist();const st=d.steps[idx];st.on=1;st.vel=clamp(vel,.05,1);if(note!=null)st.note=note;I.dirty=true;I.renderDirty=true}
 
-export { $, toast, I, pushHist, after, resolveMacros, PERF, K_MAIN, K_TMP, saveProject, loadStored, loadProjectObj, recHit, resolveMidiParam, applyMidiParam };
+export { $, toast, I, pushHist, after, resolveMacros, PERF, K_MAIN, K_TMP, saveProject, loadStored, loadProjectObj, recHit, resolveMidiParam, applyMidiParam, autoRecMove, recordFromMidiPath, midiPathToParam };

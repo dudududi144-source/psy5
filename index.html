@@ -54,6 +54,14 @@
 <div style="display:flex;gap:6px;align-items:center"><select id="seqTrack"></select><select id="lenSel"></select><select id="zoomSel" title="Step width / zoom — AUTO stretches cells; larger sizes scroll for 64/128-step patterns"><option value="0">ZOOM AUTO</option><option value="14">XS 14px</option><option value="18">S 18px</option><option value="24">M 24px</option><option value="34">L 34px</option><option value="48">XL 48px</option></select><button id="bClr">CLEAR</button><button id="bDup">DUP</button></div></div>
 <div id="seqScroll"><div id="stepGrid"></div></div>
 <div class="note" style="margin-top:6px">click=toggle · shift+click=step editor (vel/prob/micro/lock). Blue dot=parameter lock.</div>
+<div style="display:flex;gap:6px;align-items:center;margin-top:12px;flex-wrap:wrap"><h3 style="margin:0">Automation</h3>
+<select id="laneParam" title="parameter for the new lane — follows the selected track"></select>
+<button id="bLaneAdd" title="add an automation lane for the selected track + parameter">+ LANE</button>
+<button id="bArmAuto" title="arm automation recording — knob/CC moves land in armed lanes at the playhead">ARM-AUTO</button>
+<button id="bAutoQ" title="quantize recorded points to 1/16 steps">Q 1/16</button>
+<button id="bLaneClear" title="clear the selected lane's points">CLEAR LANE</button></div>
+<div id="laneWrap"><canvas id="laneCanvas" width="900" height="96"></canvas><canvas id="lanePlay" width="900" height="96"></canvas></div>
+<div id="laneList" style="margin-top:6px;max-height:150px;overflow-y:auto"></div>
 </div></section>
 <section class="tab" id="tab-sound"><div class="cols">
 <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><h3 style="margin:0">Factory library — real engine state</h3>

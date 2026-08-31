@@ -1,10 +1,11 @@
-import { $, I, pushHist, after } from '../state.js';
+import { $, I, pushHist, after, autoRecMove } from '../state.js';
 
 /* Mixer strips — volume / mute / solo, sidechain (SC) ducking controls and
    the two per-track FX sends. Sends: DLY (mix.sendA → BPM-synced delay bus)
    and REV (mix.sendB → reverb bus), 0-100, default 0 → zero behavior change.
    The #fxBar holds the GLOBAL delay controls: division (1/8 | 3/16 | 1/4)
-   and feedback (0-80%). All values live on the project and are persisted. */
+   and feedback (0-80%). All values live on the project and are persisted.
+   Knob movements call autoRecMove so armed automation lanes capture them. */
 function scDrawer(t){
 return '<div class="scRow" style="display:none;grid-column:1/-1;border-top:1px solid var(--line);margin-top:6px;padding-top:6px;grid-template-columns:1fr 1fr 1fr;gap:6px">'
 +'<label style="font-size:8px;color:var(--dim);font-family:var(--mono)">ATK ms<input class="scAtk" type="number" min="1" max="200" value="'+(t.scAttackMs!=null?t.scAttackMs:12)+'" style="width:100%"></label>'
@@ -30,17 +31,17 @@ d.innerHTML='<div class="nm" style="font-size:10px">'+t.name.split(' ')[0]+'</di
 +'<button class="scGear" title="attack / hold / release" style="padding:0 4px;font-size:9px">⋯</button></div>'
 +'<div style="display:flex;gap:4px;margin-top:4px"><button class="mute'+(t.mix.mute?' on':'')+'">M</button><button class="solo'+(t.mix.solo?' on':'')+'">S</button></div>'
 +scDrawer(t);
-d.querySelector('.vol').oninput=e=>{t.mix.vol=Math.pow(+e.target.value/100,2);if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
+d.querySelector('.vol').oninput=e=>{t.mix.vol=Math.pow(+e.target.value/100,2);if(I.eng)I.eng.syncMix(I.p);I.dirty=true;autoRecMove(i,'mix.vol',t.mix.vol)};
 d.querySelector('.mute').onclick=()=>{pushHist();t.mix.mute=!t.mix.mute;after()};
 d.querySelector('.solo').onclick=()=>{pushHist();t.mix.solo=!t.mix.solo;after()};
 const sA=d.querySelector('.sendA'),sAv=d.querySelector('.sendAv');
-sA.oninput=e=>{t.mix.sendA=(+e.target.value)/100;sAv.textContent=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
+sA.oninput=e=>{t.mix.sendA=(+e.target.value)/100;sAv.textContent=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true;autoRecMove(i,'mix.sendA',t.mix.sendA)};
 sA.onchange=()=>pushHist();
 const sB=d.querySelector('.sendB'),sBv=d.querySelector('.sendBv');
-sB.oninput=e=>{t.mix.sendB=(+e.target.value)/100;sBv.textContent=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
+sB.oninput=e=>{t.mix.sendB=(+e.target.value)/100;sBv.textContent=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true;autoRecMove(i,'mix.sendB',t.mix.sendB)};
 sB.onchange=()=>pushHist();
 const scIn=d.querySelector('.sc'),scV=d.querySelector('.scV');
-scIn.oninput=e=>{t.scAmount=+e.target.value;scV.textContent=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
+scIn.oninput=e=>{t.scAmount=+e.target.value;scV.textContent=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true;autoRecMove(i,'scAmount',t.scAmount)};
 scIn.onchange=()=>pushHist();
 d.querySelector('.scGear').onclick=()=>{const r=d.querySelector('.scRow');r.style.display=r.style.display==='none'?'grid':'none'};
 d.querySelector('.scAtk').onchange=e=>{pushHist();t.scAttackMs=Math.max(1,Math.min(200,+e.target.value||12));if(I.eng)I.eng.syncMix(I.p)};

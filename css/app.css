@@ -101,3 +101,17 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 .scene .scOps button:disabled{opacity:.3;cursor:default}
 .scene .rename{font-size:11px;font-weight:700;background:#11151d;border:1px solid var(--acc2);border-radius:4px;color:#fff;width:88px;padding:1px 3px}
 .scene.scAdd{justify-content:center;align-items:center;border-style:dashed;color:var(--acc2);min-height:46px}
+/* ── v0.5.0 automation editor ── */
+#laneWrap{position:relative;margin-top:6px;width:100%;max-width:900px;height:96px;border:1px solid #2c3442;border-radius:6px;overflow:hidden}
+#laneWrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#laneList{display:flex;flex-direction:column;gap:3px;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
+#laneList::-webkit-scrollbar{width:8px}
+#laneList::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
+.laneRow{display:flex;gap:6px;align-items:center;padding:4px 8px;background:#171c25;border:1px solid #2c3442;border-radius:6px;cursor:pointer}
+.laneRow.sel{border-color:var(--acc2)}
+.laneRow .arm{color:#5a6070;font-size:11px;padding:1px 5px;background:#11151d;border:1px solid #2c3442;border-radius:4px;cursor:pointer}
+.laneRow .arm.on{color:#ff5d5d;border-color:#ff5d5d}
+.laneRow .lb{font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.laneRow .lb i{color:var(--dim);font-style:normal;font-size:8px}
+.laneRow .val{font-size:9px;color:var(--acc);min-width:44px;text-align:right}
+.laneRow .del{font-size:9px;padding:1px 5px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer}
