@@ -257,6 +257,88 @@ arranger [scene,bars] ──► songSteps(p) generator  ◄── single source 
   verification (served bytes ≠ tag SHA across two consecutive loads with SW
   active) → remove the SW registration, keep the manifest, document honestly.
 
+## 14. Evolution + Interop (v0.7.0)
+
+### Section variants — no identical repeats
+
+```
+compose(): base sections C1..C7 (form) ──► arranger steps (occurrence walk)
+                 │                              │
+                 │ family used n>1 times        │ occurrence j of a family
+                 ▼                              ▼
+   deriveVariant(basePat, sec, k)      st.scene = variantMap[base][j-1]
+   (deep copy + seeded ops)            → DROP, DROP 2, DROP 3 …
+```
+
+- Op set (all seeded via `rngFor(seedInt, 'variant:<family>:<k>')`, nothing
+  re-rolled): hat density/offset swap, bass octave shifts on off-phrase steps
+  + velocity re-jitter + roll micro re-offset, lead motif re-processed through
+  the foundation `MotifTransformer` (transpose/retrograde/omission/invert —
+  rewritten with fillSection's cursor walk), perc re-seeding, pad voicing
+  swap. **KICK (track 0) is sacred**: positions/note/micro/prob untouched;
+  velocity accents only (`|Δvel| ≤ 0.1`).
+- Lane deltas: one family-dedicated `(track,param)` pair per family via the
+  param registry — DROP→(7,cutoff), DROP2→(4,res), BREAK→(6,detune),
+  RISER→(2,mix.sendA), BUILD→(4,cutoff) — values open progressively with the
+  variant index; the registry applies `state` lanes globally in array order,
+  so the most open (last) curve governs (documented semantics).
+- Difference contract: `variantStepDiff(a,b) = |D|/|U|` (union of on-steps;
+  note / vel>0.02 / micro>2 count as different) — every pair incl. the base
+  must reach `VARIANT_DIFF_MIN = 0.15`.
+
+### MIDI export — shared expansion, pure writer
+
+```
+songSteps(p) ──► songSchedule  ──► renderSong ──► psy6-song-<bpm>bpm.wav
+     │               (oracle)
+     └──► songMidi(p) ──► writeMidi ──► psy6-song-<bpm>bpm.mid
+          (bounce.js)      (js/midifile.js — pure format-1 writer)
+```
+
+- ONE expansion: both consumers walk the same `songSteps` generator +
+  `stepEvents` — the `.mid == WAV schedule` identity is asserted
+  note-for-note (bun) and by G26 (in-gate parse-back).
+- Tick map: 1 step = ppq/4 = 120 ticks; bar = 4·480 = 1920; total =
+  Σbars·4·480. Groove/micro offsets convert seconds → ticks at the same
+  resolution (`off/sd·120`, rounded).
+- Writer format notes: MThd (format 1, ntrks, division 480); track 0 =
+  `FF 03` name + `FF 51` tempo (μs/quarter = 60e6/bpm) + `FF 2F` EOT; one
+  MTrk per track with name meta + note on (`9n`) / off (`8n`) pairs; VLQ
+  deltas (7-bit groups, continuation bit — multi-byte unit-tested); event
+  ordering stable: tick ↑, off-before-on at ties (no stuck notes), pitch ↑.
+- Channels (device convention): melodic (`kind==='synth'`) tracks → 1–8 in
+  track order (budget: >8 melodic → export refuses); every drum-kind track →
+  channel 10 (index 9, GM percussion) with its own preset note. `durTicks` =
+  1 step — a trigger map; the WAV is the authoritative sound.
+
+### Follow-action FSM (chain mode only)
+
+```
+scene active (chain on) ── bar boundary end (sc.step % 16 === 0) ──┐
+   sc.followBarsIn++                                               │
+   barsIn >= followBars(fw, scn, loop) ?                           │
+     yes → followCount++                                           │
+           resolveFollow(p, activeScene, followCount)              │
+             - prob roll: rng()*100 >= prob → mode = 'next'        │
+             - random: pool = scenes with patterns;                │
+               pick = pool[floor(rng()*pool.length)]               │
+             - next/prev: ±1 with wrap; empty → null (no skip)     │
+             - scene: target if it has a pattern, else null        │
+           nxt != null → I.pending = nxt   (SAME quantized path)   │
+     no  → legacy chainNext at pattern-loop end (scenes without    │
+           follow behave EXACTLY as before)                        │
+```
+
+- Seeding: `rng = mulberry32(fnv(projectSeed + ':' + transitionCounter))` —
+  the counter increments per resolution in the transport session and resets
+  at transport start, so the same seed + start replays the identical
+  sequence (G27 pins the 20-transition walk for seed 424242).
+- PRECEDENCE: PLAY SONG (arranger) never consults follows — the arranger's
+  internal advance calls the captured launch directly; follow actions live
+  ONLY in the `p.chain` branch of `schedTick`.
+- `afterBars` overrides the section length: `afterBars > scene.bars >
+  pattern loop (loopSteps/16 — the legacy cadence)`.
+
 ## v0.5.0 — UNLIMIT + COMPOSER
 
 ### Limits config (`js/limits.js`)

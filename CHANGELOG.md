@@ -3,6 +3,101 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.7.0] — Run 10: EVOLUTION + INTEROP
+
+### Added — composer section variants, no identical repeats (`feat: composer section variants (no identical repeats)`)
+
+- Every section family used more than once in the arranger now derives n−1
+  variant scenes (naming `base+" 2"`, `" 3"`, …), so **no arranger repeat is
+  ever identical**. Variants are the base pattern mutated by deterministic
+  seeded ops (hat density/offset swap, bass octave shifts on off-phrase
+  steps + velocity re-jitter, lead motif re-processed through the foundation
+  `MotifTransformer`, perc repositioning, pad voicing swap) plus a per-variant
+  lane delta on family-dedicated `(track,param)` pairs via the param registry
+  (values open progressively across variants).
+- **KICK IS SACRED**: variant kicks keep exact positions/note/micro/prob —
+  velocity accents only, `|Δvel| ≤ 0.1` (`KICK_VEL_MAX_DELTA`, asserted).
+- Difference metric (documented constant `VARIANT_DIFF_MIN = 0.15`):
+  `variantStepDiff = |D|/|U|` over the union of on-steps, content-aware
+  (note / vel>0.02 / micro>2). EVERY pair within a family incl. the base must
+  reach it. Empirical FULL-ON/3min/424242 family minimums: INTRO .933,
+  BUILD .849, DROP .591, BREAK .836, RISER .840, DROP2 .338, OUTRO .886 —
+  all 9 style×length combos ≥ 0.306. Repro:
+  `bun test tests/composer.test.ts`.
+- Form unchanged: 108-bar form / 17-step / 136-bar arranger for the 3-min
+  demo; base patterns untouched (form fingerprint **pinned** to the v0.6.0
+  value `d0c5f32f032f2a88`). Fingerprint delta vs the Run 9 Phase-0 record:
+  the FORM hash is byte-stable; the project content delta is 7→17 scenes,
+  3→11 lanes, 10 variant patterns. Same seed → byte-identical project
+  INCLUDING variants. Uniqueness extended project-wide (all patterns).
+- **G23 extended (not forked)**: evidence now reports `variants=10
+  vmin=0.338 norepeat=true`.
+- G24 Chrome-float determinism bound documented at `1e-5` (empirical
+  4.17e-7…1.13e-6; the schedule `evHash` equality remains the exact layer).
+
+### Added — FOREST and HI-TECH composer styles (`feat: forest and hitech composer styles`)
+
+- Both are full recipes in `COMPOSER_STYLES` (nothing hand-rolled outside
+  the dict): per-style section chain + energy arcs, preset map, and a
+  `recipe` sub-dict (hatGhostMul / bassGrammar / percMul / percOdd /
+  energyVar / riserEvery / variant op weights).
+- FOREST ~150 BPM, harmonicMinor (darker scale bias): longer builds
+  (w .15) + more BREAK weight (.145), denser hats (1.6), rolling forest
+  bass grammar, ops {hatRot .55, bassOct .65}. 3min/424242 → 16 scenes,
+  Σ=128 bars, 179.2 s (−0.44 %).
+- HI-TECH ~155 BPM, phrygian: faster turnover (INTRO .09/BUILD .11),
+  percMul 1.8 + odd-16th glitch layer, energyVar 0.10 (seeded per-section
+  jitter), aggressive riser (one sweep per bar), ops {.5, .55}.
+  3min/424242 → 17 scenes, Σ=136 bars, 179.61 s (−0.22 %).
+- Legacy styles byte-identical: 9 project hashes (3 legacy styles ×
+  3/5/8 min) pinned in tests. All five styles render non-silent through the
+  G23 evidence loop (min section RMS 0.064). UI: 5 styles in both pickers +
+  third demo (`#bDemoForest`, FOREST 3min, same deterministic recipe path).
+
+### Added — standard MIDI file export (`feat: standard MIDI file export`)
+
+- `js/midifile.js`: pure, dependency-free **format-1** writer — track 0 =
+  tempo meta + track name; one chunk per track; VLQ deltas (multi-byte cases
+  unit-tested); stable ordering (tick ↑, off-before-on, pitch).
+- Shared song expansion — **no parallel logic**: `songMidi(p)` (bounce.js)
+  walks the SAME `songSteps` generator + `stepEvents` the offline WAV
+  renderer walks. Mapping: 1 step = 120 ticks (ppq 480), bar = 4·480,
+  total = Σbars·4·480 = 261,120 for the demo. Channels: melodic → 1–8,
+  drums → 10 (GM). `durTicks` = 1 step (trigger map; the WAV stays the
+  authoritative sound).
+- `.mid == WAV schedule` contract asserted note-for-note in bun (4,385
+  notes) **and** by **G26** (HARD, offline, CI-eligible): in-gate parse-back
+  of the demo export — `bytes=36695 fmt=1 ppq=480 trks=10 tempo=145
+  firstKick=0 notes=4385 total=261120 det=true`. e2e asserts 24 gates.
+- UI: EXPORT MIDI in the bounce modal (disabled + hint when the arranger is
+  empty) → `psy6-song-<bpm>bpm.mid`.
+
+### Added — seeded follow actions, chain mode (`feat: seeded follow actions (chain mode)`)
+
+- `scene.follow = {mode:'none'|'next'|'prev'|'random'|'scene', target?,
+  prob 0–100 (default 100), afterBars?}` — edited in the scene bank row.
+- **PRECEDENCE (documented)**: PLAY SONG strictly follows the arranger;
+  follow actions apply ONLY in chain mode, through the same quantized
+  `I.pending` launch path. `prob<100` miss → documented `'next'` fallback.
+  Random pick seeded: `mulberry32(fnv(projectSeed + ':' +
+  transitionCounter))` — replayable per transport session. `afterBars`
+  overrides the section length (`afterBars > scene.bars > pattern loop`).
+- **G27** (HARD, offline simulation, CI-asserted): scripted chain walks the
+  PINNED 20-transition random sequence
+  `[2,2,11,11,9,9,4,13,8,16,11,9,1,15,8,1,8,6,0,13,0]`, replay-identical;
+  next/prev wrap exact; scene lock; prob=0 fallback. e2e asserts 24 gates.
+- `loadProjectObj` backfills follow canonically (absent/invalid → absent;
+  legacy load→save byte-stability holds).
+
+### Release — v0.7.0 (`docs: v0.7.0`)
+
+- Battery: **271 tests across 23 files — 271 pass / 0 fail (302,947
+  expect() calls)**; `node tools/verify.mjs` GREEN.
+- Gates: **24 HARD MAIN (CI-asserted, incl. G26 MIDI + G27 follow) + 2
+  evidence-only realtime (G17, G25)** = 26 device entries; WORKLET 3/3.
+- PWA: `sw.js` `CACHE_VERSION = 'psy6-v0.7.0'` (verify.mjs enforces the
+  version↔CHANGELOG lock).
+
 ## [0.6.0] — Run 9: SONG ENGINE
 
 ### Added — full-song offline render (`feat: full-song offline render (song bounce)`)
@@ -204,6 +299,101 @@ reproducible with the command shown next to it.
 
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
+
+## [0.7.0] — Run 10: EVOLUTION + INTEROP
+
+### Added — composer section variants, no identical repeats (`feat: composer section variants (no identical repeats)`)
+
+- Every section family used more than once in the arranger now derives n−1
+  variant scenes (naming `base+" 2"`, `" 3"`, …), so **no arranger repeat is
+  ever identical**. Variants are the base pattern mutated by deterministic
+  seeded ops (hat density/offset swap, bass octave shifts on off-phrase
+  steps + velocity re-jitter, lead motif re-processed through the foundation
+  `MotifTransformer`, perc repositioning, pad voicing swap) plus a per-variant
+  lane delta on family-dedicated `(track,param)` pairs via the param registry
+  (values open progressively across variants).
+- **KICK IS SACRED**: variant kicks keep exact positions/note/micro/prob —
+  velocity accents only, `|Δvel| ≤ 0.1` (`KICK_VEL_MAX_DELTA`, asserted).
+- Difference metric (documented constant `VARIANT_DIFF_MIN = 0.15`):
+  `variantStepDiff = |D|/|U|` over the union of on-steps, content-aware
+  (note / vel>0.02 / micro>2). EVERY pair within a family incl. the base must
+  reach it. Empirical FULL-ON/3min/424242 family minimums: INTRO .933,
+  BUILD .849, DROP .591, BREAK .836, RISER .840, DROP2 .338, OUTRO .886 —
+  all 9 style×length combos ≥ 0.306. Repro:
+  `bun test tests/composer.test.ts`.
+- Form unchanged: 108-bar form / 17-step / 136-bar arranger for the 3-min
+  demo; base patterns untouched (form fingerprint **pinned** to the v0.6.0
+  value `d0c5f32f032f2a88`). Fingerprint delta vs the Run 9 Phase-0 record:
+  the FORM hash is byte-stable; the project content delta is 7→17 scenes,
+  3→11 lanes, 10 variant patterns. Same seed → byte-identical project
+  INCLUDING variants. Uniqueness extended project-wide (all patterns).
+- **G23 extended (not forked)**: evidence now reports `variants=10
+  vmin=0.338 norepeat=true`.
+- G24 Chrome-float determinism bound documented at `1e-5` (empirical
+  4.17e-7…1.13e-6; the schedule `evHash` equality remains the exact layer).
+
+### Added — FOREST and HI-TECH composer styles (`feat: forest and hitech composer styles`)
+
+- Both are full recipes in `COMPOSER_STYLES` (nothing hand-rolled outside
+  the dict): per-style section chain + energy arcs, preset map, and a
+  `recipe` sub-dict (hatGhostMul / bassGrammar / percMul / percOdd /
+  energyVar / riserEvery / variant op weights).
+- FOREST ~150 BPM, harmonicMinor (darker scale bias): longer builds
+  (w .15) + more BREAK weight (.145), denser hats (1.6), rolling forest
+  bass grammar, ops {hatRot .55, bassOct .65}. 3min/424242 → 16 scenes,
+  Σ=128 bars, 179.2 s (−0.44 %).
+- HI-TECH ~155 BPM, phrygian: faster turnover (INTRO .09/BUILD .11),
+  percMul 1.8 + odd-16th glitch layer, energyVar 0.10 (seeded per-section
+  jitter), aggressive riser (one sweep per bar), ops {.5, .55}.
+  3min/424242 → 17 scenes, Σ=136 bars, 179.61 s (−0.22 %).
+- Legacy styles byte-identical: 9 project hashes (3 legacy styles ×
+  3/5/8 min) pinned in tests. All five styles render non-silent through the
+  G23 evidence loop (min section RMS 0.064). UI: 5 styles in both pickers +
+  third demo (`#bDemoForest`, FOREST 3min, same deterministic recipe path).
+
+### Added — standard MIDI file export (`feat: standard MIDI file export`)
+
+- `js/midifile.js`: pure, dependency-free **format-1** writer — track 0 =
+  tempo meta + track name; one chunk per track; VLQ deltas (multi-byte cases
+  unit-tested); stable ordering (tick ↑, off-before-on, pitch).
+- Shared song expansion — **no parallel logic**: `songMidi(p)` (bounce.js)
+  walks the SAME `songSteps` generator + `stepEvents` the offline WAV
+  renderer walks. Mapping: 1 step = 120 ticks (ppq 480), bar = 4·480,
+  total = Σbars·4·480 = 261,120 for the demo. Channels: melodic → 1–8,
+  drums → 10 (GM). `durTicks` = 1 step (trigger map; the WAV stays the
+  authoritative sound).
+- `.mid == WAV schedule` contract asserted note-for-note in bun (4,385
+  notes) **and** by **G26** (HARD, offline, CI-eligible): in-gate parse-back
+  of the demo export — `bytes=36695 fmt=1 ppq=480 trks=10 tempo=145
+  firstKick=0 notes=4385 total=261120 det=true`. e2e asserts 24 gates.
+- UI: EXPORT MIDI in the bounce modal (disabled + hint when the arranger is
+  empty) → `psy6-song-<bpm>bpm.mid`.
+
+### Added — seeded follow actions, chain mode (`feat: seeded follow actions (chain mode)`)
+
+- `scene.follow = {mode:'none'|'next'|'prev'|'random'|'scene', target?,
+  prob 0–100 (default 100), afterBars?}` — edited in the scene bank row.
+- **PRECEDENCE (documented)**: PLAY SONG strictly follows the arranger;
+  follow actions apply ONLY in chain mode, through the same quantized
+  `I.pending` launch path. `prob<100` miss → documented `'next'` fallback.
+  Random pick seeded: `mulberry32(fnv(projectSeed + ':' +
+  transitionCounter))` — replayable per transport session. `afterBars`
+  overrides the section length (`afterBars > scene.bars > pattern loop`).
+- **G27** (HARD, offline simulation, CI-asserted): scripted chain walks the
+  PINNED 20-transition random sequence
+  `[2,2,11,11,9,9,4,13,8,16,11,9,1,15,8,1,8,6,0,13,0]`, replay-identical;
+  next/prev wrap exact; scene lock; prob=0 fallback. e2e asserts 24 gates.
+- `loadProjectObj` backfills follow canonically (absent/invalid → absent;
+  legacy load→save byte-stability holds).
+
+### Release — v0.7.0 (`docs: v0.7.0`)
+
+- Battery: **271 tests across 23 files — 271 pass / 0 fail (302,947
+  expect() calls)**; `node tools/verify.mjs` GREEN.
+- Gates: **24 HARD MAIN (CI-asserted, incl. G26 MIDI + G27 follow) + 2
+  evidence-only realtime (G17, G25)** = 26 device entries; WORKLET 3/3.
+- PWA: `sw.js` `CACHE_VERSION = 'psy6-v0.7.0'` (verify.mjs enforces the
+  version↔CHANGELOG lock).
 
 ## [0.4.0] — Run 6: EVIDENCE + PLAY + CAPTURE + STEMS + SHARE
 

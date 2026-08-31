@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 236 tests across 21 files — 236 pass / 0 fail (47241 expect() calls)
+bun test             # 271 tests across 23 files — 271 pass / 0 fail (302947 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -58,7 +58,7 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/copilot.test.ts` | 18 | co-pilot contextual bandit: context building, reward mapping, serialization round-trip, determinism, foundation extension |
 | `tests/arranger.test.ts` | 13 | section arranger: bar-quantized advance, persistence, manual override, paused transport + v0.6.0 timeline editor ops (move/insert), share round-trip, PLAY SONG offline-sim, song info |
 | `tests/sidechain.test.ts` | 10 | kick-triggered sidechain: envelope shape, overlap continuity, project round-trip |
-| `tests/sends.test.ts` | 9 | BPM-synced delay divisions, feedback clamps, deterministic IR, project round-trip |
+| `tests/sends.test.ts` | 10 | BPM-synced delay divisions, feedback clamps, deterministic IR, project round-trip |
 | `tests/bounce.test.ts` | 8 | bounce schedule determinism, WAV header/data integrity, clipping |
 | `tests/midi.test.ts` | 20 | MIDI IN core: note routing, CC learn + round-trip, param dispatch, CC0/CC123 rules, provider injection |
 | `tests/capture.test.ts` | 7 | live capture: buffer growth accounting, bar-quantization math, bounce-encoder reuse |
@@ -67,7 +67,9 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/limits.test.ts` | 14 | v0.5.0 ceilings: 16 tracks / 128 steps / 64 scenes, mixed loopLen, addTrack, step-alias regression, legacy byte-stability |
 | `tests/scenes.test.ts` | 14 | scene bank: add/duplicate/clear/reorder/rename/color/bars/fill, chain over 32+ scenes, launch semantics, persistence |
 | `tests/params.test.ts` | 12 | param registry completeness + clamps, recordPoint/quantStep math, applyLanes state-vs-lock, MIDI→lane mapping |
-| `tests/composer.test.ts` | 14 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed uniqueness, output integrity |
+| `tests/composer.test.ts` | 27 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed project-wide uniqueness, output integrity + v0.7.0 section variants (pairwise ≥ 0.15, KICK-SACRED bound, pinned form fingerprint, pinned legacy hashes) + FOREST/HI-TECH recipes |
+| `tests/midifile.test.ts` | 9 | v0.7.0 MIDI export: format-1 writer, VLQ multi-byte, stable ordering, dependency-free parse-back, `.mid == WAV schedule` note-for-note identity, byte-identical exports |
+| `tests/follow.test.ts` | 13 | v0.7.0 follow actions: model validation, followBars precedence, all modes' 20-transition simulations, prob=0 fallback, seeded replayability, JSON + share round-trips |
 | `tests/usability.test.ts` | 7 | shortcut registry (no collisions, taskbook bindings), demo recipes recompose + boot |
 | `tests/song.test.ts` | 12 | v0.6.0 song render: phase rules == live-scheduler oracle, frame-count formula (pinned number), sections/fills, schedule determinism, duration guard, cancel contract |
 | `tests/pwa.test.ts` | 10 | v0.6.0 PWA: SW CACHE_VERSION == CHANGELOG latest, network-first + cleanup + claim pieces, manifest/icon integrity, deterministic icon generator |
@@ -89,16 +91,18 @@ Honest subset classification (v0.4.0):
 | `G9`, `G11`, `G12`, `G13`, `G14`, `G15`, `G18` | deterministic OfflineAudioContext render (steal counters / sidechain / sends / bounce / drain / default-pool overload / stem isolation) | CI + local |
 | `G17` (live capture), `G25` (record song) | **realtime** ScriptProcessor tap + real scheduler | run on-device; CI reports them as non-asserted info — **local-only assertions** |
 | `G21`, `G22`, `G23`, `G24` | v0.5.0/v0.6.0 offline+pure set (long patterns / automation / composer / **song render**) | CI + local |
+| `G26` (MIDI export), `G27` (follow actions) | v0.7.0 offline+pure set (format-1 parse-back / seeded chain simulation) | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.6.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **24 MAIN entries**, of
-which **22 are hard** (offline/pure — CI asserts all 22, including G24 song
-render) and **2 are evidence-only realtime** (G17 live capture, G25 record
-song — they run on-device every time, are reported as info in CI, and are
-exercised from the production URL at every release). WORKLET: 3/3 reduced
-set. Numbering gaps G3/G4/G7/G20 never existed in any shipped commit
-(verified with `git log -S` across all history) and are left unrenumbered.
+Gate-truth accounting (v0.7.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **26 MAIN entries**, of
+which **24 are hard** (offline/pure — CI asserts all 24, including G24 song
+render, G26 MIDI export, G27 follow actions) and **2 are evidence-only
+realtime** (G17 live capture, G25 record song — they run on-device every
+time, are reported as info in CI, and are exercised from the production URL
+at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
+never existed in any shipped commit (verified with `git log -S` across all
+history) and are left unrenumbered.
 
 Note: although G9/G14/G15 were originally labelled "realtime-ish", code
 inspection (js/ui/tests.js) shows that in MAIN mode they run entirely through
@@ -160,6 +164,42 @@ In the optional WORKLET engine the Self-Gate runs a reduced but real set:
 drain + all kicks voiced, `peak=0.710 residualEvents=0 kicksVoiced=8/8`;
 G15w overload via worklet stats, `tier0Victims=0 hatSteals=188
 kicksVoiced=16/16 peak=0.938`).
+
+## Features (v0.7.0) — EVOLUTION + INTEROP
+
+v0.7.0 closes the "complete, long, UNIQUE content" gap and adds standard
+interchange: no composed section ever repeats identically, two new styles,
+standard MIDI file export, and seeded follow actions for performance.
+
+- **SECTION VARIANTS** — every section family used more than once in the
+  arranger derives variant scenes (`DROP`, `DROP 2`, `DROP 3`, …) through
+  deterministic seeded ops (hat density/offset swap, bass octave shifts +
+  velocity re-jitter, lead motif re-processed through the foundation
+  MotifTransformer, perc repositioning) plus a per-variant lane delta via the
+  param registry (cutoff/res/detune/send curves open progressively across
+  variants). **KICK IS SACRED**: kick patterns never move — velocity accents
+  only (`|Δvel| ≤ 0.1`, asserted). Difference contract: every pair within a
+  family (base included) reaches `variantStepDiff ≥ 0.15` (documented
+  union-normalized metric); measured minimum 0.306 across all styles and
+  lengths. The form, total length and base patterns are unchanged (form
+  fingerprint pinned to the v0.6.0 hash `d0c5f32f032f2a88`).
+- **5 COMPOSER STYLES** — FULL-ON 145, DARK-PSY 148, PROGRESSIVE 138,
+  **FOREST ~150** (harmonicMinor, longer builds, denser hats, rolling forest
+  bass) and **HI-TECH ~155** (glitch perc density, energy variance, per-bar
+  riser sweeps). Legacy recipes are byte-pinned; the new ones are full
+  recipes in the same dict.
+- **EXPORT MIDI** — standard format-1 MIDI file of the WHOLE arranger from
+  the SAME song expansion the offline WAV renderer walks (the `.mid` equals
+  the WAV schedule, asserted note-for-note). 1 step = 120 ticks @ ppq 480;
+  melodic tracks → channels 1–8, drums → channel 10 (GM); tempo meta from
+  the project BPM. Trigger-map durations (1 step); the WAV is the
+  authoritative sound.
+- **FOLLOW ACTIONS** (chain mode only) — per-scene `next / prev / random /
+  scene → target` with probability (miss → documented `next` fallback) and
+  `afterBars` override. Random is SEEDED (`fnv(projectSeed + ':' +
+  transitionCounter)`) — the same seed + start replays the identical
+  sequence (G27 pins it). **PRECEDENCE: PLAY SONG always follows the
+  arranger and ignores follow actions.**
 
 ## Features (v0.6.0) — SONG ENGINE
 
