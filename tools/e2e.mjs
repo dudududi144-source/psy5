@@ -43,12 +43,13 @@ const GATE_TIMEOUT = parseInt(opt('--timeout', '300000'), 10);
 
 const EXPECTED = [
   'G1-TECHNO', 'G1-PSYTRANCE', 'G1-TRANCE', 'G1-PROGRESSIVE',
-  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23',
+  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23', 'G24',
 ];
-/* G17 (live capture) is REALTIME — it runs on-device but is explicitly NOT
-   asserted in CI (documented subset boundary). G18/G19 are offline/pure and
-   join EXPECTED when they land. */
-const EXCLUDED = new Set(['G17']);
+/* G17 (live capture, v0.4.0) and G25 (record song, v0.6.0) are REALTIME —
+   they run on-device (evidence-only) but are explicitly NOT asserted in CI
+   (documented subset boundary). Both reuse the ScriptProcessor tap on the
+   master output and depend on wall-clock scheduling. */
+const EXCLUDED = new Set(['G17', 'G25']);
 const PURE = new Set(['G2', 'G5', 'G6', 'G8', 'G10', 'G16', 'G19']);
 
 /* ── 1. no-store static server on an ephemeral port ─────────────────────── */
@@ -239,7 +240,7 @@ async function main() {
       subset: {
         asserted: EXPECTED.map((id) => ({ id, class: PURE.has(id) ? 'pure-computation' : 'offline-render' })),
         notRunInCI: [
-          { gates: 'G17 (live capture)', reason: 'realtime ScriptProcessor recording — runs on-device (reported as info), never asserted in CI' },
+          { gates: 'G17 (live capture) + G25 (record song)', reason: 'realtime ScriptProcessor recording — run on-device (reported as info), never asserted in CI' },
           { gates: 'G14w/G15w (WORKLET engine reduced set)', reason: 'worklet offline rendering is environment-sensitive in CI; exercised locally and from the live site at release' },
           { gates: 'live-scheduler loop checks', reason: 'realtime loop not asserted in CI' },
         ],

@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 208 tests across 19 files — 208 pass / 0 fail (29935 expect() calls)
+bun test             # 226 tests across 20 files — 226 pass / 0 fail (47210 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -56,7 +56,7 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/foundation-primitives.test.ts` | 13 | foundation PRNG / fnv1a / scale tables (pinned vectors) |
 | `tests/soundbank.test.ts` | 4 | sound bank coherence |
 | `tests/copilot.test.ts` | 18 | co-pilot contextual bandit: context building, reward mapping, serialization round-trip, determinism, foundation extension |
-| `tests/arranger.test.ts` | 7 | section arranger: bar-quantized advance, persistence, manual override, paused transport |
+| `tests/arranger.test.ts` | 13 | section arranger: bar-quantized advance, persistence, manual override, paused transport + v0.6.0 timeline editor ops (move/insert), share round-trip, PLAY SONG offline-sim, song info |
 | `tests/sidechain.test.ts` | 10 | kick-triggered sidechain: envelope shape, overlap continuity, project round-trip |
 | `tests/sends.test.ts` | 9 | BPM-synced delay divisions, feedback clamps, deterministic IR, project round-trip |
 | `tests/bounce.test.ts` | 8 | bounce schedule determinism, WAV header/data integrity, clipping |
@@ -69,6 +69,7 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/params.test.ts` | 12 | param registry completeness + clamps, recordPoint/quantStep math, applyLanes state-vs-lock, MIDI→lane mapping |
 | `tests/composer.test.ts` | 14 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed uniqueness, output integrity |
 | `tests/usability.test.ts` | 7 | shortcut registry (no collisions, taskbook bindings), demo recipes recompose + boot |
+| `tests/song.test.ts` | 12 | v0.6.0 song render: phase rules == live-scheduler oracle, frame-count formula (pinned number), sections/fills, schedule determinism, duration guard, cancel contract |
 
 ## Self-Gate in CI
 
@@ -85,11 +86,18 @@ Honest subset classification (v0.4.0):
 | `G2`, `G5`, `G6`, `G8`, `G10`, `G16`, `G19` | pure computation (hash/save-load/macro/pools/bandit/MIDI core/share codec) | CI + local |
 | `G1-TECHNO`, `G1-PSYTRANCE`, `G1-TRANCE`, `G1-PROGRESSIVE` | deterministic OfflineAudioContext render | CI + local |
 | `G9`, `G11`, `G12`, `G13`, `G14`, `G15`, `G18` | deterministic OfflineAudioContext render (steal counters / sidechain / sends / bounce / drain / default-pool overload / stem isolation) | CI + local |
-| `G17` (live capture) | **realtime** ScriptProcessor tap + real scheduler | runs on-device; CI reports it as non-asserted info — **local-only assertion** |
+| `G17` (live capture), `G25` (record song) | **realtime** ScriptProcessor tap + real scheduler | run on-device; CI reports them as non-asserted info — **local-only assertions** |
+| `G21`, `G22`, `G23`, `G24` | v0.5.0/v0.6.0 offline+pure set (long patterns / automation / composer / **song render**) | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-CI asserts **18/19** MAIN gates (all except realtime G17); the full
-**19/19** runs on a real device / real browser session.
+Gate-truth accounting (v0.6.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **24 MAIN entries**, of
+which **22 are hard** (offline/pure — CI asserts all 22, including G24 song
+render) and **2 are evidence-only realtime** (G17 live capture, G25 record
+song — they run on-device every time, are reported as info in CI, and are
+exercised from the production URL at every release). WORKLET: 3/3 reduced
+set. Numbering gaps G3/G4/G7/G20 never existed in any shipped commit
+(verified with `git log -S` across all history) and are left unrenumbered.
 
 Note: although G9/G14/G15 were originally labelled "realtime-ish", code
 inspection (js/ui/tests.js) shows that in MAIN mode they run entirely through
@@ -151,6 +159,43 @@ In the optional WORKLET engine the Self-Gate runs a reduced but real set:
 drain + all kicks voiced, `peak=0.710 residualEvents=0 kicksVoiced=8/8`;
 G15w overload via worklet stats, `tier0Victims=0 hatSteals=188
 kicksVoiced=16/16 peak=0.938`).
+
+## Features (v0.6.0) — SONG ENGINE
+
+The composer builds the arrangement; v0.6.0 makes the device able to **export
+and record the actual song** (previously BOUNCE only rendered the current
+pattern loop ×N — a composed 3-minute song bounced as a 26-second fragment).
+
+- **SONG BOUNCE** (bounce modal → MODE `SONG`, enabled when the arranger has
+  sections): offline-renders the whole `[scene,bars]` chain through the SAME
+  live machinery — `stepEvents` per-bar seeded groove, the live scene-launch
+  phase rule (`sc.step = sc.step % newLoop`), per-scene auto-FILL, and the
+  per-step automation player (`applyLanes` → `syncMix`/`resolveMacros`), so
+  state-lane sweeps land on voices exactly as in playback. Documented frame
+  formula: `frames = ceil(sr·(0.05 + (Σbars·16 + 32)·(60/bpm/4)))` — the +32
+  steps are a 2-bar FX release tail; the toast reports music length and
+  with-tail length separately. Progress bar with section name; CANCEL aborts
+  cleanly (never touches the live AudioContext). Output `psy6-song-<bpm>bpm.wav`.
+  Render cap **10 minutes** (memory guard, toast refusal beyond).
+- **ARRANGER TIMELINE EDITOR** (Perform tab): visual blocks, width ∝ bars,
+  scene color; click-select → bars ±, reorder ◀▶, insert-from-scene, DELETE;
+  total readout in sections/bars/mm:ss. All edits persist in
+  `project.arranger` (save/export/share round-trip).
+- **PLAY SONG**: jumps to section 0, quantized start when already playing,
+  boots the transport when stopped; progress via the existing arranger state.
+- **RECORD SONG** (transport row): captures the whole live PLAY SONG through
+  the existing master tap, auto-stops at the end of the final section +1 bar,
+  encodes with the existing WAV encoder → `psy6-song-live-<bpm>bpm.wav`.
+- **G24** (offline, CI-asserted): composed FULL-ON 3min seed 424242 → song
+  render: frame count == formula (10,075,254 samples), all 7 sections
+  RMS > 0.03 (measured 0.0665–0.1088), event schedule == pure oracle
+  (evHash equality), determinism max sample diff 3.73e-7 < 1e-6 (Chrome float
+  nondeterminism between runs is real and documented — the bound is honest).
+- **G25** (realtime, evidence-only): 4-bar two-section song recorded live →
+  duration 9.381s vs 5-bar target 9.375s (**skew 6 ms**), RMS 0.082. G25 also
+  exposed and fixed a real bug: a second capture in one page session included
+  the first capture's audio (CaptureTap.start now resets state; completed
+  captures retire their tap).
 
 ## Features (v0.5.0) — UNLIMIT + COMPOSER
 

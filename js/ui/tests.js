@@ -35,6 +35,28 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
+/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene) ─────────────────
+ * MAIN engine, 24 entries on device — 22 hard (offline/pure, CI-asserted in
+ * tools/e2e.mjs) + 2 evidence-only realtime gates (G17 live capture, G25
+ * record song — ScriptProcessor tap on wall-clock; pass on-device, reported
+ * as info in CI, never asserted there).
+ *   G1-×4 genre render non-silent (offline) · G2 build determinism (pure)
+ *   G5 save/load byte-exact (pure)         · G6 macro→cutoff state (pure)
+ *   G8 pools pre-allocated (pure)          · G9 voice stealing (offline)
+ *   G10 oversampling (offline)             · G11 sidechain (offline)
+ *   G12 sends (offline)                    · G13 bounce (offline)
+ *   G14/G15 poly+steal (offline)           · G16 MIDI core (pure)
+ *   G17 live capture (REALTIME·evidence)   · G18 stems (offline)
+ *   G19 share (pure)                       · G21 long patterns (offline)
+ *   G22 automation (pure)                  · G23 composer (offline)
+ *   G24 song render (offline)              · G25 record song (REALTIME·evidence)
+ * WORKLET reduced set: 3 entries (G2, G14w, G15w) — offline worklet renders.
+ * NUMBERING GAPS (documented, never renumbered — all historical evidence
+ * cites these ids): G3, G4, G7 and G20 have NEVER existed in any shipped
+ * commit (git log -S across all history); the sequence was assigned
+ * topically and the gaps were left reserved-but-unused.
+ * The device summary line "N/24" counts entries; the honest hard-pass count
+ * cited in README/CI is 22 (24 − G17 − G25). */
 async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;if(I.engine==='worklet'){logLine('info','== PSY6 SELF-GATE — WORKLET engine (reduced but real: G2 + G14w + G15w) ==');await gateWorklet()}else{logLine('info','== PSY6 SELF-GATE — MAIN pooled engine (OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner

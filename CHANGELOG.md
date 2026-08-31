@@ -3,6 +3,73 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.6.0] — Run 9: SONG ENGINE
+
+### Added — full-song offline render (`feat: full-song offline render (song bounce)`)
+
+- Bounce modal gains MODE `SONG` (enabled only when the arranger has
+  sections): renders the WHOLE `[scene,bars]` arrangement through the live
+  machinery — `stepEvents` (per-bar seeded groove), the live scene-launch
+  phase rule (`sc.step = sc.step % newLoop`), per-scene auto-FILL, and the
+  per-step automation player (`applyLanes` → `syncMix`/`resolveMacros`) —
+  no parallel renderer. `js/bounce.js`: `songSteps` generator (single source
+  of phase truth), `songSchedule` pure oracle, `songSections`, `songFrames`,
+  `songDurationSec`, `songRenderController`, `renderSong`.
+- Frame formula (documented + asserted): `ceil(sr·(0.05+(Σbars·16+32)·(60/bpm/4)))`
+  — 0.05 s lead-in (loop-bounce convention) + music + 2-bar FX tail.
+- Progress bar (section name + percent, via OfflineAudioContext suspend at
+  section boundaries) + CANCEL (clean abort, live AudioContext untouched).
+- 10-minute render cap (memory guard — toast refusal beyond).
+- Output: `psy6-song-<bpm>bpm.wav`.
+
+### Added — arranger timeline editor + PLAY SONG (`feat: arranger timeline editor + play song`)
+
+- Perform-tab timeline: blocks width ∝ bars, scene colors, click-select;
+  bars ±, reorder ◀▶ (no drag-drop — consistent with the scene bank),
+  insert-from-scene, DELETE; total readout sections/bars/mm:ss.
+- `arrMoveStep` / `arrInsertStep` / `arrSongInfo` (reuses song-render
+  grouping) in `js/arranger.js`; ▶ PLAY SONG button (chain restart at
+  section 0, quantized when playing, boots transport when stopped).
+- Edits persist via project JSON (save/export/share round-trip tested).
+
+### Added — record live song playback (`feat: record live song playback`)
+
+- RECORD SONG (transport row): arms the existing capture tap, starts with
+  PLAY SONG at section 0, auto-stops at the end of the final section +1 bar,
+  encodes with the existing WAV encoder → `psy6-song-live-<bpm>bpm.wav`.
+- **G25** (realtime, evidence-only): 4-bar two-section song → `dur=9.381s`
+  vs `want=9.375s` (**skew 6 ms**), `rms=0.0818`, header valid.
+- **Real bug found and fixed by G25** (the non-vacuous-gate rule paying off
+  again): a second capture in one page session included the first capture's
+  audio — `CaptureTap.start()` now resets accumulated chunks/frames
+  (js/capture.js) and a completed capture retires its tap (js/ui/capture.js).
+  Repro: CAPTURE 1 bar → RECORD SONG → first capture's frames leaked into
+  the song file (494592 = 82944 + 411648).
+
+### Changed — gate-truth hygiene (`docs: gate inventory truth + song engine docs`)
+
+- Canonical gate inventory documented above `runSelfGate()`: **24 MAIN
+  entries = 22 hard (offline/pure, CI-asserted) + 2 evidence-only realtime
+  (G17, G25)**; WORKLET reduced set 3/3. Numbering gaps G3/G4/G7/G20 never
+  existed in any commit (verified `git log -S` over all history) — left
+  unrenumbered because all historical evidence cites the shipped ids.
+- CI subset (`tools/e2e.mjs`): asserts all 22 hard gates (G24 joins; G17/G25
+  explicitly excluded as realtime).
+
+### Evidence (reproducible)
+
+- `bun test` — **226 pass / 0 fail** across 20 files, 47,210 expect() calls
+  (incl. `tests/song.test.ts` 12: phase rules == live-scheduler oracle,
+  frame formula pinned to 10,075,254, sections [16,16,24,16,16,32,16]=136
+  bars, fills 3 launches × 8 hits, schedule determinism, duration guard,
+  cancel contract).
+- `node tools/verify.mjs` — GREEN (0 failures).
+- **G24** (device, OfflineAudioContext): `N=10075254/10075254 bars=136
+  rms=[0.0665,0.098,0.1088,0.0848,0.0867,0.1046,0.0688] sched=true
+  det=maxDiff=3.73e-7` — Chrome float nondeterminism between identical
+  renders is real; the documented bound (max sample diff < 1e-6) is used and
+  the actual max diff is logged, never rounded to a claim of byte-equality.
+
 ## [0.5.0] — Run 7: UNLIMIT + COMPOSER
 
 ### Added — device limits lifted (`feat: lift device limits (16 tracks, 128 steps, 64 scenes)`)

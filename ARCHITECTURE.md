@@ -214,6 +214,49 @@ state (`p.copilot`) travels inside the project payload.
 Architecture version: 1.2
 Status: IMPLEMENTED
 
+## 13. Song Engine (v0.6.0)
+
+```
+arranger [scene,bars] ──► songSteps(p) generator  ◄── single source of truth
+                              │  (live phase rule: sc.step = sc.step % newLoop;
+                              │   empty scene → previous pattern continues;
+                              │   scene.fill → 8 half-step kick hits)
+                              ▼
+        ┌────────── songSchedule (pure oracle, bun-tested) ──────────┐
+        │  evs / sections / totalSteps / total — evHash-identical to │
+        │  the render walk (G24 asserts equality)                    │
+        └──────────────────────────┬─────────────────────────────────┘
+                                   ▼
+   renderSong: OfflineAudioContext + PooledEngine (SAME graph as loop bounce)
+   per step: stepEvents(cp, phase) → eng.trigger     ── identical to schedTick
+             applyLanes(cp, phase) → syncMix(cp, t=stepTime) / resolveMacros
+   tail: +2 bars (32 steps) for delay/reverb release
+                                   ▼
+        wavEncode (EXISTING encoder) → psy6-song-<bpm>bpm.wav
+```
+
+- Deep clone: the render never touches the live project (loop-bounce guarantee).
+- `syncMix(p, when)` gained an optional time anchor (defaults to
+  `ctx.currentTime` — zero behavior change for live/loop paths); state-lane
+  glides anchor exactly at their step time offline vs up-to-LOOKAHEAD early
+  live (documented difference, same class as worker-timer jitter).
+- Frame formula: `ceil(sr·(0.05 + (Σbars·16 + 32)·(60/bpm/4)))` — asserted
+  exactly (10,075,254 @ 145 BPM / 136 bars) in tests + G24.
+- PLAY SONG reuses `arrToggle(true)` (chain restart at section 0) + the
+  existing transport start — zero new engine behavior. RECORD SONG reuses the
+  existing capture tap + WAV encoder with an auto-stop bar hook.
+- Gate-truth hygiene: canonical inventory (24 MAIN entries = 22 hard +
+  2 evidence-only realtime G17/G25; WORKLET 3/3) documented above
+  `runSelfGate()`; CI subset asserts all 22 hard gates. Gaps G3/G4/G7/G20
+  never existed in any commit (git log -S) — left unrenumbered.
+- PWA (v0.6.0): `manifest.webmanifest` + `sw.js` — **network-first** for
+  navigations and same-origin GETs (cache is offline fallback ONLY), cache
+  version const `psy6-v0.6.0` — **release checklist: bump this const on EVERY
+  release** (grep it in tools/verify.mjs), `activate` cleans old caches,
+  skipWaiting + clients.claim. Rollback rule: any staleness in live
+  verification (served bytes ≠ tag SHA across two consecutive loads with SW
+  active) → remove the SW registration, keep the manifest, document honestly.
+
 ## v0.5.0 — UNLIMIT + COMPOSER
 
 ### Limits config (`js/limits.js`)
