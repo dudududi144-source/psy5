@@ -39,6 +39,10 @@
 <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Pads</h3><div id="padModes" style="display:flex;gap:4px"></div></div><div id="pads" style="margin-top:7px"></div>
 <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap"><button id="bFill">⚡ FILL</button><button id="bVar">🎲 VARIATION</button><span class="note">DRUM=trigger drums · SCALE=key-locked notes · CHORD=diatonic triads.</span></div></div>
 <div class="panel"><h3>Macros — resolve to REAL engine state</h3><div class="macros" id="macros"></div></div>
+<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">MIDI IN — notes play the selected track</h3><span class="mono" id="midiState" style="font-size:9px;color:var(--dim)">offline</span></div>
+<div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap"><select id="midiDev" style="max-width:170px;font-size:10px"></select><button id="midiConnect">CONNECT</button><select id="midiTarget" class="mono" style="font-size:9px;max-width:150px"></select><button id="midiLearnBtn" title="Pick a target, press LEARN, then move the MIDI control (CC). CC 0 is ignored.">LEARN</button><span class="mono" id="midiLearn" style="font-size:9px;color:var(--dim)">idle</span></div>
+<div id="midiBinds" style="margin-top:6px;max-height:96px;overflow-y:auto"></div>
+<div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">note-off releases synth voices · CC123 = PANIC · CC0 ignored · MIDI clock sync: out of scope</div></div>
 </div><div>
 <div class="panel"><h3>Layers</h3><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px" id="layers"></div></div>
 <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">CO-PILOT — suggestions need APPLY (never auto)</h3><button id="bLearn">LEARN ON</button></div><div id="copBody" style="margin-top:6px"></div><div id="copStats" class="mono" style="font-size:9px;color:var(--dim);margin-top:5px"></div></div>

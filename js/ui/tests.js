@@ -1,4 +1,5 @@
-import { $, I, PERF, saveProject, loadStored } from '../state.js';
+import { $, I, PERF, saveProject, loadStored, resolveMidiParam } from '../state.js';
+import { createMidiCore, emptyMidiMap } from '../midi.js';
 import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY } from '../model.js';
@@ -111,7 +112,29 @@ p.currentPattern='A';const sd=60/p.bpm/4;let t=.05;
 for(let s=0;s<64;s++){for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}
 const buf=await oc.startRendering();
 const kicks=eng.trackCount[0],hatSteals=eng.stealCount[1],pk=peakOf(buf);
-gate('G15','overload at DEFAULT pools: kick never dropped, tier-0 never stolen, hats starve among themselves',kicks===16&&eng.tier0StealAttempts===0&&hatSteals>0&&pk>0.05,'tier0Steals='+eng.tier0StealAttempts+' hatSteals='+hatSteals+' kicks='+kicks+'/16 peak='+pk.toFixed(3))}catch(e){gate('G15','overload at default pools',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G15','overload at DEFAULT pools: kick never dropped, tier-0 never stolen, hats starve among themselves',kicks===16&&eng.tier0StealAttempts===0&&hatSteals>0&&pk>0.05,'tier0Steals='+eng.tier0StealAttempts+' hatSteals='+hatSteals+' kicks='+kicks+'/16 peak='+pk.toFixed(3))}catch(e){gate('G15','overload at default pools',false,'ERR '+e.message)}
+/* G16 — MIDI input core (js/midi.js): scripted session, exact assertions.
+   note on → selected track (velocity/127 exact) · note off ×2 · CC learn
+   binds the first received CC to the target path · that CC then moves
+   scAmount to an exact value · CC 0 never consumed · CC 123 → panic ·
+   midiMap round-trips through JSON byte-exact. */
+try{
+const p16=buildStyle('TECHNO',7);p16.midiMap=emptyMidiMap();
+const notes16=[],offs16=[];let panics16=0,learnBind16=null;
+const core16=createMidiCore({selectedTrack:()=>4,noteOn:(t,vel,note)=>notes16.push({t,vel,note}),noteOff:t=>offs16.push({t}),panic:()=>panics16++,dispatch:(path,v)=>resolveMidiParam(p16,path,v),onBind:(cc,path)=>{learnBind16={cc,path};p16.midiMap.bindings[cc]=path}});
+core16.map=p16.midiMap;
+const send16=a=>core16.onMessage({data:Uint8Array.from(a)});
+send16([0x90,60,100]);send16([0x90,62,0]);send16([0x80,60,0]);
+core16.beginLearn('track.2.scAmount');send16([0xB0,0,64]);/* CC0 must NOT be consumed */
+const cc0kept=core16.learn==='track.2.scAmount'&&!p16.midiMap.bindings[0];
+send16([0xB0,45,70]);/* first real CC → learn */
+send16([0xB0,45,70]);/* now dispatches: scAmount=round(70/127*100)=55 */
+send16([0xB0,123,0]);
+const sc16=p16.tracks[2].scAmount;
+const rt16=JSON.stringify(JSON.parse(JSON.stringify(p16.midiMap)))===JSON.stringify(p16.midiMap);
+const n0=notes16[0]||{};
+const ok16=notes16.length===1&&n0.t===4&&n0.note===60&&Math.abs(n0.vel-100/127)<1e-9&&offs16.length===2&&cc0kept&&!!learnBind16&&learnBind16.cc===45&&learnBind16.path==='track.2.scAmount'&&sc16===55&&panics16===1&&rt16;
+gate('G16','midi: note→selected track w/ exact velocity, learn binds cc→param, cc moves scAmount to exact value, cc0 ignored, cc123 panics, map round-trips',ok16,'note=60/vel='+(n0.vel!=null?Math.round(n0.vel*127):'?')+'@t'+n0.t+' offs='+offs16.length+' learn='+(learnBind16?learnBind16.cc+'→'+learnBind16.path:'none')+' sc='+sc16+' cc0kept='+cc0kept+' panic='+panics16+' rt='+rt16)}catch(e){gate('G16','midi input core',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).
