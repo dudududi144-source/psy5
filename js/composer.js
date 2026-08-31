@@ -1,4 +1,4 @@
-/* ============ SONG COMPOSER (v0.5.0) — complete unique arrangements ============
+/* ============ SONG COMPOSER (v0.7.0) — complete unique arrangements ============
    Pure and deterministic: seeded by (projectSeed, styleId, targetMinutes).
    No DOM, no Date.now/Math.random anywhere — every decision draws from
    rngFor(projectSeed, label) sub-streams, so the same seed+style+length
@@ -18,9 +18,19 @@
      4. LEAD MOTIF — generated on the scale, varied per section through the
         foundation MotifTransformer (drops state it, BREAK inverts, BUILD
         fragments, OUTRO omits) — real variation ops, not re-rolls.
-     5. LANES — filter-sweep lane on BUILD (lead cutoff) and sendA/B rise on
-        RISER (pad), written as 'state' lanes via the v0.5.0 param registry.
-     6. OUTPUT — scenes renamed by section (color-tagged), arranger steps,
+     5. SECTION VARIANTS (v0.7.0) — every section family used more than once
+        in the arranger gets n−1 derived variant scenes (naming: base+" 2",
+        " 3", …) so NO arranger repeat is ever identical. Variants are the
+        base pattern mutated by deterministic seeded ops (hats density/offset
+        swap, bass octave/velocity re-jitter on off-phrase steps, lead motif
+        re-processed through MotifTransformer, perc repositioning) plus a
+        lane delta via the param registry. The KICK is sacred: positions,
+        note, micro and prob untouched — velocity accents only (|Δvel| ≤ 0.1).
+        Bars per scene, the form and the total length are unchanged.
+     6. LANES — filter-sweep lane on BUILD (lead cutoff) and sendA/B rise on
+        RISER (pad), written as 'state' lanes via the v0.5.0 param registry;
+        variant lanes use family-dedicated (track,param) pairs (see below).
+     7. OUTPUT — scenes renamed by section (color-tagged), arranger steps,
         9th track (FX riser), project bpm/scale/root per style. */
 import { rngFor, degreeToSemitone } from '../foundation/foundation.mjs';
 import { arcAt } from '../foundation/composition/form.mjs';
@@ -180,6 +190,134 @@ function fillSection(p, pat, section, bars, energy, ctx) {
   return pat;
 }
 
+/* ============ SECTION VARIANTS (v0.7.0) — no identical repeats ============
+   PSY CONSTRAINT: the kick is sacred. Variant kicks keep their exact
+   positions/note/micro/prob; only velocity accents (|Δvel| ≤ 0.1) are
+   allowed. Variation targets hats/bass/lead/perc/pad + lane deltas.
+
+   Difference metric (documented constant VARIANT_DIFF_MIN = 0.15):
+   variantStepDiff(a,b) = |D| / |U| where U = steps (all tracks) where
+   EITHER pattern has a note, D ⊆ U where the on-state differs OR both are
+   on and (note differs ∨ |Δvel| > 0.02 ∨ |Δmicro| > 2). 0 = identical,
+   1 = disjoint. Union normalization makes sparse (INTRO) and dense (DROP)
+   families comparable. EVERY pair within a family — base included — must
+   reach VARIANT_DIFF_MIN. */
+
+export const VARIANT_DIFF_MIN = 0.15;
+export const KICK_VEL_MAX_DELTA = 0.1;
+
+function variantStepDiff(a, b) {
+  let uni = 0, dif = 0;
+  for (const tk of Object.keys(a.data)) {
+    const da = a.data[tk], db = b.data[tk];
+    const n = Math.min(da.len, db.len);
+    for (let i = 0; i < n; i++) {
+      const x = da.steps[i], y = db.steps[i];
+      if (!x.on && !y.on) continue;
+      uni++;
+      if (!!x.on !== !!y.on) { dif++; continue }
+      if ((x.note | 0) !== (y.note | 0) || Math.abs(x.vel - y.vel) > 0.02 || Math.abs((x.micro || 0) - (y.micro || 0)) > 2) dif++;
+    }
+  }
+  return uni ? dif / uni : 0;
+}
+
+/* minVariantDiff — smallest pairwise diff within a family (base included) */
+function minVariantDiff(pats) {
+  let m = 1;
+  for (let i = 0; i < pats.length; i++) for (let j = i + 1; j < pats.length; j++) m = Math.min(m, variantStepDiff(pats[i], pats[j]));
+  return m;
+}
+
+/* deriveVariant — deep-copy the base pattern and mutate it into variant k
+   (k = 1 → " 2"). Every op is seeded from its own rngFor stream; nothing
+   is re-rolled from scratch, everything derives from the base material. */
+function deriveVariant(basePat, sec, k, ctx) {
+  const pat = deep(basePat);
+  pat.name = basePat.name + 'v' + (k + 1);
+  const rng = rngFor(ctx.seedInt, 'variant:' + sec.id + ':' + k);
+  const energy = sec.energyMid;
+  /* KICK (track 0) — SACRED: positions/note/micro/prob untouched; velocity
+     accents only, hard-bounded at KICK_VEL_MAX_DELTA (±0.07 actual). */
+  const dk = pat.data[0];
+  if (dk) for (let i = 0; i < dk.len; i++) {
+    const st = dk.steps[i];
+    if (st.on) { const dv = (rng() - 0.5) * 0.14; if (Math.abs(dv) > 0.02) st.vel = Math.min(1, Math.max(0.05, st.vel + dv)) }
+  }
+  /* HATS (track 2) — density/offset swap: rotate the offbeat grid one 16th
+     later on seeded bars; re-seed ghost 16ths at high energy; sections with
+     no hat layer at all gain a low-velocity offbeat layer. */
+  const dh = pat.data[2];
+  if (dh) {
+    for (let b = 0; b < dh.len / 16; b++) {
+      if (rng() < 0.45) for (const o of [2, 6, 10, 14]) {
+        const src = dh.steps[b * 16 + o], dst = dh.steps[b * 16 + o + 1];
+        if (src.on && !dst.on) { dst.on = 1; dst.vel = Math.min(1, Math.max(0.05, src.vel * (0.9 + rng() * 0.2))); dst.prob = 1; src.on = 0 }
+        else if (src.on && dst.on) dst.vel = Math.min(1, dst.vel + 0.1);
+      }
+    }
+    if (energy >= 0.75) { for (let s = 0; s < dh.len; s++) if (s % 2 === 0 && rng() < 0.3) put(pat, 2, s, 0.25 + rng() * 0.15) }
+    else if (!dh.steps.some(st => st.on)) { for (let b = 0; b < dh.len / 16; b++) for (const o of [2, 6, 10, 14]) if (rng() < 0.7) put(pat, 2, b * 16 + o, 0.3 + rng() * 0.12) }
+  }
+  /* BASS (track 4) — octave shifts (±12) on off-phrase (odd) steps, velocity
+     re-jitter, roll micro re-offset on psy-push steps. */
+  const db = pat.data[4];
+  if (db) for (let i = 0; i < db.len; i++) {
+    const st = db.steps[i];
+    if (!st.on) continue;
+    if (i % 2 === 1 && rng() < 0.6) st.note = Math.min(108, Math.max(12, st.note + (rng() < 0.85 ? 12 : -12)));
+    st.vel = Math.min(1, Math.max(0.05, st.vel + (rng() - 0.5) * 0.24));
+    if (st.micro) st.micro = Math.max(-100, Math.min(100, st.micro + Math.round((rng() - 0.5) * 12)));
+  }
+  /* LEAD (track 5) — the section motif re-processed through the foundation
+     MotifTransformer (never re-rolled), rewritten with the same cursor walk
+     fillSection uses. Sections without a lead skip the op. */
+  const dl = pat.data[5];
+  if (dl && dl.steps.some(st => st.on) && ctx.sectionMotifs[sec.id]) {
+    const m0 = ctx.sectionMotifs[sec.id];
+    const pick = rng();
+    let m;
+    if (k % 2 === 1) m = pick < 0.5 ? MotifTransformer.transpose(m0, 3) : MotifTransformer.transpose(m0, -2);
+    else if (pick < 0.4) m = MotifTransformer.retrograde(m0);
+    else if (pick < 0.7) m = MotifTransformer.omission(m0, (ctx.seedInt ^ (0xABCD + k * 0x9E37)) | 0);
+    else m = MotifTransformer.invert(m0);
+    dl.steps = Array.from({ length: dl.len }, () => mkStep(false));
+    const degNote = (deg, oct) => ctx.root + 24 + degreeToSemitone(ctx.scaleIv, deg) + 12 * (oct || 0);
+    const barsN = dl.len / 16;
+    for (let b = 0; b < barsN; b++) {
+      let cursor = b * 16;
+      for (const ev of m.events) {
+        if (!ev.rest && cursor < dl.len) put(pat, 5, cursor, 0.4 + ev.accent * 0.35, degNote(ev.deg, ev.oct));
+        cursor += ev.dur;
+      }
+    }
+  }
+  /* PERC (track 3) — repositioning: re-seeded sparse density (same recipe). */
+  const dp = pat.data[3];
+  if (dp) { dp.steps = Array.from({ length: dp.len }, () => mkStep(false)); for (let s = 0; s < dp.len; s += 2) if (rng() < 0.06 + energy * 0.12) put(pat, 3, s, 0.3 + rng() * 0.4) }
+  /* PAD (track 6) — second-voicing interval swap where a pad exists. */
+  const dd = pat.data[6];
+  if (dd) {
+    const ivs = [7, 3, 10]; const iv = ivs[Math.floor(rng() * ivs.length)];
+    for (let i = 0; i < dd.len; i++) { const st = dd.steps[i]; if (st.on && st.note === ctx.root + 12 + 7) st.note = ctx.root + 12 + iv; if (st.on) st.vel = Math.min(1, Math.max(0.05, st.vel + (rng() - 0.5) * 0.16)) }
+  }
+  return pat;
+}
+
+/* variantLane — the per-variant lane delta via the param registry. One
+   family-dedicated (track,param) pair per family (no clashes with the base
+   BUILD/RISER lanes); values OPEN progressively with the variant index.
+   The registry applies 'state' lanes globally in array order, so when a
+   family has several variants the most open (last) curve governs — the
+   documented global-apply semantics of the v0.5.0 lane model. */
+const VARIANT_LANES = {
+  DROP: { track: 7, param: 'cutoff', pts: k => [[0, 800 + 700 * k], [64, 2000 + 1600 * k], [127, 4200 + 2600 * k]] },
+  DROP2: { track: 4, param: 'res', pts: k => [[0, 4 + 2 * k], [127, 10 + 4 * k]] },
+  BREAK: { track: 6, param: 'detune', pts: k => [[0, 3 + 2.5 * k], [127, 9 + 5 * k]] },
+  RISER: { track: 2, param: 'mix.sendA', pts: k => [[0, 0.08 + 0.08 * k], [127, 0.25 + 0.15 * k]] },
+  BUILD: { track: 4, param: 'cutoff', pts: k => [[0, 500 + 400 * k], [127, 1800 + 1200 * k]] },
+};
+
 /* compose — the pure entry point. targetMinutes ∈ {3,5,8} (any >0 works). */
 export function compose(styleId, targetMinutes, seed, seedLabel) {
   const style = COMPOSER_STYLES[styleId] || COMPOSER_STYLES['FULL-ON'];
@@ -219,9 +357,11 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   const arrSteps = [];
   let sceneIdx = 0;
   const formSections = [];
+  const secMotifs = {}; /* per-family fillSection motif — variants re-process it */
   for (let i = 0; i < sections.length; i++) {
     const sec = sections[i];
     const motif = sectionMotif(seedInt, sec.id, baseMotif);
+    secMotifs[sec.id] = motif;
     const patName = 'C' + (i + 1);
     const pat = { name: patName, data: {} };
     for (let t = 0; t < p.tracks.length; t++) pat.data[t] = { len: 16, steps: Array.from({ length: 16 }, () => mkStep(false)) };
@@ -233,6 +373,55 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
     formSections.push({ id: sec.id, bars: sec.bars, energy: +sec.energyMid.toFixed(3), pattern: patName, scene: sceneIdx });
     sceneIdx++;
   }
+
+  /* 3b. SECTION VARIANTS (v0.7.0) — every family used more than once in the
+     arranger gets n−1 derived variant scenes; the arranger is rewritten so
+     occurrence j of a family plays the base (j=0) then " 2", " 3", … Bars
+     per step, the form and the total length are unchanged. */
+  const vctx = { seedInt, scaleIv, root: p.root, sectionMotifs: secMotifs };
+  const usage = new Map();
+  for (const st of arrSteps) usage.set(st.scene, (usage.get(st.scene) || 0) + 1);
+  const occSeen = new Map();       /* scene → occurrences already assigned */
+  const variantMap = new Map();    /* base scene → [variant scene idx, …] */
+  let variantCount = 0;
+  const famPats = new Map();       /* base scene → [patA, patB, …] for the metric */
+  for (const st of arrSteps) {
+    const base = st.scene, n = usage.get(base);
+    const occ = occSeen.get(base) || 0;
+    occSeen.set(base, occ + 1);
+    if (n <= 1 || occ === 0) continue;
+    if (!variantMap.has(base)) {
+      const sec = sections[base];
+      const famName = sec.id;
+      const ids = [];
+      const pats = [p.patterns[p.scenes[base].pattern]];
+      for (let kk = 1; kk < n; kk++) {
+        const patName = 'C' + (base + 1) + 'v' + (kk + 1);
+        p.patterns[patName] = deriveVariant(p.patterns[p.scenes[base].pattern], sec, kk, vctx);
+        p.scenes.push({ name: famName + ' ' + (kk + 1), pattern: patName, color: sec.color, bars: Math.min(sec.bars, 8), fill: false });
+        ids.push(p.scenes.length - 1);
+        pats.push(p.patterns[patName]);
+        variantCount++;
+      }
+      variantMap.set(base, ids);
+      famPats.set(base, pats);
+    }
+    const ids = variantMap.get(base);
+    st.scene = ids[occ - 1];
+  }
+  /* variant lane deltas — provenance: which variant scene the curve belongs
+     to (metadata only; the registry applies 'state' lanes globally in array
+     order, so the most open (last) curve of a family governs) */
+  const variantLanes = [];
+  for (const [base, ids] of variantMap) {
+    const spec = VARIANT_LANES[sections[base].id];
+    if (!spec) continue; /* INTRO/OUTRO variants: step ops carry the variation */
+    ids.forEach((sid, j) => variantLanes.push({ track: spec.track, param: spec.param, mode: 'state', pts: deep(spec.pts(j + 1)), variant: p.scenes[sid].name }));
+  }
+  /* family difference evidence (base included in every pairwise set) */
+  let minFamDiff = 1;
+  for (const [, pats] of famPats) minFamDiff = Math.min(minFamDiff, minVariantDiff(pats));
+
   p.currentPattern = 'C1'; p.activeScene = 0;
   p.arranger = { v: 1, on: true, steps: arrSteps, idx: 0, barsIn: 0 };
 
@@ -249,7 +438,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
     lanes.push({ track: 6, param: 'mix.sendA', mode: 'state', pts: [[0, 0.05], [len - 1, 0.9]] });
     lanes.push({ track: 6, param: 'mix.sendB', mode: 'state', pts: [[0, 0.05], [len - 1, 0.85]] });
   }
-  p.lanes = lanes;
+  p.lanes = lanes.concat(variantLanes);
 
   /* 5. stats + determinism fingerprint */
   const totalSecs = formSections.reduce((a, s) => a + s.bars, 0);
@@ -258,7 +447,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   return {
     project: p,
     form: { style: styleId, seed: label, bpm, sections: formSections, totalBars: totalSecs, lengthSec: +lengthSec.toFixed(2), targetSec: targetMinutes * 60 },
-    stats: { tracks: p.tracks.length, scenes: p.scenes.length, lanes: p.lanes.length, lengthErr: +(((lengthSec - targetMinutes * 60) / (targetMinutes * 60)) * 100).toFixed(3), fingerprint },
+    stats: { tracks: p.tracks.length, scenes: p.scenes.length, lanes: p.lanes.length, variants: variantCount, minVariantDiff: +minFamDiff.toFixed(3), lengthErr: +(((lengthSec - targetMinutes * 60) / (targetMinutes * 60)) * 100).toFixed(3), fingerprint },
   };
 }
 
@@ -284,4 +473,4 @@ export function sectionsFingerprint(p, formSections) {
 /* fnv-ish string→int for string seeds (keeps the numeric contract of seeds) */
 function fnvish(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) } return (h >>> 0).toString(16) }
 
-export { SECTION_CHAIN, allocateBars };
+export { SECTION_CHAIN, allocateBars, variantStepDiff, minVariantDiff, VARIANT_LANES };

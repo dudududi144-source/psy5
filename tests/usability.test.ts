@@ -64,9 +64,13 @@ describe('demo songs', () => {
       /* the shipped form summary matches the recomposition */
       expect(a.form.sections.map(s => ({ id: s.id, bars: s.bars }))).toEqual(doc.form.sections)
       expect(a.form.totalBars).toBe(doc.form.totalBars)
-      /* loads through the project pipeline with scenes + arranger intact */
+      /* loads through the project pipeline with scenes + arranger intact —
+         the pipeline preserves exactly what the composer emitted (base +
+         variant scenes per the v0.7.0 no-identical-repeats contract) */
       loadProjectObj(a.project)
-      expect(I.p.scenes.length).toBe(7)
+      expect(I.p.scenes.length).toBe(a.stats.scenes)
+      expect(I.p.scenes.length).toBeGreaterThan(7) /* variants exist in every demo */
+      expect(I.p.arranger.steps.length).toBe(a.project.arranger.steps.length)
       expect(I.p.arranger.on).toBe(true)
       expect(I.p.tracks.length).toBe(9)
     }

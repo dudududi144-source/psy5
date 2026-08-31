@@ -141,28 +141,42 @@ describe('song render: frame-count formula', () => {
 })
 
 describe('song render: sections + fills + determinism', () => {
-  test('composed arranger → 7 musical sections covering 136 bars', () => {
+  test('composed arranger → 17 musical sections (no identical repeats) covering 136 bars', () => {
+    /* v0.7.0: every arranger step is its OWN scene (base + " 2"/" 3"…
+       variants) — 17 distinct sections, Σbars unchanged at 136 */
     const p = compose('FULL-ON', 3, 424242).project
     const secs = songSections(p)
-    expect(secs.length).toBe(7)
-    expect(secs.map(s => s.name)).toEqual(['INTRO', 'BUILD', 'DROP', 'BREAK', 'RISER', 'DROP2', 'OUTRO'])
-    expect(secs.map(s => s.bars)).toEqual([16, 16, 24, 16, 16, 32, 16])
+    expect(secs.length).toBe(17)
+    expect(new Set(secs.map(s => s.name)).size).toBe(17)
+    expect(secs.map(s => s.name)).toEqual([
+      'INTRO', 'INTRO 2', 'BUILD', 'BUILD 2', 'DROP', 'DROP 2', 'DROP 3',
+      'BREAK', 'BREAK 2', 'RISER', 'RISER 2',
+      'DROP2', 'DROP2 2', 'DROP2 3', 'DROP2 4', 'OUTRO', 'OUTRO 2',
+    ])
+    expect(secs.every(s => s.bars === 8)).toBe(true)
     expect(secs.reduce((a, s) => a + s.bars, 0)).toBe(136)
     expect(secs[0].startBar).toBe(0)
     expect(secs[secs.length - 1].endBar).toBe(136)
   })
   test('scene.fill → 8 half-step kick hits (track 3) at the section boundary', () => {
+    /* v0.7.0: the drop FAMILY (DROP, DROP 2, DROP 3) occupies the same three
+       8-bar steps the old repeated DROP scene did — filling all three scenes
+       re-creates the old 3-launch expectation at the same step positions. */
     const p = compose('FULL-ON', 3, 424242).project
     const secs = songSections(p)
-    const sc = p.scenes.findIndex(s => s.name === secs[2].name) /* DROP */
-    p.scenes[sc].fill = true
+    const dropIdx = secs.findIndex(s => s.name === 'DROP')
+    expect(dropIdx).toBe(4) /* INTRO, INTRO 2, BUILD, BUILD 2 → DROP @ bar 32 */
+    const sc = p.scenes.findIndex(s => s.name === 'DROP')
+    const sc2 = p.scenes.findIndex(s => s.name === 'DROP 2')
+    const sc3 = p.scenes.findIndex(s => s.name === 'DROP 3')
+    expect(sc).toBeGreaterThanOrEqual(0); expect(sc2).toBeGreaterThanOrEqual(0); expect(sc3).toBeGreaterThanOrEqual(0)
+    p.scenes[sc].fill = true; p.scenes[sc2].fill = true; p.scenes[sc3].fill = true
     const sch = songSchedule(p, SONG_LEAD)
-    const boundaryStep = secs[2].startBar * 16 /* DROP starts at bar 32 → step 512 */
+    const boundaryStep = secs[dropIdx].startBar * 16 /* DROP starts at bar 32 → step 512 */
     expect(boundaryStep).toBe(512)
     const fills = sch.evs.filter(e => e.fill)
-    /* DROP spans 3 arranger steps (24 bars = steps 512..895) — the scene is
-       RE-LAUNCHED at every 8-bar step boundary, and every launch fires the
-       fill (live schedTick does exactly the same on pending apply) → 3×8 */
+    /* the drop FAMILY spans 3 arranger steps (24 bars from step 512) — each
+       scene launches once with its own fill flag → 3×8 */
     expect(fills.length).toBe(24)
     const sd = 60 / p.bpm / 4
     /* group key = section-start time, reconstructed from the vel ramp */

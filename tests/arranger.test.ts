@@ -168,7 +168,7 @@ describe('timeline editor ops (Run 9)', () => {
   test('arrSongInfo: sections/bars/durations match the song-render view', () => {
     I.p = compose('FULL-ON', 3, 424242).project
     const info = arrSongInfo()
-    expect(info.sections).toBe(7)
+    expect(info.sections).toBe(17) /* v0.7.0: 17 distinct sections (variants) */
     expect(info.bars).toBe(136)
     expect(info.bpm).toBe(145)
     const sd = 60 / 145 / 4
