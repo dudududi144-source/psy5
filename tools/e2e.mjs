@@ -43,13 +43,13 @@ const GATE_TIMEOUT = parseInt(opt('--timeout', '300000'), 10);
 
 const EXPECTED = [
   'G1-TECHNO', 'G1-PSYTRANCE', 'G1-TRANCE', 'G1-PROGRESSIVE',
-  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18',
+  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19',
 ];
 /* G17 (live capture) is REALTIME — it runs on-device but is explicitly NOT
    asserted in CI (documented subset boundary). G18/G19 are offline/pure and
    join EXPECTED when they land. */
 const EXCLUDED = new Set(['G17']);
-const PURE = new Set(['G2', 'G5', 'G6', 'G8', 'G10', 'G16']);
+const PURE = new Set(['G2', 'G5', 'G6', 'G8', 'G10', 'G16', 'G19']);
 
 /* ── 1. no-store static server on an ephemeral port ─────────────────────── */
 function startServer() {

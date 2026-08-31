@@ -10,6 +10,7 @@ import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
 import { armCapture, captureStop, captureState, captureResult } from './capture.js';
 import { startSched } from '../scheduler.js';
+import { canonicalProject, encodeShare, decodeShare } from '../share.js';
 
 function logLine(cls,msg){const L=$('log');const s=document.createElement('span');s.className=cls;L.appendChild(s);s.textContent=msg+'\n';L.scrollTop=L.scrollHeight}
 const GATE_RES=[];
@@ -192,7 +193,23 @@ const kickTail=rmsW(s18a.buf,bT,dur18);/* after the kick: only its own decay tai
 const s18a2=await renderBounce(p18,1,{trackIdx:0});
 const det18=s18a.scheduleHash===s18a2.scheduleHash&&s18a.scheduleHash!==s18b.scheduleHash;
 const ok18=s18a.N===s18b.N&&kickIn>0.001&&bassIn>0.001&&kickSilent===0&&bassSilent===0&&kickTail<=0.001&&det18;
-gate('G18','stems: per-track isolation — no-voice regions exactly 0 (incl. the other track\u2019s whole timeframe), deterministic per-track schedules',ok18,'kickRMS='+kickIn.toFixed(4)+' bassRMS='+bassIn.toFixed(4)+' silentRegions=0/0 kickOwnTail='+kickTail.toFixed(6)+' N='+s18a.N+' det='+det18)}catch(e){gate('G18','stems',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G18','stems: per-track isolation — no-voice regions exactly 0 (incl. the other track\u2019s whole timeframe), deterministic per-track schedules',ok18,'kickRMS='+kickIn.toFixed(4)+' bassRMS='+bassIn.toFixed(4)+' silentRegions=0/0 kickOwnTail='+kickTail.toFixed(6)+' N='+s18a.N+' det='+det18)}catch(e){gate('G18','stems',false,'ERR '+e.message)}
+/* G19 — share links (pure — CI-asserted): default PSYTRANCE project →
+   canonical JSON → deflate-raw → base64url token → decode → deep-equal
+   (canonical form on BOTH sides — key order pinned, values identical).
+   The co-pilot learner snapshot (p.copilot) must survive the round trip;
+   the same project must produce a byte-identical token (determinism). */
+try{
+const p19=buildStyle('PSYTRANCE',42);
+p19.copilot={v:1,records:[{k:'g19',a:'fill',r:1}],stats:{decisions:1}};
+const enc19=await encodeShare(p19);
+if(!enc19.ok)throw new Error('encode: '+enc19.reason);
+const dec19=await decodeShare(enc19.token);
+const eq19=canonicalProject(dec19.project)===canonicalProject(p19);
+const cop19=!!(dec19.project.copilot&&dec19.project.copilot.records&&dec19.project.copilot.records.length===1&&dec19.project.copilot.stats.decisions===1);
+const det19=(await encodeShare(p19)).token===enc19.token;
+const ok19=eq19&&cop19&&det19;
+gate('G19','share link: canonical round-trip deep-equal, learner snapshot survives, byte-identical determinism',ok19,'json='+enc19.jsonBytes+'B token='+enc19.tokenBytes+'B warn='+enc19.warn+' det='+det19+' learner='+cop19)}catch(e){gate('G19','share links',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).

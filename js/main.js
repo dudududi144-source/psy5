@@ -1,4 +1,4 @@
-import { $, toast, I, K_MAIN, loadStored } from './state.js';
+import { $, toast, I, K_MAIN, loadStored, loadProjectObj } from './state.js';
 import { renderHeader, wireHeader } from './ui/header.js';
 import { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform } from './ui/perform.js';
 import { renderSeq, renderPos, wireSeq } from './ui/seq.js';
@@ -13,6 +13,7 @@ import { startSched } from './scheduler.js';
 import { PooledEngine } from './engine.js';
 import { mkWorkletEngine, WORKLET_LIMITATIONS } from './worklet-engine.js';
 import { buildStyle } from './presets.js';
+import { parseShareHash, decodeShare } from './share.js';
 import { SYNTH_VOICES, DRUM_VOICES } from './model.js';
 
 function renderAll(){if(!I.p)return;renderHeader();renderScenes();renderPads();renderTracks();renderLayers();renderMacros();renderSeq();renderLib();renderSynthEd();renderMixer();renderMidi();I.renderDirty=false}
@@ -26,7 +27,7 @@ async function powerOn(style,resume){const AC=window.AudioContext||window.webkit
 /* engine A/B (PSY6): MAIN pooled engine = default + reference · WORKLET = opt-in experimental */
 if(I.engineSel==='worklet'){try{I.eng=await mkWorkletEngine(ctx);I.engine='worklet'}catch(e){I.engine='main';I.eng=new PooledEngine(ctx);toast('WORKLET BOOT FAILED → MAIN ENGINE')}}else{I.engine='main';I.eng=new PooledEngine(ctx)}
 try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
-let p=null;if(resume)p=loadStored();if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;I.upAt=Date.now();I.eng.syncMix(p);$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireMidi();wireCapture();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
+let p=null;if(resume)p=loadStored();if(!p&&I.pendingShare){p=I.pendingShare;I.pendingShare=null}if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;loadProjectObj(p);/* backfill (midiMap/masterVol/sc/fx) — idempotent, sets I.p to the same object */I.upAt=Date.now();I.eng.syncMix(p);$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireMidi();wireCapture();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
 
 (function boot(){const sp=$('stylePicker');['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE'].forEach(st=>{const b=document.createElement('button');b.textContent='⚡ '+st;b.onclick=()=>powerOn(st,false);sp.appendChild(b)});const empty=document.createElement('button');empty.textContent='∅ EMPTY';empty.onclick=()=>powerOn('EMPTY',false);sp.appendChild(empty);
 /* engine selector — MAIN is the default (zero behavior change); WORKLET is opt-in */
@@ -35,4 +36,19 @@ const mkEng=(id,label,title)=>{const b=document.createElement('button');b.textCo
 mkEng('main','⬤ MAIN (default)','Pooled engine — default').classList.add('on');
 mkEng('worklet','⚙ WORKLET (experimental)','AudioWorklet engine — reduced feature set, reduced self-gate');
 $('engNote').textContent='MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (15 checks).';
-try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$('resumeBtn').onclick=()=>powerOn(null,true)})();
+try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$('resumeBtn').onclick=()=>powerOn(null,true);
+/* share-link consent (v0.4.0): #p= present → banner with LOAD SHARE / DISMISS.
+   NEVER auto-load — the shared project replaces the in-memory project only on
+   an explicit user click. */
+const shareTok=parseShareHash(location.hash);
+if(shareTok){
+const bar=document.createElement('div');
+bar.style.cssText='margin-top:14px;padding:10px 14px;border:1px solid var(--acc2);border-radius:10px;max-width:560px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center';
+bar.innerHTML='<span class="mono" style="font-size:10px">SHARED PROJECT DETECTED ('+shareTok.length+' chars) — load it? It replaces the current in-memory project.</span>';
+const bLoad=document.createElement('button');bLoad.textContent='LOAD SHARE';bLoad.style.borderColor='var(--acc2)';bLoad.style.color='var(--acc2)';
+const bDis=document.createElement('button');bDis.textContent='DISMISS';
+bLoad.onclick=async()=>{try{const r=await decodeShare(shareTok);I.pendingShare=r.project;powerOn('SHARED',false)}catch(e){bar.querySelector('span').textContent='SHARE LINK INVALID — '+e.message}};
+bDis.onclick=()=>{history.replaceState(null,'',location.pathname);bar.remove()};
+bar.appendChild(bLoad);bar.appendChild(bDis);
+$('power').appendChild(bar);
+}})();
