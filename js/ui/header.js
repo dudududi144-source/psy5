@@ -1,8 +1,13 @@
-import { $, toast, I, pushHist, after, saveProject, loadProjectObj } from '../state.js';
+import { $, toast, I, pushHist, after, saveProject, loadProjectObj, PERF } from '../state.js';
 import { startSched, stopSched } from '../scheduler.js';
 import { clamp, GROOVES, loopLen } from '../model.js';
 import { renderBounce, stemTracks, wavEncode, pcmFromBuffer } from '../bounce.js';
 import { encodeShare } from '../share.js';
+import { padHit } from './perform.js';
+import { helpRows } from '../shortcuts.js';
+const padTrigger=i=>{try{padHit(i)}catch(e){/* engine not booted yet */}};
+function toggleHelp(){const o=$('helpOverlay');if(!o)return;o.style.display=o.style.display==='flex'?'none':'flex'}
+function closeHelp(){const o=$('helpOverlay');if(o)o.style.display='none'}
 
 function renderHeader(){if($('grooveSel').options.length===0)$('grooveSel').innerHTML=Object.keys(GROOVES).map(k=>'<option value="'+k+'">'+GROOVES[k].label+'</option>').join('');$('grooveSel').value=I.p.groove||'straight';if(document.activeElement!==$('seedIn'))$('seedIn').value=I.p.seed||'PSY6';$('fsm').textContent=I.fsm;$('bpm').value=I.p.bpm;$('swing').value=I.p.swing;$('swV').textContent=I.p.swing+'%';$('bPlay').classList.toggle('on',['PLAYING','RECORDING','TRANSITIONING'].includes(I.fsm));$('bRec').classList.toggle('on',I.recOn);$('bChain').classList.toggle('on',I.p.chain);$('bChain').textContent='CHAIN '+(I.p.chain?'ON':'OFF')}
 
@@ -22,6 +27,24 @@ if(mode==='stems'){const {tracks}=stemTracks(I.p,loops);if(!tracks.length){toast
 let done=0;for(const ti of tracks){const {buf,N}=await renderBounce(I.p,loops,{trackIdx:ti});const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);const nm=(I.p.tracks[ti].name||('track-'+ti)).replace(/\s+/g,'-').toLowerCase();dlWav(ab,'psy6-stem-'+nm+'.wav');done++;await new Promise(r=>setTimeout(r,350))/* sequential downloads — browsers throttle rapid clicks */}
 toast('STEMS ✓ '+done+' file'+(done===1?'':'s')+' · '+N+' samples each');$('bounceModal').style.display='none'}
 else{const {buf,N}=await renderBounce(I.p,loops);const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);dlWav(ab,'psy6-bounce-'+I.p.bpm+'bpm.wav');toast('BOUNCED ✓ '+N+' samples · '+(ab.byteLength/1024|0)+' KB');$('bounceModal').style.display='none'}}catch(err){toast('BOUNCE FAILED — '+err.message)}b.disabled=false;b.textContent='RENDER WAV'};
-window.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(e.code==='Space'){e.preventDefault();if(['PLAYING','RECORDING','TRANSITIONING'].includes(I.fsm))$('bStop').click();else $('bPlay').click()}else if(e.key==='r')$('bRec').click();else if(e.key==='z'){if(e.shiftKey)$('bRedo').click();else $('bUndo').click()}else if(e.key>='1'&&e.key<='8'){I.selTrack=+e.key-1;I.renderDirty=true}})}
+/* keyboard dispatcher — bindings come from js/shortcuts.js (single source of
+   truth, collision-tested; ? renders the help overlay from the same table) */
+window.addEventListener('keydown',e=>{
+if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+if(e.code==='Space'){e.preventDefault();if(['PLAYING','RECORDING','TRANSITIONING'].includes(I.fsm))$('bStop').click();else $('bPlay').click()}
+else if(e.code.startsWith('Digit')){const n=+e.code.slice(5);if(n>=1&&n<=8){if(e.shiftKey){I.selTrack=n-1;I.renderDirty=true}else padTrigger(n-1)}}
+else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();if(!I.p)return;let i=I.p.activeScene;const dir=e.key==='ArrowRight'?1:-1;for(let k=0;k<I.p.scenes.length;k++){i=(i+dir+I.p.scenes.length)%I.p.scenes.length;if(PERF.launch(i).ok)break}}
+else if(e.key==='f')PERF.fill();
+else if(e.key==='v')PERF.variation();
+else if(e.key==='b')$('bBounce').click();
+else if(e.key==='r')$('bRec').click();
+else if(e.key==='z'){if(e.shiftKey)$('bRedo').click();else $('bUndo').click()}
+else if(e.key==='?'){toggleHelp()}
+else if(e.key==='Escape')closeHelp();
+});
+function toggleHelp(){const o=$('helpOverlay');if(!o)return;o.style.display=o.style.display==='flex'?'none':'flex'}
+function closeHelp(){const o=$('helpOverlay');if(o)o.style.display='none'}
+window.__psy6ToggleHelp=toggleHelp;
+}
 
 export { renderHeader, wireHeader };

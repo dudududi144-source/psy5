@@ -4,6 +4,7 @@ import { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wir
 import { renderSeq, renderPos, wireSeq } from './ui/seq.js';
 import { renderLanes, wireLanes, drawPlayhead, populateParamSelect } from './ui/lanes.js';
 import { wireCompose } from './ui/compose.js';
+import { helpRows } from './shortcuts.js';
 import { arrToggle } from './arranger.js';
 import { renderLib, renderSynthEd, wireSound } from './ui/sound.js';
 import { renderMixer } from './ui/mix.js';
@@ -39,7 +40,13 @@ const mkEng=(id,label,title)=>{const b=document.createElement('button');b.textCo
 mkEng('main','⬤ MAIN (default)','Pooled engine — default').classList.add('on');
 mkEng('worklet','⚙ WORKLET (experimental)','AudioWorklet engine — reduced feature set, reduced self-gate');
 $('engNote').textContent='MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (19 checks).';
-try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$('resumeBtn').onclick=()=>powerOn(null,true);wireCompose();/* power-screen COMPOSE row must be live before boot */
+try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$('resumeBtn').onclick=()=>powerOn(null,true);
+/* DEMOS: recipes recompose deterministically client-side; loads into memory only */
+async function loadDemo(file){try{const doc=await (await fetch(file)).json();const {compose}=await import('./composer.js');const r=compose(doc.style,doc.minutes,doc.seed);I.pendingCompose=r.project;I.composedLoad=r.form;const sb=document.querySelector('#stylePicker button');if(sb)sb.click()}catch(e){toast('DEMO FAILED — '+e.message)}}
+$('bDemoFull').onclick=()=>loadDemo('data/demos/demo-fullon.json');
+$('bDemoDark').onclick=()=>loadDemo('data/demos/demo-darkpsy.json');wireCompose();/* power-screen COMPOSE row must be live before boot */
+/* help overlay from the shortcut registry (single source of truth) */
+(function(){const hb=$('helpBody');if(!hb)return;hb.innerHTML=helpRows().map(g=>'<div style="margin:6px 0"><div class="mono" style="font-size:9px;color:var(--acc2)">'+g.group.toUpperCase()+'</div>'+g.items.map(it=>'<div style="display:flex;gap:8px;font-size:11px;padding:1px 0"><span class="mono" style="min-width:70px;color:var(--acc)">'+it.key+'</span><span style="color:#fffa">'+it.label+'</span></div>').join('')+'</div>').join('');const b=$('bHelp');if(b)b.onclick=()=>window.__psy6ToggleHelp&&window.__psy6ToggleHelp()})();
 /* share-link consent (v0.4.0): #p= present → banner with LOAD SHARE / DISMISS.
    NEVER auto-load — the shared project replaces the in-memory project only on
    an explicit user click. */

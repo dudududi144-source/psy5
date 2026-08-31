@@ -1,0 +1,42 @@
+{
+ "kind": "psy6-demo",
+ "v": 1,
+ "note": "Deterministic PSY6 composer recipe — the client recomposes byte-identically from style/minutes/seed (js/composer.js). Loading boots into memory only.",
+ "style": "DARK-PSY",
+ "minutes": 5,
+ "seed": 777,
+ "form": {
+  "sections": [
+   {
+    "id": "INTRO",
+    "bars": 24
+   },
+   {
+    "id": "BUILD",
+    "bars": 24
+   },
+   {
+    "id": "DROP",
+    "bars": 36
+   },
+   {
+    "id": "BREAK",
+    "bars": 24
+   },
+   {
+    "id": "RISER",
+    "bars": 20
+   },
+   {
+    "id": "DROP2",
+    "bars": 32
+   },
+   {
+    "id": "OUTRO",
+    "bars": 24
+   }
+  ],
+  "totalBars": 184,
+  "lengthSec": 298.38
+ }
+}

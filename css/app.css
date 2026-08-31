@@ -115,3 +115,16 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 .laneRow .lb i{color:var(--dim);font-style:normal;font-size:8px}
 .laneRow .val{font-size:9px;color:var(--acc);min-width:44px;text-align:right}
 .laneRow .del{font-size:9px;padding:1px 5px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer}
+/* ── v0.5.0 accessibility: touch targets + small screens ── */
+.tg>button{min-height:40px;min-width:40px}
+nav button{min-height:40px}
+#bCompose,#bComposeHdr,#bDemoFull,#bDemoDark{min-height:40px}
+@media(max-width:480px){
+.tg{flex-wrap:wrap}
+.tg>button{flex:1 1 auto}
+.panel{padding:10px}
+h3{font-size:12px}
+#scenes{max-height:280px}
+.cols{gap:8px}
+header select{max-width:90px}
+}

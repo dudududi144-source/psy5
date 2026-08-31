@@ -69,4 +69,4 @@ function renderMacros(){const w=$('macros');w.innerHTML='';[['ENERGY',M_ENERGY],
 
 function wirePerform(){$('bFill').onclick=()=>PERF.fill();$('bVar').onclick=()=>PERF.variation();}
 
-export { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform };
+export { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform, padHit };

@@ -17,13 +17,18 @@
 <input id="compSeed" placeholder="seed" style="width:110px" title="seed — same seed = identical song">
 <button id="bCompose" title="generate a complete unique arrangement (intro→build→drop→break→riser→drop2→outro)">✦ COMPOSE</button>
 </div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;justify-content:center">
+<span class="mono" style="font-size:9px;color:var(--dim)">DEMOS:</span>
+<button id="bDemoFull" title="Load the demo song: FULL-ON 3 min (composed, deterministic)">▶ FULL-ON 3MIN</button>
+<button id="bDemoDark" title="Load the demo song: DARK-PSY 5 min (composed, deterministic)">▶ DARK-PSY 5MIN</button>
+</div>
 <div class="note" id="engNote" style="max-width:560px;text-align:center"></div>
 <button id="resumeBtn" style="display:none;border-color:var(--acc2);color:var(--acc2);padding:12px 20px">RESUME LAST SESSION</button>
 </div>
 <div class="app" id="app">
 <header>
 <div class="brand">PSY6<small>POOLED ENGINE</small></div>
-<div class="tg"><button id="bPlay">▶ PLAY</button><button id="bStop">■ STOP</button><button id="bRec" class="rec">● REC</button><button id="bCap" title="Record the live master output losslessly (WAV). Starts on the next bar, stops on the next bar.">CAPTURE</button><button id="bPanic">PANIC</button></div>
+<div class="tg"><button id="bPlay" title="Start playback from the top (Space)">▶ PLAY</button><button id="bStop" title="Stop playback and kill all voices (Space)">■ STOP</button><button id="bRec" class="rec" title="Record-arm: pad and MIDI note hits write into the sequencer (r)">● REC</button><button id="bCap" title="Record the live master output losslessly (WAV). Starts on the next bar, stops on the next bar.">CAPTURE</button><button id="bPanic" title="Kill all sounding voices immediately">PANIC</button></div>
 <div class="tg">
 <div><label>BPM</label><input id="bpm" type="number" min="40" max="300" style="width:56px"></div>
 <div style="width:80px"><label>Swing <span id="swV" class="mono"></span></label><input id="swing" type="range" min="0" max="66"></div>
@@ -32,7 +37,7 @@
 <div style="width:84px"><label>Seed</label><input id="seedIn" type="text" style="width:78px" title="Project seed — same seed + bar = identical events every loop"></div>
 </div>
 <div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><span class="chip" id="copChip" title="CO-PILOT — consent-driven suggestions">✦ CO-PILOT</span><canvas id="meter" width="90" height="26"></canvas></div>
-<div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bShare" title="Copy a share link: project → canonical JSON → deflate-raw → base64url → #p= — loads only with explicit consent">SHARE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><button id="bBounce" title="Offline-render the current pattern loop ×N to a 16-bit WAV">BOUNCE</button><button id="bComposeHdr" title="Compose a complete unique song (intro→build→drop→break→riser→drop2→outro)">COMPOSE</button><input type="file" id="impF" accept=".json" style="display:none"></div>
+<div class="tg"><button id="bUndo" title="Undo (z)">⟲</button><button id="bRedo" title="Redo (Shift+z)">⟳</button><button id="bSave" title="Save the project to this browser (localStorage)">SAVE</button><button id="bShare" title="Copy a share link: project → canonical JSON → deflate-raw → base64url → #p= — loads only with explicit consent">SHARE</button><button id="bExport" title="Download the project as a JSON file">EXPORT</button><button id="bImport" title="Load a project JSON file">IMPORT</button><button id="bBounce" title="Offline-render the current pattern loop ×N to a 16-bit WAV">BOUNCE</button><button id="bComposeHdr" title="Compose a complete unique song (intro→build→drop→break→riser→drop2→outro)">COMPOSE</button><input type="file" id="impF" accept=".json" style="display:none"></div>
 </header>
 <nav>
 <button data-t="perform" class="on">Perform</button><button data-t="seq">Sequencer</button>
@@ -95,6 +100,14 @@
 <div style="display:flex;gap:8px;margin-top:6px"><button id="cmpGo">GENERATE</button><button id="cmpCancel">CANCEL</button></div>
 </div>
 </div>
+<div id="helpOverlay" style="display:none;position:fixed;inset:0;background:#000d;z-index:60;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+<div style="background:#171c25;border:1px solid #2c3442;border-radius:12px;padding:18px;min-width:300px;max-width:520px;max-height:80vh;overflow-y:auto">
+<h3 style="margin:0 0 10px">Keyboard shortcuts</h3>
+<div id="helpBody"></div>
+<div style="margin-top:10px"><button onclick="document.getElementById('helpOverlay').style.display='none'">CLOSE (Esc)</button></div>
+</div>
+</div>
+<button id="bHelp" title="Keyboard shortcuts (?)" style="position:fixed;right:10px;bottom:10px;z-index:55;border-radius:50%;width:40px;height:40px;font-weight:700">?</button>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
