@@ -38,7 +38,21 @@ import { motifFromEvents, MotifTransformer } from '../foundation/music/motif.mjs
 import { SCALES, mkStep, deep } from './model.js';
 import { initTracks, addTrackToProject, libFind, assignPresetToTrack } from './presets.js';
 
-/* ── style templates ── */
+/* ── style templates ──
+   v0.7.0: every style is a FULL RECIPE in this dict — section chain
+   (weights + energy arcs, same 7 canonical ids), per-track preset map,
+   and a `recipe` sub-dict consumed by fillSection/deriveVariant:
+     hatGhostMul  — ghost-16th hat density multiplier (denser hats)
+     bassGrammar  — 'roll' (default psy odd-16th roll) | 'forest'
+                    (rolling 16ths with octave wander)
+     percMul      — perc density multiplier (HI-TECH glitch density)
+     percOdd      — perc also fires on odd 16ths (glitch grammar)
+     energyVar    — per-section energy jitter amplitude (higher variance)
+     riserEvery   — FX sweep spacing in steps (16 = every bar, aggressive)
+     ops          — variant op weights {hatRot, bassOct} (deriveVariant)
+   Styles WITHOUT a recipe (FULL-ON/DARK-PSY/PROGRESSIVE) resolve every
+   field to the v0.6.0 constant — their output is byte-identical to the
+   pinned hashes in the tests. Nothing is hand-rolled outside this dict. */
 export const COMPOSER_STYLES = {
   'FULL-ON': {
     label: 'FULL-ON', bpm: 145, scale: 'phrygian',
@@ -51,6 +65,36 @@ export const COMPOSER_STYLES = {
   'PROGRESSIVE': {
     label: 'PROGRESSIVE', bpm: 138, scale: 'minor',
     presets: { kick: 'PR-KICK', snare: 'TR-CLAP', hat: 'PR-HAT', perc: 'PR-PERC', bass: 'PR-BASS-WARM', lead: 'PR-LEAD-MELODIC', pad: 'PR-PAD-EVOLVE', arp: 'PR-ARP-MELODIC', fx: 'FX-TE-RISE' },
+  },
+  'FOREST': {
+    label: 'FOREST', bpm: 150, scale: 'harmonicMinor', /* darker scale bias */
+    presets: { kick: 'PS-KICK-DEEP', snare: 'PS-GLITCH', hat: 'PS-HAT', perc: 'PS-PERC', bass: 'PS-BASS-AGGRO', lead: 'PS-LEAD-FMTEX', pad: 'PS-PAD-PSYCH', arp: 'PS-ARP-ACID', fx: 'FX-PS-RISE' },
+    /* longer builds, more BREAK weight (weights sum to 1) */
+    chain: [
+      { id: 'INTRO', w: 0.11, energy: [0.20, 0.35], color: 3 },
+      { id: 'BUILD', w: 0.15, energy: [0.35, 0.65], color: 4 },
+      { id: 'DROP', w: 0.18, energy: [0.85, 0.92], color: 0 },
+      { id: 'BREAK', w: 0.145, energy: [0.30, 0.45], color: 5 },
+      { id: 'RISER', w: 0.095, energy: [0.45, 0.80], color: 4 },
+      { id: 'DROP2', w: 0.17, energy: [0.90, 0.98], color: 0 },
+      { id: 'OUTRO', w: 0.15, energy: [0.45, 0.15], color: 6 },
+    ],
+    recipe: { hatGhostMul: 1.6, bassGrammar: 'forest', percMul: 1.15, energyVar: 0, riserEvery: 32, ops: { hatRot: 0.55, bassOct: 0.65 } },
+  },
+  'HI-TECH': {
+    label: 'HI-TECH', bpm: 155, scale: 'phrygian',
+    presets: { kick: 'PS-KICK-TIGHT', snare: 'PS-GLITCH', hat: 'PS-HAT', perc: 'PS-PERC', bass: 'PS-BASS-ROLL', lead: 'PS-LEAD-SQUELCH', pad: 'PS-PAD-PSYCH', arp: 'PS-ARP-ACID', fx: 'FX-PS-RISE' },
+    /* faster section turnover, aggressive riser placement */
+    chain: [
+      { id: 'INTRO', w: 0.09, energy: [0.25, 0.42], color: 3 },
+      { id: 'BUILD', w: 0.11, energy: [0.42, 0.72], color: 4 },
+      { id: 'DROP', w: 0.21, energy: [0.90, 0.96], color: 0 },
+      { id: 'BREAK', w: 0.115, energy: [0.35, 0.50], color: 5 },
+      { id: 'RISER', w: 0.115, energy: [0.52, 0.88], color: 4 },
+      { id: 'DROP2', w: 0.215, energy: [0.95, 1.00], color: 0 },
+      { id: 'OUTRO', w: 0.145, energy: [0.50, 0.20], color: 6 },
+    ],
+    recipe: { hatGhostMul: 1.3, bassGrammar: 'roll', percMul: 1.8, percOdd: true, energyVar: 0.10, riserEvery: 16, ops: { hatRot: 0.5, bassOct: 0.55 } },
   },
 };
 
@@ -75,8 +119,9 @@ const put = (pat, track, step, vel, note, micro) => {
 };
 
 /* allocate bars: weights → multiples of 4 (min 4), remainder to the longest */
-function allocateBars(totalBars) {
-  const bars = SECTION_CHAIN.map(s => Math.max(4, Math.round((totalBars * s.w) / 4) * 4));
+function allocateBars(totalBars, ws) {
+  const W = ws || SECTION_CHAIN.map(s => s.w);
+  const bars = SECTION_CHAIN.map((s, i) => Math.max(4, Math.round((totalBars * W[i]) / 4) * 4));
   let sum = bars.reduce((a, b) => a + b, 0);
   let guard = 0;
   while (sum !== totalBars && guard++ < 1000) {
@@ -116,6 +161,7 @@ const sectionMotif = (seed, sectionId, base) => {
 function fillSection(p, pat, section, bars, energy, ctx) {
   const len = Math.min(bars, 8) * 16;
   const { style, rng, motif, scaleIv, root } = ctx;
+  const rc = style.recipe || {}; /* v0.7.0 style recipe — defaults = v0.6.0 constants */
   for (const t of Object.keys(pat.data)) {
     const d = pat.data[t];
     d.len = len;
@@ -135,24 +181,36 @@ function fillSection(p, pat, section, bars, energy, ctx) {
       if (full && energy > 0.92 && rng() < 0.3) put(pat, 0, base + 14, 0.55);
     }
   }
-  /* BASS — psy rolling on drops (odd 16ths, psy-push micro baked in), 8ths mid, sustained when calm */
+  /* BASS — psy rolling on drops (odd 16ths, psy-push micro baked in), 8ths mid,
+     sustained when calm. FOREST recipe: rolling 16th grammar with octave
+     wander on the drops (the forest rolling-bass variant). */
   if (sec === 'DROP' || sec === 'DROP2' || energy >= 0.8) {
-    for (let s = 1; s < len; s += 2) {
-      const push = (sec === 'DROP' || sec === 'DROP2') ? 19 + Math.round(rng() * 6) : null; /* psy-push: +6..8 ticks */
-      put(pat, 4, s, 0.82 + rng() * 0.1, notes.bass, push);
+    if (rc.bassGrammar === 'forest') {
+      for (let s = 0; s < len; s++) {
+        if (rng() < 0.14) continue; /* breaths keep it rolling, not static */
+        const push = 19 + Math.round(rng() * 6);
+        put(pat, 4, s, 0.78 + rng() * 0.14, rng() < 0.22 ? notes.bass + 12 : notes.bass, push);
+      }
+    } else {
+      for (let s = 1; s < len; s += 2) {
+        const push = (sec === 'DROP' || sec === 'DROP2') ? 19 + Math.round(rng() * 6) : null; /* psy-push: +6..8 ticks */
+        put(pat, 4, s, 0.82 + rng() * 0.1, notes.bass, push);
+      }
     }
   } else if (energy >= 0.55) {
     for (let s = 0; s < len; s += 2) if (rng() < 0.8) put(pat, 4, s, 0.7 + rng() * 0.1, notes.bass)
   } else {
     for (let b = 0; b < len / 16; b++) { put(pat, 4, b * 16, 0.8, notes.bass); put(pat, 4, b * 16 + 8, 0.75, notes.bass) }
   }
-  /* HATS — offbeat core, 16th ghosts as energy rises */
+  /* HATS — offbeat core, 16th ghosts as energy rises (density per recipe) */
   if (energy >= 0.35) {
     for (let b = 0; b < len / 16; b++) for (const o of [2, 6, 10, 14]) put(pat, 2, b * 16 + o, 0.45 + energy * 0.2)
-    if (energy >= 0.75) for (let s = 0; s < len; s++) if (s % 2 === 0 && rng() < 0.3) put(pat, 2, s, 0.25 + rng() * 0.15)
+    if (energy >= 0.75) for (let s = 0; s < len; s++) if (s % 2 === 0 && rng() < 0.3 * (rc.hatGhostMul || 1)) put(pat, 2, s, 0.25 + rng() * 0.15)
   }
-  /* PERC — seeded sparse density scaled by energy */
-  for (let s = 0; s < len; s += 2) if (rng() < 0.06 + energy * 0.12) put(pat, 3, s, 0.3 + rng() * 0.4)
+  /* PERC — seeded sparse density scaled by energy (recipe multiplier +
+     optional odd-16th glitch layer) */
+  for (let s = 0; s < len; s += 2) if (rng() < (0.06 + energy * 0.12) * (rc.percMul || 1)) put(pat, 3, s, 0.3 + rng() * 0.4)
+  if (rc.percOdd) { for (let s = 1; s < len; s += 2) if (rng() < (0.03 + energy * 0.07) * (rc.percMul || 1)) put(pat, 3, s, 0.22 + rng() * 0.3) }
   /* SNARE — backbeat on full sections, half-time on BREAK */
   if (sec === 'BREAK') { for (let b = 0; b < len / 16; b++) { put(pat, 1, b * 16 + 4, 0.6); put(pat, 1, b * 16 + 12, 0.65) } }
   else if (energy >= 0.8) { for (let b = 0; b < len / 16; b++) { put(pat, 1, b * 16 + 4, 0.55); put(pat, 1, b * 16 + 12, 0.6) } }
@@ -180,8 +238,9 @@ function fillSection(p, pat, section, bars, energy, ctx) {
     const seq = [0, 2, 4, 6, 4, 2];
     for (let s = 0; s < len; s++) { if (rng() < 0.85) put(pat, 7, s, 0.28 + rng() * 0.12, root + 24 + degreeToSemitone(scaleIv, seq[s % seq.length])) }
   }
-  /* FX — riser sweeps through the RISER section, one per 2 bars */
-  if (sec === 'RISER') { for (let s = 0; s < len; s += 32) put(pat, 8, s, 0.8) }
+  /* FX — riser sweeps through the RISER section, spacing per recipe
+     (default one per 2 bars; HI-TECH one per bar — aggressive placement) */
+  if (sec === 'RISER') { for (let s = 0; s < len; s += (rc.riserEvery || 32)) put(pat, 8, s, 0.8) }
   /* FILL — snare roll ending BUILD and RISER (last bar, rising velocity) */
   if (sec === 'BUILD' || sec === 'RISER') {
     const fb = len - 16;
@@ -237,6 +296,8 @@ function deriveVariant(basePat, sec, k, ctx) {
   pat.name = basePat.name + 'v' + (k + 1);
   const rng = rngFor(ctx.seedInt, 'variant:' + sec.id + ':' + k);
   const energy = sec.energyMid;
+  const rc = (ctx.style && ctx.style.recipe) || {}; /* per-style op weights */
+  const ops = rc.ops || {};
   /* KICK (track 0) — SACRED: positions/note/micro/prob untouched; velocity
      accents only, hard-bounded at KICK_VEL_MAX_DELTA (±0.07 actual). */
   const dk = pat.data[0];
@@ -250,13 +311,13 @@ function deriveVariant(basePat, sec, k, ctx) {
   const dh = pat.data[2];
   if (dh) {
     for (let b = 0; b < dh.len / 16; b++) {
-      if (rng() < 0.45) for (const o of [2, 6, 10, 14]) {
+      if (rng() < (ops.hatRot != null ? ops.hatRot : 0.45)) for (const o of [2, 6, 10, 14]) {
         const src = dh.steps[b * 16 + o], dst = dh.steps[b * 16 + o + 1];
         if (src.on && !dst.on) { dst.on = 1; dst.vel = Math.min(1, Math.max(0.05, src.vel * (0.9 + rng() * 0.2))); dst.prob = 1; src.on = 0 }
         else if (src.on && dst.on) dst.vel = Math.min(1, dst.vel + 0.1);
       }
     }
-    if (energy >= 0.75) { for (let s = 0; s < dh.len; s++) if (s % 2 === 0 && rng() < 0.3) put(pat, 2, s, 0.25 + rng() * 0.15) }
+    if (energy >= 0.75) { for (let s = 0; s < dh.len; s++) if (s % 2 === 0 && rng() < 0.3 * (rc.hatGhostMul || 1)) put(pat, 2, s, 0.25 + rng() * 0.15) }
     else if (!dh.steps.some(st => st.on)) { for (let b = 0; b < dh.len / 16; b++) for (const o of [2, 6, 10, 14]) if (rng() < 0.7) put(pat, 2, b * 16 + o, 0.3 + rng() * 0.12) }
   }
   /* BASS (track 4) — octave shifts (±12) on off-phrase (odd) steps, velocity
@@ -265,7 +326,7 @@ function deriveVariant(basePat, sec, k, ctx) {
   if (db) for (let i = 0; i < db.len; i++) {
     const st = db.steps[i];
     if (!st.on) continue;
-    if (i % 2 === 1 && rng() < 0.6) st.note = Math.min(108, Math.max(12, st.note + (rng() < 0.85 ? 12 : -12)));
+    if (i % 2 === 1 && rng() < (ops.bassOct != null ? ops.bassOct : 0.6)) st.note = Math.min(108, Math.max(12, st.note + (rng() < 0.85 ? 12 : -12)));
     st.vel = Math.min(1, Math.max(0.05, st.vel + (rng() - 0.5) * 0.24));
     if (st.micro) st.micro = Math.max(-100, Math.min(100, st.micro + Math.round((rng() - 0.5) * 12)));
   }
@@ -294,7 +355,7 @@ function deriveVariant(basePat, sec, k, ctx) {
   }
   /* PERC (track 3) — repositioning: re-seeded sparse density (same recipe). */
   const dp = pat.data[3];
-  if (dp) { dp.steps = Array.from({ length: dp.len }, () => mkStep(false)); for (let s = 0; s < dp.len; s += 2) if (rng() < 0.06 + energy * 0.12) put(pat, 3, s, 0.3 + rng() * 0.4) }
+  if (dp) { dp.steps = Array.from({ length: dp.len }, () => mkStep(false)); for (let s = 0; s < dp.len; s += 2) if (rng() < (0.06 + energy * 0.12) * (rc.percMul || 1)) put(pat, 3, s, 0.3 + rng() * 0.4); if (rc.percOdd) { for (let s = 1; s < dp.len; s += 2) if (rng() < (0.03 + energy * 0.07) * (rc.percMul || 1)) put(pat, 3, s, 0.22 + rng() * 0.3) } }
   /* PAD (track 6) — second-voicing interval swap where a pad exists. */
   const dd = pat.data[6];
   if (dd) {
@@ -325,11 +386,17 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   const seedInt = (typeof seed === 'number' ? seed : parseInt(fnvish(String(seed)), 16) >>> 0) | 0;
   const label = seedLabel || String(seed);
 
-  /* 1. form: bars + energies */
+  /* 1. form: bars + energies (per-style chain; energyVar jitters HI-TECH) */
+  const rc = style.recipe || {};
+  const chain = style.chain || SECTION_CHAIN;
   const rawTotal = (targetMinutes * bpm) / 4;           /* 1 bar = 4 beats */
   const totalBars = Math.max(28, Math.round(rawTotal / 4) * 4); /* multiple of 4 */
-  const bars = allocateBars(totalBars);
-  const sections = SECTION_CHAIN.map((s, i) => ({ ...s, bars: bars[i], energyMid: arcAt(s.energy, Math.floor(bars[i] / 2), bars[i]) }));
+  const bars = allocateBars(totalBars, chain.map(s => s.w));
+  const sections = chain.map((s, i) => {
+    let e = arcAt(s.energy, Math.floor(bars[i] / 2), bars[i]);
+    if (rc.energyVar) { const j = rngFor(seedInt, 'evar:' + s.id)(); e = Math.min(1, Math.max(0.05, e + (j - 0.5) * rc.energyVar)) }
+    return { ...s, bars: bars[i], energyMid: e };
+  });
 
   /* 2. project shell */
   const p = {
@@ -378,7 +445,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
      arranger gets n−1 derived variant scenes; the arranger is rewritten so
      occurrence j of a family plays the base (j=0) then " 2", " 3", … Bars
      per step, the form and the total length are unchanged. */
-  const vctx = { seedInt, scaleIv, root: p.root, sectionMotifs: secMotifs };
+  const vctx = { seedInt, scaleIv, root: p.root, sectionMotifs: secMotifs, style };
   const usage = new Map();
   for (const st of arrSteps) usage.set(st.scene, (usage.get(st.scene) || 0) + 1);
   const occSeen = new Map();       /* scene → occurrences already assigned */

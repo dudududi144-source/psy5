@@ -19,6 +19,7 @@ const SCALES={
   major: FOUNDATION_SCALES.major,
   dorian: FOUNDATION_SCALES.dorian,
   phrygian: FOUNDATION_SCALES.phrygian,
+  harmonicMinor: FOUNDATION_SCALES.harmonicMinor, /* v0.7.0 FOREST — darker bias */
 };
 const M_ENERGY=0,M_DRIVE=1,M_SPACE=2,M_MOVE=3;
 function gcd(a,b){while(b){const t=a%b;a=b;b=t}return a}

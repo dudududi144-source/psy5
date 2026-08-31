@@ -4,7 +4,7 @@ import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack, addTrackToProject } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval } from '../model.js';
 import { recordPoint, quantStep, applyLanes } from '../autorec.js';
-import { compose, minVariantDiff, VARIANT_DIFF_MIN } from '../composer.js';
+import { compose, minVariantDiff, VARIANT_DIFF_MIN, COMPOSER_STYLES } from '../composer.js';
 import { paramApply } from '../params.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
 import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, evHash } from '../bounce.js';
@@ -353,14 +353,31 @@ for(const sec of c23.form.sections){
   rmsBySection.push(+(Math.sqrt(s/d.length)).toFixed(4));
 }
 const dropRms=rmsBySection[2];
+/* v0.7.0 style coverage: every style's base sections bounce offline non-silent
+   (G23-style structure × the full style dict) */
+const styleRms={};
+let stylesRmsOk=true;
+for(const sid of Object.keys(COMPOSER_STYLES)){
+  if(sid==='FULL-ON')continue;
+  const cs=compose(sid,3,424242),ps=cs.project;const rr=[];
+  for(const sec of cs.form.sections){
+    ps.currentPattern=sec.pattern;
+    const b=await renderBounce(ps,1);
+    const d=b.buf.getChannelData(0);let s=0;for(let i=0;i<d.length;i++)s+=d[i]*d[i];
+    rr.push(+(Math.sqrt(s/d.length)).toFixed(4));
+  }
+  styleRms[sid]=rr;
+  if(!rr.every(r=>r>0.03))stylesRmsOk=false;
+}
+const allRmsOk=rmsBySection.every(r=>r>0.03)&&stylesRmsOk;
 /* variant extension: group scenes into families, min pairwise diff per family */
 const fam23=new Map();
 for(const sc of p23.scenes){const base=sc.name.replace(/ \d+$/,'');if(!fam23.has(base))fam23.set(base,[]);fam23.get(base).push(p23.patterns[sc.pattern])}
 let vmin23=1,varFams23=0;
 for(const[,pats]of fam23){if(pats.length<2)continue;varFams23++;const m=minVariantDiff(pats);if(m<vmin23)vmin23=m}
 const varOk=varFams23>=7&&vmin23>=VARIANT_DIFF_MIN&&p23.arranger.steps.length===new Set(p23.arranger.steps.map(s=>s.scene)).size;
-const ok23=secOk&&lenOk&&detOk&&dropRms>0.03&&rmsBySection.every(r=>r>0.03)&&varOk;
-gate('G23','composer: 7-section form scaled to target (±5%), byte-identical regenerate, every section bounces non-silent (DROP RMS > 0.03), variants: '+varFams23+' families all pairwise ≥ '+VARIANT_DIFF_MIN+' incl. base, zero repeated scenes',ok23,'sections='+c23.form.sections.map(s=>s.id+':'+s.bars).join('/')+' len='+c23.form.lengthSec+'s rms=['+rmsBySection.join(',')+'] det='+detOk+' variants='+c23.stats.variants+' vmin='+vmin23.toFixed(3)+' norepeat='+(new Set(p23.arranger.steps.map(s=>s.scene)).size===p23.arranger.steps.length))}catch(e){gate('G23','composer',false,'ERR '+e.message)}
+const ok23=secOk&&lenOk&&detOk&&dropRms>0.03&&allRmsOk&&varOk;
+gate('G23','composer: 7-section form scaled to target (±5%), byte-identical regenerate, EVERY style bounces non-silent (DROP RMS > 0.03), variants: '+varFams23+' families all pairwise ≥ '+VARIANT_DIFF_MIN+' incl. base, zero repeated scenes',ok23,'sections='+c23.form.sections.map(s=>s.id+':'+s.bars).join('/')+' len='+c23.form.lengthSec+'s rms=['+rmsBySection.join(',')+'] det='+detOk+' variants='+c23.stats.variants+' vmin='+vmin23.toFixed(3)+' norepeat='+(new Set(p23.arranger.steps.map(s=>s.scene)).size===p23.arranger.steps.length)+' styles5=rmsOk:'+stylesRmsOk+' min='+Math.min.apply(null,[].concat(Object.keys(styleRms).map(k=>Math.min.apply(null,styleRms[k])))).toFixed(3))}catch(e){gate('G23','composer',false,'ERR '+e.message)}
 /* G24 — song render (offline — CI-asserted): compose FULL-ON 3min seed 424242 →
    renderSong renders the WHOLE arranger through the LIVE machinery
    (scene-launch phase rule sc.step%newLoop, per-bar seeded groove, per-scene

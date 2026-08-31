@@ -44,7 +44,8 @@ try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$(
 /* DEMOS: recipes recompose deterministically client-side; loads into memory only */
 async function loadDemo(file){try{const doc=await (await fetch(file)).json();const {compose}=await import('./composer.js');const r=compose(doc.style,doc.minutes,doc.seed);I.pendingCompose=r.project;I.composedLoad=r.form;const sb=document.querySelector('#stylePicker button');if(sb)sb.click()}catch(e){toast('DEMO FAILED — '+e.message)}}
 $('bDemoFull').onclick=()=>loadDemo('data/demos/demo-fullon.json');
-$('bDemoDark').onclick=()=>loadDemo('data/demos/demo-darkpsy.json');wireCompose();/* power-screen COMPOSE row must be live before boot */
+$('bDemoDark').onclick=()=>loadDemo('data/demos/demo-darkpsy.json');
+$('bDemoForest').onclick=()=>loadDemo('data/demos/demo-forest.json');wireCompose();/* power-screen COMPOSE row must be live before boot */
 /* help overlay from the shortcut registry (single source of truth) */
 (function(){const hb=$('helpBody');if(!hb)return;hb.innerHTML=helpRows().map(g=>'<div style="margin:6px 0"><div class="mono" style="font-size:9px;color:var(--acc2)">'+g.group.toUpperCase()+'</div>'+g.items.map(it=>'<div style="display:flex;gap:8px;font-size:11px;padding:1px 0"><span class="mono" style="min-width:70px;color:var(--acc)">'+it.key+'</span><span style="color:#fffa">'+it.label+'</span></div>').join('')+'</div>').join('');const b=$('bHelp');if(b)b.onclick=()=>window.__psy6ToggleHelp&&window.__psy6ToggleHelp()})();
 /* share-link consent (v0.4.0): #p= present → banner with LOAD SHARE / DISMISS.

@@ -12,7 +12,7 @@
 <div class="note mono" style="font-size:9px;color:var(--dim);letter-spacing:.12em">AUDIO ENGINE</div>
 <div class="styles" id="enginePicker"></div>
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;justify-content:center">
-<select id="compStyle" title="composer style"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option></select>
+<select id="compStyle" title="composer style"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option></select>
 <select id="compLen" title="target length"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option></select>
 <input id="compSeed" placeholder="seed" style="width:110px" title="seed — same seed = identical song">
 <button id="bCompose" title="generate a complete unique arrangement (intro→build→drop→break→riser→drop2→outro)">✦ COMPOSE</button>
@@ -21,6 +21,7 @@
 <span class="mono" style="font-size:9px;color:var(--dim)">DEMOS:</span>
 <button id="bDemoFull" title="Load the demo song: FULL-ON 3 min (composed, deterministic)">▶ FULL-ON 3MIN</button>
 <button id="bDemoDark" title="Load the demo song: DARK-PSY 5 min (composed, deterministic)">▶ DARK-PSY 5MIN</button>
+<button id="bDemoForest" title="Load the demo song: FOREST 3 min (composed, deterministic)">▶ FOREST 3MIN</button>
 </div>
 <div class="note" id="engNote" style="max-width:560px;text-align:center"></div>
 <button id="resumeBtn" style="display:none;border-color:var(--acc2);color:var(--acc2);padding:12px 20px">RESUME LAST SESSION</button>
@@ -91,7 +92,7 @@
 <div style="background:#171c25;border:1px solid #2c3442;border-radius:12px;padding:18px;min-width:300px;max-width:420px">
 <h3 style="margin:0 0 10px">✦ COMPOSE — complete arrangement</h3>
 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-<label style="font-size:10px;color:var(--dim)">STYLE <select id="cmpStyle"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option></select></label>
+<label style="font-size:10px;color:var(--dim)">STYLE <select id="cmpStyle"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option></select></label>
 <label style="font-size:10px;color:var(--dim)">LENGTH <select id="cmpLen"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option></select></label>
 <label style="font-size:10px;color:var(--dim)">SEED <input id="cmpSeed" placeholder="seed" style="width:100px"></label>
 </div>

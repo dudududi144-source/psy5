@@ -43,6 +43,7 @@ describe('demo songs', () => {
   const demos = [
     { file: 'data/demos/demo-fullon.json', style: 'FULL-ON', minutes: 3, seed: 424242 },
     { file: 'data/demos/demo-darkpsy.json', style: 'DARK-PSY', minutes: 5, seed: 777 },
+    { file: 'data/demos/demo-forest.json', style: 'FOREST', minutes: 3, seed: 424242 },
   ]
   test('demo files exist and are valid composer recipes', () => {
     for (const d of demos) {

@@ -308,3 +308,68 @@ describe('section variants (v0.7.0 — no identical repeats)', () => {
     expect((d.project as any).scenes.map((s: any) => s.name)).toEqual(p.scenes.map(s => s.name))
   })
 })
+
+describe('FOREST + HI-TECH styles (v0.7.0)', () => {
+  test('both styles are full recipes: chain (7 canonical ids, weights sum 1) + recipe dict', () => {
+    for (const styleId of ['FOREST', 'HI-TECH']) {
+      const st = COMPOSER_STYLES[styleId]
+      expect(st.chain!.length).toBe(7)
+      expect(st.chain!.map(s => s.id)).toEqual(SECTION_CHAIN.map(s => s.id))
+      expect(st.chain!.reduce((a, s) => a + s.w, 0)).toBeCloseTo(1, 9)
+      expect(st.recipe).toBeTruthy()
+      expect(st.recipe!.hatGhostMul).toBeGreaterThan(1)     /* denser hats */
+      expect(st.recipe!.ops).toBeTruthy()                   /* variant op weights */
+    }
+    expect(COMPOSER_STYLES['FOREST']!.recipe!.bassGrammar).toBe('forest')
+    expect(COMPOSER_STYLES['HI-TECH']!.recipe!.percOdd).toBe(true)
+    expect(COMPOSER_STYLES['HI-TECH']!.recipe!.riserEvery).toBe(16) /* aggressive riser */
+    expect(COMPOSER_STYLES['FULL-ON']!.recipe).toBeUndefined()      /* legacy = defaults */
+  })
+  test('length ±5% + bpm + form sums (3/5/8 min, both styles) — extends the structure suite', () => {
+    for (const styleId of ['FOREST', 'HI-TECH']) {
+      for (const minutes of [3, 5, 8]) {
+        const r = compose(styleId, minutes, SEED)
+        expect(r.form.bpm).toBe(COMPOSER_STYLES[styleId]!.bpm)
+        expect(Math.abs(r.form.lengthSec - minutes * 60) / (minutes * 60)).toBeLessThanOrEqual(0.05)
+        const sum = r.form.sections.reduce((a, s) => a + s.bars, 0)
+        expect(sum).toBe(r.form.totalBars)
+        for (const s of r.form.sections) { expect(s.bars).toBeGreaterThanOrEqual(4); expect(s.bars % 4).toBe(0) }
+      }
+    }
+  })
+  test('uniqueness (20 seeds per new style, project-wide JSON)', () => {
+    for (const styleId of ['FOREST', 'HI-TECH']) {
+      const seeds = Array.from({ length: 20 }, (_, i) => 1000 + i * 77)
+      const jsons = seeds.map(s => JSON.stringify(compose(styleId, 3, s).project))
+      for (let i = 0; i < 20; i++) for (let j = i + 1; j < 20; j++) expect(jsons[i]).not.toBe(jsons[j])
+    }
+  })
+  test('recipe fields are audible: FOREST bass rolls 16ths incl. even steps; HI-TECH perc denser', () => {
+    const forest = compose('FOREST', 3, SEED).project
+    const fullon = compose('FULL-ON', 3, SEED).project
+    const fDrop = forest.patterns['C3']!.data[4]  /* FOREST DROP bass */
+    const oDrop = fullon.patterns['C3']!.data[4]  /* FULL-ON DROP bass (odd 16ths only) */
+    const fEven = fDrop.steps.filter((s, i) => s.on && i % 2 === 0).length
+    expect(fEven).toBeGreaterThan(20)             /* forest grammar: full 16th roll */
+    const hTech = compose('HI-TECH', 3, SEED).project
+    const dark = compose('DARK-PSY', 3, SEED).project
+    const hPerc = hTech.patterns['C3']!.data[3]!.steps.filter(s => s.on).length
+    const dPerc = dark.patterns['C3']!.data[3]!.steps.filter(s => s.on).length
+    expect(hPerc).toBeGreaterThan(dPerc)          /* glitch density recipe audible */
+  })
+  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical to the v0.7.0 Phase-1 hashes', () => {
+    /* any intentional change to the legacy recipes (or to shared code paths
+       they consume) must consciously update these pins — documented contract */
+    const pins: Record<string, string[]> = {
+      'FULL-ON': ['e16c966e39f27f75', 'd959b7708157241d', 'c86651f7c69d6266'],
+      'DARK-PSY': ['5ca267f00ff6cd76', '6b85b900952907ef', '00cd194ee3ee5cb8'],
+      'PROGRESSIVE': ['306fa510cd5964a2', '92f34a5367613528', '08396986a9be79ed'],
+    }
+    for (const [styleId, hashes] of Object.entries(pins)) {
+      ;[3, 5, 8].forEach((minutes, i) => {
+        const h = createHash('sha256').update(JSON.stringify(compose(styleId, minutes, SEED).project)).digest('hex').slice(0, 16)
+        expect(h).toBe(hashes[i])
+      })
+    }
+  })
+})
