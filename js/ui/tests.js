@@ -4,6 +4,7 @@ import { PooledEngine } from '../engine.js';
 import { buildStyle, libFind, assignPresetToTrack, addTrackToProject } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval } from '../model.js';
 import { recordPoint, quantStep, applyLanes } from '../autorec.js';
+import { compose } from '../composer.js';
 import { paramApply } from '../params.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
 import { renderBounce, bounceSchedule } from '../bounce.js';
@@ -284,7 +285,29 @@ const cutoffBefore=p22b.tracks[5].sound.cutoff;
 applyLanes(p22b,8);
 const lockSkip=p22b.tracks[5].sound.cutoff===cutoffBefore;
 const ok22=ptsOk&&replaceOk&&nonTrivial&&qOk&&maxErr<=1e-9&&interpOk&&lockSkip;
-gate('G22','automation: scripted record session writes exact quantized points (replace on duplicate), offline apply matches laneEval within 1e-9, lock lanes never touch state',ok22,'pts='+lane22.pts.length+' exact='+ptsOk+' replace='+replaceOk+' qOk='+qOk+' maxErr='+maxErr+' interp='+interpWant.toFixed(3)+' lockSkip='+lockSkip)}catch(e){gate('G22','automation',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G22','automation: scripted record session writes exact quantized points (replace on duplicate), offline apply matches laneEval within 1e-9, lock lanes never touch state',ok22,'pts='+lane22.pts.length+' exact='+ptsOk+' replace='+replaceOk+' qOk='+qOk+' maxErr='+maxErr+' interp='+interpWant.toFixed(3)+' lockSkip='+lockSkip)}catch(e){gate('G22','automation',false,'ERR '+e.message)}
+/* G23 — composer (offline — CI-asserted): FULL-ON 3-minute composition from
+   a fixed seed → 7-section form, bars sum to target, length within ±5%;
+   regenerate determinism (identical fingerprint); EVERY section bounces
+   offline non-silent with DROP RMS > 0.03. */
+try{
+const c23=compose('FULL-ON',3,424242);
+const p23=c23.project;
+const sum23=c23.form.sections.reduce((a,s)=>a+s.bars,0);
+const secOk=c23.form.sections.length===7&&c23.form.sections.every(s=>s.bars>=4&&s.bars%4===0)&&sum23===c23.form.totalBars;
+const lenOk=Math.abs(c23.form.lengthSec-180)/180<=0.05;
+const c23b=compose('FULL-ON',3,424242);
+const detOk=c23.stats.fingerprint===c23b.stats.fingerprint&&JSON.stringify(c23b.project)===JSON.stringify(p23);
+const rmsBySection=[];
+for(const sec of c23.form.sections){
+  p23.currentPattern=sec.pattern;
+  const b=await renderBounce(p23,1);
+  const d=b.buf.getChannelData(0);let s=0;for(let i=0;i<d.length;i++)s+=d[i]*d[i];
+  rmsBySection.push(+(Math.sqrt(s/d.length)).toFixed(4));
+}
+const dropRms=rmsBySection[2];
+const ok23=secOk&&lenOk&&detOk&&dropRms>0.03&&rmsBySection.every(r=>r>0.03);
+gate('G23','composer: 7-section form scaled to target (±5%), byte-identical regenerate, every section bounces non-silent (DROP RMS > 0.03)',ok23,'sections='+c23.form.sections.map(s=>s.id+':'+s.bars).join('/')+' len='+c23.form.lengthSec+'s rms=['+rmsBySection.join(',')+'] det='+detOk)}catch(e){gate('G23','composer',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).

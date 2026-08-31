@@ -1,0 +1,65 @@
+/* ============ COMPOSER UI (v0.5.0) — power-screen row + header modal ============
+   The composer itself is pure (js/composer.js). This module only:
+   - collects style/length/seed,
+   - protects non-empty projects (explicit confirm listing what is replaced),
+   - loads the composed project into memory (keep = load; cancel = discard),
+   - lands the user on the Perform tab with the arranger active.
+   The seed field's INITIAL value uses Date.now (UI convenience only — the
+   composition path itself is fully deterministic on the field's value). */
+import { $, I, toast, loadProjectObj } from '../state.js';
+import { compose, COMPOSER_STYLES } from '../composer.js';
+import { arrToggle } from '../arranger.js';
+
+function hasNotes(p) {
+  if (!p) return false;
+  return Object.values(p.patterns || {}).some(pat => Object.values(pat.data || {}).some(d => (d.steps || []).some(s => s.on)));
+}
+function readForm(styleSel, lenSel, seedInp) {
+  const styleId = styleSel.value;
+  const minutes = +lenSel.value;
+  const seedRaw = (seedInp.value || '').trim();
+  const seed = seedRaw === '' ? (Date.now() % 1000000) : (isNaN(+seedRaw) ? seedRaw : +seedRaw);
+  return { styleId, minutes, seed };
+}
+function landOnPerform(form) {
+  const btn = Array.from(document.querySelectorAll('nav button')).find(x => x.dataset.t === 'perform');
+  if (btn) btn.click();
+  try { arrToggle(true) } catch (e) { /* already on */ }
+  if (!I.sched.on) { const bp = $('bPlay'); if (bp) bp.click() }
+  toast('COMPOSED ✓ ' + form.style + ' · ' + form.totalBars + ' bars · ' + form.lengthSec.toFixed(0) + 's · seed ' + form.seed);
+}
+function updateInfo() {
+  const el = $('cmpInfo'); if (!el) return;
+  const styleId = $('cmpStyle').value;
+  const minutes = +$('cmpLen').value;
+  const bpm = (COMPOSER_STYLES[styleId] || {}).bpm || '?';
+  el.textContent = styleId + ' · ' + bpm + ' BPM · ~' + minutes + ' min · seed editable — same seed = identical song';
+}
+export function wireCompose() {
+  /* ── power-screen row: compose BEFORE boot (goes through powerOn) ── */
+  const pb = $('bCompose');
+  if (pb) pb.onclick = () => {
+    const { styleId, minutes, seed } = readForm($('compStyle'), $('compLen'), $('compSeed'));
+    const r = compose(styleId, minutes, seed);
+    I.pendingCompose = r.project;
+    I.composedLoad = r.form;
+    const styleBtn = document.querySelector('#stylePicker button'); /* any style boots; powerOn prefers pendingCompose */
+    if (styleBtn) styleBtn.click();
+  };
+  /* ── header modal: compose while running ── */
+  const hb = $('bComposeHdr');
+  if (hb) hb.onclick = () => { const m = $('composeModal'); if (m) { m.style.display = 'flex'; updateInfo() } };
+  const cancel = $('cmpCancel');
+  if (cancel) cancel.onclick = () => { const m = $('composeModal'); if (m) m.style.display = 'none' };
+  const go = $('cmpGo');
+  if (go) go.onclick = () => {
+    const { styleId, minutes, seed } = readForm($('cmpStyle'), $('cmpLen'), $('cmpSeed'));
+    if (hasNotes(I.p) && !confirm('COMPOSE replaces the current in-memory project:\n• all scenes, patterns and lanes\n• the arranger chain\n• project bpm/scale/root\nYour current project is NOT saved. Continue?')) return;
+    const r = compose(styleId, minutes, seed);
+    const m = $('composeModal'); if (m) m.style.display = 'none';
+    loadProjectObj(r.project);
+    I.renderDirty = true;
+    landOnPerform(r.form);
+  };
+  for (const id of ['cmpStyle', 'cmpLen', 'cmpSeed']) { const el = $(id); if (el) el.onchange = updateInfo }
+}

@@ -11,6 +11,12 @@
 <div class="styles" id="stylePicker"></div>
 <div class="note mono" style="font-size:9px;color:var(--dim);letter-spacing:.12em">AUDIO ENGINE</div>
 <div class="styles" id="enginePicker"></div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;justify-content:center">
+<select id="compStyle" title="composer style"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option></select>
+<select id="compLen" title="target length"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option></select>
+<input id="compSeed" placeholder="seed" style="width:110px" title="seed — same seed = identical song">
+<button id="bCompose" title="generate a complete unique arrangement (intro→build→drop→break→riser→drop2→outro)">✦ COMPOSE</button>
+</div>
 <div class="note" id="engNote" style="max-width:560px;text-align:center"></div>
 <button id="resumeBtn" style="display:none;border-color:var(--acc2);color:var(--acc2);padding:12px 20px">RESUME LAST SESSION</button>
 </div>
@@ -26,7 +32,7 @@
 <div style="width:84px"><label>Seed</label><input id="seedIn" type="text" style="width:78px" title="Project seed — same seed + bar = identical events every loop"></div>
 </div>
 <div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><span class="chip" id="copChip" title="CO-PILOT — consent-driven suggestions">✦ CO-PILOT</span><canvas id="meter" width="90" height="26"></canvas></div>
-<div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bShare" title="Copy a share link: project → canonical JSON → deflate-raw → base64url → #p= — loads only with explicit consent">SHARE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><button id="bBounce" title="Offline-render the current pattern loop ×N to a 16-bit WAV">BOUNCE</button><input type="file" id="impF" accept=".json" style="display:none"></div>
+<div class="tg"><button id="bUndo">⟲</button><button id="bRedo">⟳</button><button id="bSave">SAVE</button><button id="bShare" title="Copy a share link: project → canonical JSON → deflate-raw → base64url → #p= — loads only with explicit consent">SHARE</button><button id="bExport">EXPORT</button><button id="bImport">IMPORT</button><button id="bBounce" title="Offline-render the current pattern loop ×N to a 16-bit WAV">BOUNCE</button><button id="bComposeHdr" title="Compose a complete unique song (intro→build→drop→break→riser→drop2→outro)">COMPOSE</button><input type="file" id="impF" accept=".json" style="display:none"></div>
 </header>
 <nav>
 <button data-t="perform" class="on">Perform</button><button data-t="seq">Sequencer</button>
@@ -76,6 +82,19 @@
 <table id="gateTab" style="margin-top:8px;display:none"><thead><tr><th>ID</th><th>Claim</th><th>Result</th><th>Evidence</th></tr></thead><tbody></tbody></table>
 </div></section>
 </main></div><div id="bounceModal" style="display:none;position:fixed;inset:0;background:#000d;z-index:150;align-items:center;justify-content:center"><div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:300px;max-width:420px;text-align:center"><h3 style="margin:0 0 8px">BOUNCE — offline WAV</h3><div class="note" style="margin-bottom:10px">Renders the current pattern loop ×N through a fresh offline engine graph. The live engine keeps running — the bounce never touches it. 16-bit PCM stereo, 44.1 kHz.</div><div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:12px;flex-wrap:wrap"><label class="mono" style="font-size:10px">MODE <select id="bounceMode"><option value="mix" selected>MIX</option><option value="stems" title="One WAV per non-empty track — same deterministic offline graph">STEMS</option></select></label><label class="mono" style="font-size:10px">LOOPS <select id="bounceLoops"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option><option value="8">8</option></select></label><span class="mono" id="bounceInfo" style="font-size:9px;color:var(--dim)"></span></div><div style="display:flex;gap:8px;justify-content:center"><button id="bounceGo">RENDER WAV</button><button id="bounceCancel">CLOSE</button></div></div></div><div id="toast"></div>
+<div id="composeModal" style="display:none;position:fixed;inset:0;background:#000c;align-items:center;justify-content:center;z-index:50">
+<div style="background:#171c25;border:1px solid #2c3442;border-radius:12px;padding:18px;min-width:300px;max-width:420px">
+<h3 style="margin:0 0 10px">✦ COMPOSE — complete arrangement</h3>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<label style="font-size:10px;color:var(--dim)">STYLE <select id="cmpStyle"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option></select></label>
+<label style="font-size:10px;color:var(--dim)">LENGTH <select id="cmpLen"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option></select></label>
+<label style="font-size:10px;color:var(--dim)">SEED <input id="cmpSeed" placeholder="seed" style="width:100px"></label>
+</div>
+<div class="note" id="cmpInfo" style="margin:8px 0"></div>
+<div class="note" style="margin:8px 0">Generates scenes INTRO→BUILD→DROP→BREAK→RISER→DROP2→OUTRO, patterns for all 9 tracks, the arranger chain and filter/send lanes. Deterministic: same seed = identical song.</div>
+<div style="display:flex;gap:8px;margin-top:6px"><button id="cmpGo">GENERATE</button><button id="cmpCancel">CANCEL</button></div>
+</div>
+</div>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

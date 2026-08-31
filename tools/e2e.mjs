@@ -43,7 +43,7 @@ const GATE_TIMEOUT = parseInt(opt('--timeout', '300000'), 10);
 
 const EXPECTED = [
   'G1-TECHNO', 'G1-PSYTRANCE', 'G1-TRANCE', 'G1-PROGRESSIVE',
-  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22',
+  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23',
 ];
 /* G17 (live capture) is REALTIME — it runs on-device but is explicitly NOT
    asserted in CI (documented subset boundary). G18/G19 are offline/pure and
