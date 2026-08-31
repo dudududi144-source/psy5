@@ -45,6 +45,10 @@ const EXPECTED = [
   'G1-TECHNO', 'G1-PSYTRANCE', 'G1-TRANCE', 'G1-PROGRESSIVE',
   'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16',
 ];
+/* G17 (live capture) is REALTIME — it runs on-device but is explicitly NOT
+   asserted in CI (documented subset boundary). G18/G19 are offline/pure and
+   join EXPECTED when they land. */
+const EXCLUDED = new Set(['G17']);
 const PURE = new Set(['G2', 'G5', 'G6', 'G8', 'G10', 'G16']);
 
 /* ── 1. no-store static server on an ephemeral port ─────────────────────── */
@@ -226,7 +230,8 @@ async function main() {
 
     const byId = new Map(gates.map((g) => [g.id, g]));
     const missing = EXPECTED.filter((id) => !byId.has(id));
-    const failed = gates.filter((g) => g.pass !== true);
+    const failed = gates.filter((g) => g.pass !== true && !EXCLUDED.has(g.id));
+    const excludedInfo = gates.filter((g) => EXCLUDED.has(g.id)).map((g) => ({ id: g.id, pass: g.pass, ev: g.ev }));
     const ok = missing.length === 0 && failed.length === 0 && gates.length > 0;
 
     verdict = {
@@ -234,14 +239,15 @@ async function main() {
       subset: {
         asserted: EXPECTED.map((id) => ({ id, class: PURE.has(id) ? 'pure-computation' : 'offline-render' })),
         notRunInCI: [
+          { gates: 'G17 (live capture)', reason: 'realtime ScriptProcessor recording — runs on-device (reported as info), never asserted in CI' },
           { gates: 'G14w/G15w (WORKLET engine reduced set)', reason: 'worklet offline rendering is environment-sensitive in CI; exercised locally and from the live site at release' },
           { gates: 'live-scheduler loop checks', reason: 'realtime loop not asserted in CI' },
         ],
-        note: 'All MAIN-mode gates are pure computation or deterministic OfflineAudioContext renders (G9/G14/G15 included — no realtime dependency in MAIN mode); criteria are inequality/integer, not bit-exact.',
+        note: 'All asserted MAIN-mode gates are pure computation or deterministic OfflineAudioContext renders (G9/G14/G15 included — no realtime dependency in MAIN mode); criteria are inequality/integer, not bit-exact.',
       },
       boot,
       verdictLine,
-      summary: { total: gates.length, passed: gates.filter((g) => g.pass).length, failed: failed.length, missing },
+      summary: { total: EXPECTED.length, passed: EXPECTED.filter((id) => byId.get(id) && byId.get(id).pass).length, failed: failed.length, missing, excludedInfo },
       gates: gates.map((g) => ({ ...g, class: PURE.has(g.id) ? 'pure-computation' : 'offline-render' })),
     };
   } catch (e) {
@@ -260,7 +266,7 @@ async function main() {
     console.error('E2E GATES: RED');
     process.exit(1);
   }
-  console.error('E2E GATES: GREEN (' + verdict.summary.passed + '/' + verdict.summary.total + ')');
+  console.error('E2E GATES: GREEN (' + verdict.summary.passed + '/' + verdict.summary.total + ' asserted)');
 }
 
 main();

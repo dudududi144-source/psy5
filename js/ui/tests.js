@@ -8,6 +8,8 @@ import { renderBounce, bounceSchedule } from '../bounce.js';
 import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
+import { armCapture, captureStop, captureState, captureResult } from './capture.js';
+import { startSched } from '../scheduler.js';
 
 function logLine(cls,msg){const L=$('log');const s=document.createElement('span');s.className=cls;L.appendChild(s);s.textContent=msg+'\n';L.scrollTop=L.scrollHeight}
 const GATE_RES=[];
@@ -134,7 +136,32 @@ const sc16=p16.tracks[2].scAmount;
 const rt16=JSON.stringify(JSON.parse(JSON.stringify(p16.midiMap)))===JSON.stringify(p16.midiMap);
 const n0=notes16[0]||{};
 const ok16=notes16.length===1&&n0.t===4&&n0.note===60&&Math.abs(n0.vel-100/127)<1e-9&&offs16.length===2&&cc0kept&&!!learnBind16&&learnBind16.cc===45&&learnBind16.path==='track.2.scAmount'&&sc16===55&&panics16===1&&rt16;
-gate('G16','midi: note→selected track w/ exact velocity, learn binds cc→param, cc moves scAmount to exact value, cc0 ignored, cc123 panics, map round-trips',ok16,'note=60/vel='+(n0.vel!=null?Math.round(n0.vel*127):'?')+'@t'+n0.t+' offs='+offs16.length+' learn='+(learnBind16?learnBind16.cc+'→'+learnBind16.path:'none')+' sc='+sc16+' cc0kept='+cc0kept+' panic='+panics16+' rt='+rt16)}catch(e){gate('G16','midi input core',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G16','midi: note→selected track w/ exact velocity, learn binds cc→param, cc moves scAmount to exact value, cc0 ignored, cc123 panics, map round-trips',ok16,'note=60/vel='+(n0.vel!=null?Math.round(n0.vel*127):'?')+'@t'+n0.t+' offs='+offs16.length+' learn='+(learnBind16?learnBind16.cc+'→'+learnBind16.path:'none')+' sc='+sc16+' cc0kept='+cc0kept+' panic='+panics16+' rt='+rt16)}catch(e){gate('G16','midi input core',false,'ERR '+e.message)}
+/* G17 — live capture (REALTIME — local device only; CI asserts everything
+   EXCEPT this gate). Through the REAL scheduler + ScriptProcessor tap on the
+   master output: arm → recording starts on the next 16-step bar boundary →
+   one full bar → stop arms on the following boundary → encoded by the
+   EXISTING bounce WAV encoder. Assert: valid WAV header (RIFF/WAVE/PCM16/
+   stereo, data=frames×4), duration within ±50 ms of one bar, RMS > 0.001. */
+try{
+if(!I.eng||!I.ctx)throw new Error('no engine');
+if(!['PLAYING','RECORDING','TRANSITIONING'].includes(I.fsm)){I.fsm='PLAYING';startSched()}/* the gate needs the real transport — start it like power-on does */
+const barSec=16*60/I.p.bpm/4;
+const armR=armCapture();if(!armR.ok)throw new Error('arm failed');
+const dl17=Date.now()+barSec*1000+6000;
+while(captureState().state!=='capturing'&&Date.now()<dl17)await new Promise(r=>setTimeout(r,60));
+if(captureState().state!=='capturing')throw new Error('start boundary never hit');
+captureStop();
+const dl17b=Date.now()+barSec*1000+6000;
+while(captureState().state!=='idle'&&Date.now()<dl17b)await new Promise(r=>setTimeout(r,60));
+if(captureState().state!=='idle')throw new Error('stop boundary never hit');
+const res17=captureResult();if(!res17)throw new Error('no capture result');
+const v17=new DataView(res17.wav);
+const tag17=o=>String.fromCharCode(v17.getUint8(o),v17.getUint8(o+1),v17.getUint8(o+2),v17.getUint8(o+3));
+const dur17=res17.frames/res17.sampleRate;
+const hdr17=tag17(0)==='RIFF'&&tag17(8)==='WAVE'&&v17.getUint16(22,true)===2&&v17.getUint16(34,true)===16&&v17.getUint32(40,true)===res17.frames*4;
+const ok17=hdr17&&Math.abs(dur17-barSec)<=.05&&res17.rms>0.001;
+gate('G17','live capture: real tap, bar-quantized start/stop, bounce-encoder WAV, non-silent',ok17,'frames='+res17.frames+' dur='+dur17.toFixed(3)+'s bar='+barSec.toFixed(3)+'s skew='+((dur17-barSec)*1000).toFixed(0)+'ms rms='+res17.rms.toFixed(4)+' hdr='+hdr17)}catch(e){gate('G17','live capture (realtime)',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).

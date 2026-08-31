@@ -7,6 +7,7 @@ import { renderMixer } from './ui/mix.js';
 import { wireTests } from './ui/tests.js';
 import { wireCopilot } from './ui/copilot.js';
 import { wireMidi, renderMidi } from './ui/midiui.js';
+import { wireCapture } from './ui/capture.js';
 import { wireArranger } from './ui/arranger.js';
 import { startSched } from './scheduler.js';
 import { PooledEngine } from './engine.js';
@@ -25,7 +26,7 @@ async function powerOn(style,resume){const AC=window.AudioContext||window.webkit
 /* engine A/B (PSY6): MAIN pooled engine = default + reference · WORKLET = opt-in experimental */
 if(I.engineSel==='worklet'){try{I.eng=await mkWorkletEngine(ctx);I.engine='worklet'}catch(e){I.engine='main';I.eng=new PooledEngine(ctx);toast('WORKLET BOOT FAILED → MAIN ENGINE')}}else{I.engine='main';I.eng=new PooledEngine(ctx)}
 try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
-let p=null;if(resume)p=loadStored();if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;I.upAt=Date.now();I.eng.syncMix(p);$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireMidi();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
+let p=null;if(resume)p=loadStored();if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;I.upAt=Date.now();I.eng.syncMix(p);$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireMidi();wireCapture();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
 
 (function boot(){const sp=$('stylePicker');['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE'].forEach(st=>{const b=document.createElement('button');b.textContent='⚡ '+st;b.onclick=()=>powerOn(st,false);sp.appendChild(b)});const empty=document.createElement('button');empty.textContent='∅ EMPTY';empty.onclick=()=>powerOn('EMPTY',false);sp.appendChild(empty);
 /* engine selector — MAIN is the default (zero behavior change); WORKLET is opt-in */
