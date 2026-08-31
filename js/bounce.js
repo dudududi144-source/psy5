@@ -60,11 +60,17 @@ return {channels:ch,sampleRate:buf.sampleRate};
 }
 
 /* renderBounce — offline render of the current pattern × loops.
+ * opts.trackIdx (optional): render a STEM — only that track's events are
+ * triggered (the other tracks never spawn voices → their contribution is
+ * exactly 0), through the SAME deterministic graph and schedule. No opts →
+ * full-mix render, byte-identical behavior to v0.3.0 (same hash).
  * Returns {buf, N, scheduleHash} — N is the EXACT sample count the schedule
  * spans (buffer.length === N), scheduleHash identifies the event list. */
-export async function renderBounce(p,loops){
+export async function renderBounce(p,loops,opts){
+opts=opts||{};
 const sr=44100,t0=.05;
-const sch=bounceSchedule(p,loops,t0);
+let sch=bounceSchedule(p,loops,t0);
+if(opts.trackIdx!=null)sch=Object.assign({},sch,{evs:sch.evs.filter(e=>e.track===opts.trackIdx)});
 const N=Math.ceil(sch.total*sr);
 const oc=new OfflineAudioContext(2,N,sr);
 const eng=new PooledEngine(oc);
@@ -72,4 +78,12 @@ eng.syncMix(p);
 for(const e of sch.evs)eng.trigger(p.tracks[e.track],e.t,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sch.stepDur);
 const buf=await oc.startRendering();
 return {buf,N,scheduleHash:evHash(sch.evs),schedule:sch};
+}
+
+/* stemTracks — which tracks have notes in the current bounce schedule
+ * (current pattern × loops)? Only non-empty tracks get stem files. */
+export function stemTracks(p,loops){
+const sch=bounceSchedule(p,loops,.05);
+const seen=new Set();for(const e of sch.evs)seen.add(e.track);
+return {tracks:Array.from(seen).sort((a,b)=>a-b),schedule:sch};
 }

@@ -161,7 +161,38 @@ const tag17=o=>String.fromCharCode(v17.getUint8(o),v17.getUint8(o+1),v17.getUint
 const dur17=res17.frames/res17.sampleRate;
 const hdr17=tag17(0)==='RIFF'&&tag17(8)==='WAVE'&&v17.getUint16(22,true)===2&&v17.getUint16(34,true)===16&&v17.getUint32(40,true)===res17.frames*4;
 const ok17=hdr17&&Math.abs(dur17-barSec)<=.05&&res17.rms>0.001;
-gate('G17','live capture: real tap, bar-quantized start/stop, bounce-encoder WAV, non-silent',ok17,'frames='+res17.frames+' dur='+dur17.toFixed(3)+'s bar='+barSec.toFixed(3)+'s skew='+((dur17-barSec)*1000).toFixed(0)+'ms rms='+res17.rms.toFixed(4)+' hdr='+hdr17)}catch(e){gate('G17','live capture (realtime)',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
+gate('G17','live capture: real tap, bar-quantized start/stop, bounce-encoder WAV, non-silent',ok17,'frames='+res17.frames+' dur='+dur17.toFixed(3)+'s bar='+barSec.toFixed(3)+'s skew='+((dur17-barSec)*1000).toFixed(0)+'ms rms='+res17.rms.toFixed(4)+' hdr='+hdr17)}catch(e){gate('G17','live capture (realtime)',false,'ERR '+e.message)}
+/* G18 — per-track stems (offline — CI-asserted): a 2-track project with
+   NON-OVERLAPPING events (kick @ step 4, bass @ step 12) renders each track
+   through the SAME deterministic bounce graph with only that track's events.
+   Isolation semantics, stated honestly: a stem contains ONLY its own track —
+   regions where the track has NO voice at all are EXACTLY 0 (stem1's silence
+   spans the kick's whole timeframe → the kick contributes exactly 0 to the
+   bass stem); the residual after a track's own voice is its own exponential
+   decay tail (bounded ≤ 1e-3), physics not bleed. Assert: no-voice regions
+   exactly 0, own regions > 1e-3, identical span, deterministic schedules. */
+try{
+const p18=buildStyle('TECHNO',7);p18.bpm=128;
+const pat18=p18.patterns['A'];
+for(let t=0;t<8;t++){pat18.data[t].len=16;for(const s of pat18.data[t].steps)s.on=0}
+pat18.data[0].steps[4].on=1;pat18.data[0].steps[4].vel=.95;pat18.data[0].steps[4].note=48;
+pat18.data[4].steps[12].on=1;pat18.data[4].steps[12].vel=.9;pat18.data[4].steps[12].note=p18.root+24;
+/* clean-room isolation: no FX sends (a track's own delay/reverb tail is its own stem output, but here we want pure silence before each event) */
+p18.tracks[0].mix.sendA=0;p18.tracks[0].mix.sendB=0;
+p18.tracks[4].mix.sendA=0;p18.tracks[4].mix.sendB=0;
+p18.currentPattern='A';
+const sd18=60/p18.bpm/4,kT=.05+4*sd18,bT=.05+12*sd18;
+const s18a=await renderBounce(p18,1,{trackIdx:0});
+const s18b=await renderBounce(p18,1,{trackIdx:4});
+const dur18=s18a.N/44100-0.005;
+const rmsW=(b,a,z)=>{const d=b.getChannelData(0);let s=0,n=0;const zz=Math.min(Math.floor(z*44100),d.length);for(let i=Math.floor(a*44100);i<zz;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0};
+const kickIn=rmsW(s18a.buf,kT,kT+.6),kickSilent=rmsW(s18a.buf,.06,kT-.05);
+const bassIn=rmsW(s18b.buf,bT,dur18),bassSilent=rmsW(s18b.buf,.06,bT-.05);/* spans the kick timeframe → kick contributes exactly 0 */
+const kickTail=rmsW(s18a.buf,bT,dur18);/* after the kick: only its own decay tail may remain */
+const s18a2=await renderBounce(p18,1,{trackIdx:0});
+const det18=s18a.scheduleHash===s18a2.scheduleHash&&s18a.scheduleHash!==s18b.scheduleHash;
+const ok18=s18a.N===s18b.N&&kickIn>0.001&&bassIn>0.001&&kickSilent===0&&bassSilent===0&&kickTail<=0.001&&det18;
+gate('G18','stems: per-track isolation — no-voice regions exactly 0 (incl. the other track\u2019s whole timeframe), deterministic per-track schedules',ok18,'kickRMS='+kickIn.toFixed(4)+' bassRMS='+bassIn.toFixed(4)+' silentRegions=0/0 kickOwnTail='+kickTail.toFixed(6)+' N='+s18a.N+' det='+det18)}catch(e){gate('G18','stems',false,'ERR '+e.message)}}const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
    G2: deterministic model build (engine-independent).
