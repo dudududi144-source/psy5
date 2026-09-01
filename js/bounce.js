@@ -53,10 +53,14 @@ v.setInt16(o,x<0?x*32768:x*32767,true);o+=2;
 return ab;
 }
 
-/* pcmFromBuffer — AudioBuffer → {channels, sampleRate} for wavEncode. */
-export function pcmFromBuffer(buf){
-const ch=[];for(let c=0;c<buf.numberOfChannels;c++)ch.push(buf.getChannelData(c));
-return {channels:ch,sampleRate:buf.sampleRate};
+/* pcmFromBuffer — AudioBuffer → {channels, sampleRate} for wavEncode.
+ * Optional (startFrame, frames) slices a RANGE out of a longer render
+ * (v0.8.0 section bounce: the bounds render walks the whole prefix for
+ * phase/bleed continuity and is sliced to the requested window). */
+export function pcmFromBuffer(buf,startFrame,frames){
+  const off=Math.max(0,startFrame|0),n=(frames==null)?(buf.length-off):Math.min(frames|0,buf.length-off);
+  const ch=[];for(let c=0;c<buf.numberOfChannels;c++)ch.push(buf.getChannelData(c).slice(off,off+n));
+  return {channels:ch,sampleRate:buf.sampleRate};
 }
 
 /* renderBounce — offline render of the current pattern × loops.
@@ -121,6 +125,7 @@ import { applySceneMix } from './scenes.js';
 export const SONG_LEAD = .05;       /* s — attack headroom, matches loop bounce t0 */
 export const SONG_TAIL_STEPS = 32;  /* 2 bars of 16 steps — FX release tail */
 export const SONG_MAX_SEC = 600;    /* memory guard: refuse renders beyond 10 min */
+export const SONG_STEMS_BUDGET_MIN = 60; /* v0.8.0: total stem budget in audio-minutes (Σ stems × duration) */
 
 /* songSteps — the single source of truth for the song timeline walk.
  * Yields one entry per STEP of the whole arrangement, applying the exact
@@ -262,6 +267,38 @@ export function songMidi(p) {
   const totalBars = steps.reduce((a, s) => a + (s.bars | 0), 0);
   return { ppq, bpm: cp.bpm, name: 'PSY6 SONG ' + cp.bpm + 'BPM', tracks, totalTicks: totalBars * 4 * ppq };
 }
+/* songStemTracks — which tracks have ≥1 event in the WHOLE SONG schedule?
+ * Only non-empty tracks get stem files (same convention as the loop-bounce
+ * stemTracks). */
+export function songStemTracks(p){
+const sch=songSchedule(p,SONG_LEAD);
+const seen=new Set();for(const e of sch.evs)seen.add(e.track);
+return {tracks:Array.from(seen).sort((a,b)=>a-b),schedule:sch};
+}
+
+/* songStemsGuard — the v0.8.0 memory caps (PURE — refusal paths unit-tested):
+ *   1. per-stem cap: song with-tail length ≤ SONG_MAX_SEC (10 min)
+ *   2. total budget: stems × duration ≤ SONG_STEMS_BUDGET_MIN audio-minutes
+ *      (> 6 stems on a long song is exactly what this refuses) */
+export function songStemsGuard(p,stemCount){
+const d=songDurationSec(p);
+if(d.withTail>SONG_MAX_SEC)return{ok:false,reason:'per-stem cap: song is '+(d.withTail/60).toFixed(1)+' min with tail (cap '+Math.round(SONG_MAX_SEC/60)+' min)'};
+const totalMin=stemCount*d.withTail/60;
+if(totalMin>SONG_STEMS_BUDGET_MIN)return{ok:false,reason:'stems budget: '+stemCount+' stems × '+(d.withTail/60).toFixed(1)+' min = '+totalMin.toFixed(0)+' audio-min (cap '+SONG_STEMS_BUDGET_MIN+')'};
+return{ok:true};
+}
+
+/* sectionFrames — the EXACT sample count of a bounds render (documented
+ * formula, asserted in tests + G30):
+ *   frames = ceil(sr · (SONG_LEAD + (barsInRange·16 + SONG_TAIL_STEPS)·sd))
+ * barsInRange = endBar − startBar (half-open [startBar,endBar) range).
+ * The file is the full-walk render SLICED from SONG_LEAD before the section
+ * start (0.05 s pre-roll) through the section end + the 2-bar FX tail. */
+export function sectionFrames(p,startBar,endBar){
+const sd=60/p.bpm/4,bars=Math.max(0,(endBar|0)-(startBar|0));
+return Math.ceil(44100*(SONG_LEAD+(bars*16+SONG_TAIL_STEPS)*sd));
+}
+
 /* songRenderController — cancel/progress contract for renderSong (unit-
  * testable without Web Audio; the UI drives it from the CANCEL button). */
 export function songRenderController(){
@@ -277,21 +314,49 @@ return{cancelled:false,onProgress:null,cancel(){this.cancelled=true}};
  * applied through the SAME applySceneMix primitive the live quantized
  * launch uses (scheduler.js), glided from the exact section-start time —
  * the offline render reflects snapshots with no parallel implementation.
+ *
+ * v0.8.0 SINGLE-RENDERER options (SONG bounce / STEMS / SECTION all call
+ * this ONE renderer — no fork):
+ *   opts.trackFilter — track index: render a single track's stem. Filtering
+ *     uses the SAME machinery as the loop-bounce stems (renderBounce):
+ *     non-matching tracks never spawn voices → their contribution is
+ *     exactly 0 (no signal math). The per-scene auto-FILL flourish (track
+ *     3) is included when the filter IS track 3.
+ *   opts.bounds — [startBar, endBar) half-open arranger range: SECTION
+ *     BOUNCE. The renderer walks and renders the WHOLE arrangement (the
+ *     single-renderer contract: identical event set, identical graph, an
+ *     exact full render — empirical evidence: any event skipping or buffer
+ *     shortening perturbs the whole offline render at the 1e-3 level, so
+ *     the ONLY way a section can be sample-equal to the song is to BE the
+ *     song's render, sliced). The returned file is the SLICE
+ *       frames = ceil(sr·(SONG_LEAD + (barsInRange·16 + SONG_TAIL_STEPS)·sd))
+ *     starting SONG_LEAD before the section start (0.05 s pre-roll) — the
+ *     formula is asserted in tests + G30 via sectionFrames(). Cost equals a
+ *     SONG bounce (memory + time); the SONG_MAX_SEC guard applies.
+ *     Slice with pcmFromBuffer(buf, startFrame, N); the music window is
+ *     sample-EXACT against the corresponding full-render slice (G30).
  * opts.ctrl: songRenderController (progress + cancel). opts.t0 override.
  * Deep-clones p: the live project is never touched (loop-bounce guarantee).
- * Returns {buf, N, evs, sections, scheduleHash, musicSec, totalSec} or
- * {cancelled:true}. Cancel semantics: the offline render simply never
- * resumes — its promise stays pending and the OfflineAudioContext becomes
- * unreachable (GC); the live AudioContext is untouched, no dangling UI. */
+ * Returns {buf, N, startFrame, evs, sections, scheduleHash, musicSec,
+ * totalSec} or {cancelled:true}. buf is ALWAYS the full-song render
+ * (buf.length === full frames); bounds renders return N/startFrame as the
+ * slice window — slice with pcmFromBuffer(buf, startFrame, N). Full renders
+ * have startFrame 0 and N == buf.length. */
 export async function renderSong(p,opts){
 opts=opts||{};
 const ctrl=opts.ctrl||{};
 const t0=opts.t0==null?SONG_LEAD:opts.t0,sr=44100;
 const cp=JSON.parse(JSON.stringify(p));
+const tf=(opts.trackFilter==null)?null:(opts.trackFilter|0);
+const bounds=(Array.isArray(opts.bounds)&&(opts.bounds[1]|0)>(opts.bounds[0]|0))?[(opts.bounds[0]|0),(opts.bounds[1]|0)]:null;
 const plan=songSchedule(cp,t0);
 const sd=plan.stepDur;
 if(!plan.totalSteps)return null;
 const N=Math.ceil(plan.total*sr);
+/* slice metadata for bounds (the render itself is ALWAYS the full song) */
+const startFrame=bounds?Math.max(0,Math.round(sr*((t0+bounds[0]*16*sd)-SONG_LEAD))):0;
+if(bounds){const bars=cp.arranger.steps.reduce((a,s)=>a+(s.bars|0),0);if(bounds[1]>bars)return null}
+const sliceN=bounds?sectionFrames(cp,bounds[0],bounds[1]):N;
 const oc=new OfflineAudioContext(2,N,sr);
 const eng=new PooledEngine(oc);
 eng.syncMix(cp);
@@ -311,11 +376,11 @@ if(!ctrl.cancelled)oc.resume().catch(()=>{/* gone */});
 const evs=[];
 for(const y of songSteps(cp)){
 if(ctrl.cancelled){if(ctrl._onCancelled)try{ctrl._onCancelled()}catch(e){/* noop */}return{cancelled:true}}
-if(y.sectionStart){const scn0=cp.scenes[y.scene];/* v0.8.0: scene mix snapshot at the section launch — same primitive as the live quantized launch */if(scn0&&scn0.pattern!=null&&applySceneMix(cp,y.scene))eng.syncMix(cp,t0+y.abs*sd)}
-if(y.fill&&y.sectionStart){const scn=cp.scenes[y.scene];
+if(y.sectionStart){const scn0=cp.scenes[y.scene];/* v0.8.0: scene mix snapshot at the section launch — same primitive as the live quantized launch; applied on EVERY section start (also outside bounds: state continuity) */if(scn0&&scn0.pattern!=null&&applySceneMix(cp,y.scene))eng.syncMix(cp,t0+y.abs*sd)}
+if(y.fill&&y.sectionStart&&(tf==null||tf===3)){const scn=cp.scenes[y.scene];
 if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)eng.trigger(cp.tracks[3],t0+y.abs*sd+k*sd/2,{track:3,off:0,vel:.5+.05*k,note:48,lock:{}},sd)}
 const list=stepEvents(cp,y.phase);
-for(const e of list){eng.trigger(cp.tracks[e.track],t0+y.abs*sd+e.off,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sd);evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock})}
+for(const e of list){if(tf!=null&&e.track!==tf)continue;eng.trigger(cp.tracks[e.track],t0+y.abs*sd+e.off,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sd);evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock})}
 const auto=applyLanes(cp,y.phase);
 if(auto.mixed||auto.macroed){
 if(auto.macroed)resolveMacros(cp);
@@ -323,5 +388,5 @@ eng.syncMix(cp,t0+y.abs*sd);
 }
 }
 const buf=await oc.startRendering();
-return{buf,N,evs,sections:plan.sections,scheduleHash:evHash(evs),musicSec:plan.totalSteps*sd,totalSec:(plan.totalSteps+SONG_TAIL_STEPS)*sd};
+return{buf,N:sliceN,startFrame,evs,sections:plan.sections,scheduleHash:evHash(evs),musicSec:plan.totalSteps*sd,totalSec:(plan.totalSteps+SONG_TAIL_STEPS)*sd};
 }
