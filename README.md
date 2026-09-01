@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 271 tests across 23 files — 271 pass / 0 fail (302947 expect() calls)
+bun test             # 300 tests across 26 files — 300 pass / 0 fail (303842 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -70,6 +70,9 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/composer.test.ts` | 27 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed project-wide uniqueness, output integrity + v0.7.0 section variants (pairwise ≥ 0.15, KICK-SACRED bound, pinned form fingerprint, pinned legacy hashes) + FOREST/HI-TECH recipes |
 | `tests/midifile.test.ts` | 9 | v0.7.0 MIDI export: format-1 writer, VLQ multi-byte, stable ordering, dependency-free parse-back, `.mid == WAV schedule` note-for-note identity, byte-identical exports |
 | `tests/follow.test.ts` | 13 | v0.7.0 follow actions: model validation, followBars precedence, all modes' 20-transition simulations, prob=0 fallback, seeded replayability, JSON + share round-trips |
+| `tests/mixsnap.test.ts` | 14 | v0.8.0 scene mix snapshots: canonical validation/clamps, registry application, walk-order launch trace, persistence + share round-trips, composer energy-curve payloads (kick excluded), determinism incl. snapshots, form-fp unchanged |
+| `tests/master.test.ts` | 9 | v0.8.0 master section: ensureMaster backfill/clamps, 9 registry params apply, compOn rounding, project-level exclusion, MIDI denorm, legacy load idempotence, share round-trip |
+| `tests/stems-song.test.ts` | 6 | v0.8.0 song stems + section bounce: songStemTracks, stems memory caps (per-stem 10 min, 60 audio-minute budget), sectionFrames formula, songFrames unchanged |
 | `tests/usability.test.ts` | 7 | shortcut registry (no collisions, taskbook bindings), demo recipes recompose + boot |
 | `tests/song.test.ts` | 12 | v0.6.0 song render: phase rules == live-scheduler oracle, frame-count formula (pinned number), sections/fills, schedule determinism, duration guard, cancel contract |
 | `tests/pwa.test.ts` | 10 | v0.6.0 PWA: SW CACHE_VERSION == CHANGELOG latest, network-first + cleanup + claim pieces, manifest/icon integrity, deterministic icon generator |
@@ -92,15 +95,17 @@ Honest subset classification (v0.4.0):
 | `G17` (live capture), `G25` (record song) | **realtime** ScriptProcessor tap + real scheduler | run on-device; CI reports them as non-asserted info — **local-only assertions** |
 | `G21`, `G22`, `G23`, `G24` | v0.5.0/v0.6.0 offline+pure set (long patterns / automation / composer / **song render**) | CI + local |
 | `G26` (MIDI export), `G27` (follow actions) | v0.7.0 offline+pure set (format-1 parse-back / seeded chain simulation) | CI + local |
+| `G28` (scene mix snapshots), `G29` (master EQ+glue), `G30` (song stems + section bounce) | v0.8.0 offline+pure set (snapshot RMS ratio + null-mix control / neutral tolerance + crest compression / stem frames + RMS ordering + slice equality) | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.7.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **26 MAIN entries**, of
-which **24 are hard** (offline/pure — CI asserts all 24, including G24 song
-render, G26 MIDI export, G27 follow actions) and **2 are evidence-only
-realtime** (G17 live capture, G25 record song — they run on-device every
-time, are reported as info in CI, and are exercised from the production URL
-at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
+Gate-truth accounting (v0.8.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **27 MAIN entries**, of
+which **25 are hard** (offline/pure — CI asserts all 25, including G24 song
+render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
+G30 stems/sections) and **2 are evidence-only realtime** (G17 live capture,
+G25 record song — they run on-device every time, are reported as info in CI,
+and are exercised from the production URL at every release). WORKLET: 3/3
+reduced set. Numbering gaps G3/G4/G7/G20
 never existed in any shipped commit (verified with `git log -S` across all
 history) and are left unrenumbered.
 
@@ -200,6 +205,49 @@ standard MIDI file export, and seeded follow actions for performance.
   transitionCounter)`) — the same seed + start replays the identical
   sequence (G27 pins it). **PRECEDENCE: PLAY SONG always follows the
   arranger and ignores follow actions.**
+
+## Features (v0.8.0) — SCENE STATE + MASTER + STEMS
+
+- **SCENE MIX SNAPSHOTS** — every scene can carry a mix identity
+  (`scene.mix`: per-track vol/pan/sendA/sendB/scAmount, optional master
+  params, optional note). Applied on EVERY launch path (instant click, the
+  quantized bar-boundary launch that PLAY SONG / chain / follow actions /
+  manual launches all share, and the offline song render) through ONE
+  primitive (`applySceneMix`) with a glide anchored at the launch point.
+  **Precedence: the snapshot applies at the launch; per-step automation
+  lanes evaluate on top** — continuous automation wins per-step, exactly as
+  documented in js/scenes.js. Null-mix scenes are byte-identical to legacy
+  behavior (opt-in; G28 asserts the event schedule is unchanged). The scene
+  bank has MIX→SCENE (capture the current mixer — mute/solo deliberately not
+  captured), ×MIX, and a MIX badge. The composer populates snapshots from
+  the section energy curve (INTRO low → DROP full/dry/bass-duck → BREAK
+  spatial/duck-off → RISER swell → OUTRO fall; variants lean pan ±0.12; the
+  kick level NEVER appears in a composer snapshot). Form fingerprint
+  unchanged (`d0c5f32f032f2a88`); whole-project legacy hashes re-pinned
+  (documented in CHANGELOG 0.8.0).
+- **MASTER SECTION** (Mixer tab → MASTER): EQ3 (low shelf 100 Hz / peak
+  1 kHz Q 0.8 / high shelf 8 kHz, ±12 dB) + glue compressor (−40..0 dB,
+  1..20:1, 1..100 ms, 20..1000 ms, makeup 0..24 dB, GLUE ON/OFF — bypass
+  removes the node from the chain). Neutral by default: existing projects
+  render identically within a measured **1.79e-7** max sample diff (G29).
+  All 9 params are registry params: lane-automatable (track −1),
+  ARM-AUTO-recordable, MIDI-learnable (`master.<param>`), snapshot-able.
+- **SONG STEMS** (bounce modal → MODE SONG → STEMS checkbox): one
+  `psy6-song-stem-<track>.wav` per non-empty track through the SAME
+  renderSong (trackFilter — isolation by not spawning other voices, no
+  signal math). Sequential downloads with progress. Memory caps
+  (`songStemsGuard`): per-stem ≤ 10 min with tail; total budget
+  Σ stems × duration ≤ 60 audio-minutes — > 6 stems on a long song is
+  exactly what this refuses (toast).
+- **SECTION BOUNCE** (Perform tab → timeline: click selects, shift+click
+  extends a contiguous range → BOUNCE SECTION): `psy6-section-<scene>-<idx>
+  .wav` — the selected arranger range **as it appears in the song** (slice
+  of the full arrangement render; music window sample-exact vs the full
+  render, G30 measured 2.98e-7). File = 0.05 s pre-roll + range music +
+  2-bar FX tail; formula asserted. Renders the full arrangement (single
+  renderer) and slices — cost equals a SONG bounce; the 10-minute guard
+  applies. SHARE note: the share hard cap moved 50 → 64 KB so a composed
+  snapshot-bearing song still fits a share link.
 
 ## Features (v0.6.0) — SONG ENGINE
 

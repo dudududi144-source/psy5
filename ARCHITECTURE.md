@@ -399,6 +399,79 @@ draws from `rngFor(seed, label)` sub-streams over the foundation primitives:
    `p.arranger.on`. Same seed+style+minutes → byte-identical project;
    different seeds → different fingerprints (tested across 20 seeds).
 
+## 15. Scene State + Master + Stems (v0.8.0)
+
+### Scene mix snapshot model
+
+```
+scene.mix = null                                     ← legacy/absent (zero change)
+          | { tracks: { [trackIdx]: { vol, pan, sendA, sendB, scAmount } },
+              master?: { eqLow, eqMid, eqHigh, compOn, compThresh, compRatio,
+                         compAttack, compRelease, compMakeup },
+              note?: string }
+```
+
+`normalizeSceneMix` (js/scenes.js) validates + clamps into CANONICAL form —
+ascending track keys, registry field order — on every write AND on load
+(`loadProjectObj` scene rebuild; the same canonical-order pitfall the
+follow-actions run documented). Everything invalid/empty → null.
+
+### Application path (one primitive, three callers)
+
+```
+PERF.launch (instant) ─────────────┐
+scheduler pending-launch (quantized:│─→ applySceneMix(p,i) → eng.syncMix(p, WHEN)
+  PLAY SONG / chain / follows) ─────┤         (registry writes; WHEN = launch anchor:
+renderSong sectionStart (offline) ──┘          ctx-time | bar boundary | exact step)
+```
+
+Precedence: the snapshot writes the mix state AT the launch; the per-step
+automation player (`applyLanes`) evaluates on top every step — continuous
+lanes win per-step. Composer snapshots are pure functions of (section id,
+energy, variant index): INTRO low / BUILD rising (bass duck 40) /
+DROP+DROP2 full+dry (bass duck 55) / BREAK spatial, duck off / RISER swell,
+duck off / OUTRO fall; variant pan lean ±0.12; KICK level never in a
+composer snapshot.
+
+### Master chain (v0.8.0)
+
+```
+tracks ─┬─ input → duck → pan ──┬──────────────→ master ─ eqLow ─ eqMid ─ eqHigh ─┐
+        │      (post-fader)     └→ sA → delay bus ────────────┘                  │ (compOn 1)
+        │                                 └→ sB → reverb bus ──┘   eqHigh → glueComp → makeup ─┘
+        └───────────────────────────────────────────────────────→ (compOn 0: straight to) → masterComp → analyser → out
+```
+
+compOn 0 (default) REMOVES the glue node from the graph (rewire, not
+threshold-bypass) — neutral. `applyMaster(p, when)` is the single apply path
+(called from syncMix with the same anchor); `opts.masterFlat` builds the
+exact pre-v0.8.0 topology for the G29 neutral A/B. The 9 master params are
+registry params (project target ⇒ lane.track −1 ⇒ automatable, ARM-AUTO
+recordable, MIDI-learnable via `master.<param>` denorm, snapshot-able via
+`scene.mix.master`). `ensureMaster` backfills+clamps legacy projects.
+
+### Single-renderer song API (js/bounce.js)
+
+```
+renderSong(p, {
+  trackFilter  → stem of ONE track (events filtered — other tracks never
+                 spawn voices; fill flourish only on track-3 stems)
+  bounds       → [startBar,endBar) SECTION = full arrangement render SLICED
+                 (startFrame = LEAD before the section; N = sectionFrames)
+  ctrl         → progress + cancel (unchanged)
+})
+pcmFromBuffer(buf, startFrame, N) → wavEncode — the slicing step
+```
+
+Why bounds = full render + slice (measured, not assumed): skipping events or
+shortening the offline buffer perturbs the whole Chrome offline render at the
+1e-3 level even FAR BEFORE the change point (each path is individually
+deterministic; identical event set + identical buffer length = bit-exact —
+bounds [0,136] over the 136-bar song matched the full render exactly).
+The only way a section is sample-equal to the song is to BE the song's
+render, sliced. Cost equals a SONG bounce; SONG_MAX_SEC + songStemsGuard
+(per-stem 10 min, 60 audio-minute total budget) are the memory caps.
+
 The UI (power-screen row + header modal) collects style/length/seed, guards
 overwrites with an explicit confirm, and lands on the Perform tab with the
 arranger active — composition happens in a fresh in-memory project the user
@@ -413,5 +486,5 @@ before v0.5.0 the only global bindings were Space/r/z/1-8 (header.js);
 b and ? were added.
 
 ---
-Architecture version: 1.3
+Architecture version: 1.4
 Status: IMPLEMENTED

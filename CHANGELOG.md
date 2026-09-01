@@ -3,6 +3,126 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.8.0] — Run 11: SCENE STATE + MASTER + STEMS
+
+### Added — scene mixer snapshots (`feat: scene mixer snapshots (arrangement-aware mix)`)
+
+- `scene.mix = null | { tracks: { [trackIdx]: { vol, pan, sendA, sendB,
+  scAmount } }, master?: {…9 master params}, note?: string }` — absent/null =
+  legacy scene, zero behavior change. Payloads are validated + clamped into a
+  CANONICAL form (ascending track keys, registry field order) on every write
+  and on load, so load→save byte-stability holds regardless of how a save was
+  produced. Persisted in save/export/share/RESUME.
+- **One application primitive** (`applySceneMix`, js/scenes.js) on every
+  launch path: instant launch (state.js), the quantized scheduler
+  pending-launch branch (PLAY SONG, chain, follow actions, manual quantized)
+  and the offline renderSong section launch — each gliding via the existing
+  `syncMix(p, when)` anchor. Documented precedence: snapshot applies AT the
+  launch, then per-step automation lanes evaluate on top (the continuous
+  automation wins per-step).
+- The composer populates every scene's snapshot from the section energy
+  curve (pure function of section id + energy + variant index — no rng):
+  INTRO low melodic level + light space, BUILD rising with bass duck 40,
+  DROP/DROP2 full + dry + **bass duck 55**, BREAK spatial (sendA/sendB up,
+  ducking off), RISER swell (pad/fx up, no ducking), OUTRO fall. Variant
+  scenes lean pan ±0.12 so arranger repeats move in stereo. **The KICK level
+  never appears in a composer snapshot** (kick is sacred — level too).
+- Composer determinism re-proven: same seed → byte-identical project
+  INCLUDING snapshots (`bun test tests/mixsnap.test.ts`).
+- Fingerprint deltas (documented): form-fp **UNCHANGED**
+  (`d0c5f32f032f2a88` — patterns untouched by the snapshot pass); the
+  9 legacy-style whole-project hashes re-pinned to the v0.8.0 values
+  (FULL-ON `338e9537…/1d9c77e2…/3db876a1…`, DARK-PSY `038f8e5b…/62902511…/
+  766a8576…`, PROGRESSIVE `d8c7d9ac…/c73d8755…/d6bb48ee…` for 3/5/8 min —
+  the only delta is the added mix payloads; run `bun test tests/composer.test.ts`).
+- Share cap raised 51200 → **65536** bytes: a snapshot-bearing composed song
+  compresses to 38,726 B → **51,636** base64url chars, crossing the old 50 KB
+  cap by 0.8% — a share of the device's own composed output is a first-class
+  flow (js/share.js comment documents the arithmetic).
+- UI: scene bank rows gain **MIX→SCENE** (writes the current mixer state into
+  the scene; mute/solo deliberately not captured), **×MIX** (clear), and a MIX
+  badge on scenes carrying a snapshot; toast confirmations.
+- **G28 (offline, CI-asserted)**: scripted bass-only 2-section song — snapshot
+  bass-vol 0.5 vs live 0.8 → per-section RMS ratio **2.529** in the mandated
+  [2.0, 2.6] (theory (0.8/0.5)²=2.56; the setTargetAtTime glide damps the
+  first ms — logged); null-mix control ratio **1.0038**; schedule hash
+  identical (the layer is opt-in). Repro: `bun tools/e2e.mjs`.
+
+### Added — master EQ3 + glue compressor (`feat: master EQ and glue compressor (automation-ready)`)
+
+- Chain: `master → EQ3 → [glueComp → makeup gain] → existing master comp →
+  analyser`. EQ3: low shelf 100 Hz, mid peak 1 kHz (Q 0.8), high shelf 8 kHz,
+  each ±12 dB. Glue: threshold −40..0 dB, ratio 1..20, attack 1..100 ms,
+  release 20..1000 ms, makeup 0..24 dB, `compOn` 0/1 — **bypass REMOVES the
+  node from the chain** (guaranteed neutral).
+- 9 params registered in js/params.js (`eqLow eqMid eqHigh compOn compThresh
+  compRatio compAttack compRelease compMakeup`, project target): automatable
+  (lane.track −1), ARM-AUTO-recordable, MIDI-learnable (`master.<param>` CC
+  0–1 → full range via `paramDenorm`), and scene-snapshot-able
+  (`scene.mix.master`). `ensureMaster` backfills legacy projects with neutral
+  defaults + clamps (loadProjectObj — the canonical-order pitfall respected).
+  MASTER panel in the Mixer tab (GLUE toggle + 8 controls, tooltips).
+  Worklet limitation documented (worklet master has its own
+  saturation/limiter).
+- **G29 (offline, CI-asserted)**: (a) neutral tolerance — default engine vs
+  `masterFlat` (the exact pre-v0.8.0 topology) max sample diff **1.79e-7 <
+  1e-6** on both channels (EQ biquads at 0 dB + glue removed); (b)
+  compression evidence on the dense PSYTRANCE loop at −20 dB/4:1/10 ms/
+  150 ms/makeup 0 — crest factor 9.25 → **6.59 (2.94 dB ∈ [0.5, 6])**.
+  Chrome's DynamicsCompressor applies an IMPLICIT makeup gain (observed
+  **+4.25 dB** RMS rise), so the RMS-reduction contract is evaluated
+  makeup-invariantly as crest reduction, with the raw RMS delta logged.
+  Repro: `bun tools/e2e.mjs`.
+
+### Added — song stems + section bounce (`feat: song stems and section bounce (one renderer)`)
+
+- renderSong is the ONE renderer: `opts.trackFilter` renders one track's stem
+  through the same machinery as the loop-bounce stems (non-matching tracks
+  never spawn voices — no signal math); `opts.bounds` returns an arranger
+  range **as a slice of the full arrangement render** — the section exactly
+  as it appears in the song (phase continuity, mix snapshots and FX bleed all
+  real). File formula (documented, asserted):
+  `frames = ceil(sr·(0.05 + (barsInRange·16 + 32)·60/bpm/4))`.
+- **Empirical finding (documented in js/bounce.js)**: skipping events or
+  shortening the offline buffer perturbs the WHOLE Chrome offline render at
+  the 1e-3 level (each path is individually deterministic; identical event
+  set + length = bit-exact). Hence section bounce = full render + slice,
+  which makes the music window sample-EXACT vs the full render. Cost equals a
+  SONG bounce; the 10-minute guard applies.
+- UI: **STEMS checkbox** in the SONG bounce path →
+  `psy6-song-stem-<trackName>.wav` for every non-empty track (sequential
+  downloads, progress label + toasts); **BOUNCE SECTION** in the timeline
+  editor on a contiguous selection (click / shift+click) →
+  `psy6-section-<sceneName>-<idx>.wav`. Memory caps (`songStemsGuard`,
+  refusal toasts): per-stem ≤ 10 min; Σ stems × duration ≤ **60
+  audio-minutes** (> 6 stems on long songs is exactly what this refuses).
+- **G30 (offline, CI-asserted)** on the demo song (FULL-ON 3min 424242):
+  stem frames == formula (**10,075,254**), kick stem RMS **0.0551** > melodic
+  stem RMS **0.0391** (track 4), DROP section frames == formula (**732,137**),
+  section music window vs full-render slice **maxDiff 2.98e-7** (G24-class
+  float wobble; contract bound 1e-5). Repro: `bun tools/e2e.mjs`.
+
+### Changed — gate inventory + e2e runtime
+
+- Canonical inventory (js/ui/tests.js): **27 device entries = 25 HARD
+  (offline/pure, CI-asserted 27/27 including G28/G29/G30) + 2 evidence-only
+  realtime (G17, G25)**; WORKLET reduced set 3/3. Gaps G3/G4/G7/G20 remain
+  documented-never-existed; next free id **G31**. e2e default timeout
+  300 → 600 s (three new heavy offline gates).
+- Battery at release: `bun test` → **300/300 across 26 files (303,842
+  expect() calls)**; `node tools/verify.mjs` GREEN.
+
+### Evidence (reproducible)
+
+```
+bun test                          # 300/300 (26 files) — incl. mixsnap/master/stems-song suites
+node tools/verify.mjs             # GREEN (sw.js CACHE_VERSION == CHANGELOG lock at psy6-v0.8.0)
+bun tools/e2e.mjs                 # headless Chrome: 27/27 asserted gates + G17/G25 evidence
+bun -e "import('./js/composer.js').then(async m=>{const c=m.compose('FULL-ON',3,424242);console.log(c.stats)})"
+                                  # {145 BPM, 17 scenes, 9 tracks, variants 10, snapshots 17,
+                                  #  minVariantDiff 0.338} — form-fp unchanged d0c5f32f032f2a88
+```
+
 ## [0.7.0] — Run 10: EVOLUTION + INTEROP
 
 ### Added — composer section variants, no identical repeats (`feat: composer section variants (no identical repeats)`)
