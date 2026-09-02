@@ -48,9 +48,8 @@ import { initTracks, addTrackToProject, libFind, assignPresetToTrack } from './p
 import { normalizeSceneMix } from './scenes.js';
 
 /* composer length menu (minutes) — v0.9.0 P4 adds 12 and 20 (documented
- * tiers); P3 ships 3/5/8. The library's ADD CURRENT recovery snaps to the
- * nearest of these. */
-export const COMPOSER_LENGTHS = [3, 5, 8];
+ * tiers); the library's ADD CURRENT recovery snaps to the nearest of these. */
+export const COMPOSER_LENGTHS = [3, 5, 8, 12, 20];
 
 /* ── style templates ──
    v0.7.0: every style is a FULL RECIPE in this dict — section chain
@@ -112,7 +111,13 @@ export const COMPOSER_STYLES = {
   },
 };
 
-/* section chain: weights sum to 1; energy arcs [start,end] across the section */
+/* section chain: weights sum to 1; energy arcs [start,end] across the section.
+   Extended forms (>8 min, v0.9.0 P4) use EXTENDED_CHAIN — 11 sections:
+   the base 7 plus DROP3, a second BREAK, BRIDGE and OUTRO2. `beh` maps a
+   section to the canonical BEHAVIOR fillSection/mixForSection/sectionMotif
+   key on (DROP2/DROP3 behave like DROP; BREAK2/BRIDGE like BREAK; OUTRO2
+   like OUTRO). Base sections have no beh — beh === id (byte-identical
+   3/5/8-min output). */
 const SECTION_CHAIN = [
   { id: 'INTRO', w: 0.125, energy: [0.25, 0.40], color: 3 },
   { id: 'BUILD', w: 0.125, energy: [0.40, 0.70], color: 4 },
@@ -121,6 +126,19 @@ const SECTION_CHAIN = [
   { id: 'RISER', w: 0.10, energy: [0.50, 0.85], color: 4 },
   { id: 'DROP2', w: 0.20, energy: [0.95, 1.00], color: 0 },
   { id: 'OUTRO', w: 0.125, energy: [0.50, 0.20], color: 6 },
+];
+const EXTENDED_CHAIN = [
+  { id: 'INTRO', w: 0.07, energy: [0.20, 0.35], color: 3 },
+  { id: 'BUILD', w: 0.09, energy: [0.40, 0.70], color: 4 },
+  { id: 'DROP', w: 0.12, energy: [0.90, 0.95], color: 0 },
+  { id: 'BREAK', w: 0.08, energy: [0.35, 0.50], color: 5 },
+  { id: 'RISER', w: 0.07, energy: [0.50, 0.85], color: 4 },
+  { id: 'DROP2', w: 0.12, energy: [0.95, 1.00], color: 0 },
+  { id: 'BREAK2', w: 0.08, energy: [0.35, 0.50], color: 5, beh: 'BREAK' },
+  { id: 'BRIDGE', w: 0.09, energy: [0.45, 0.60], color: 6, beh: 'BREAK' },
+  { id: 'DROP3', w: 0.13, energy: [0.92, 0.98], color: 0, beh: 'DROP' },
+  { id: 'OUTRO', w: 0.08, energy: [0.50, 0.30], color: 6 },
+  { id: 'OUTRO2', w: 0.07, energy: [0.30, 0.15], color: 6, beh: 'OUTRO' },
 ];
 const SECTION_BY_ID = new Map(SECTION_CHAIN.map(s => [s.id, s]));
 
@@ -132,10 +150,13 @@ const put = (pat, track, step, vel, note, micro) => {
   if (micro != null) st.micro = Math.max(-100, Math.min(100, micro));
 };
 
-/* allocate bars: weights → multiples of 4 (min 4), remainder to the longest */
+/* allocate bars: weights → multiples of 4 (min 4), remainder to the longest.
+   v0.9.0 FIX (Run 15 catch): walk the PASSED weight list — the old code
+   mapped SECTION_CHAIN (hardcoded 7) while reading ws[i], producing NaN
+   bars for the extended 11-section chains. */
 function allocateBars(totalBars, ws) {
   const W = ws || SECTION_CHAIN.map(s => s.w);
-  const bars = SECTION_CHAIN.map((s, i) => Math.max(4, Math.round((totalBars * W[i]) / 4) * 4));
+  const bars = W.map(w => Math.max(4, Math.round((totalBars * w) / 4) * 4));
   let sum = bars.reduce((a, b) => a + b, 0);
   let guard = 0;
   while (sum !== totalBars && guard++ < 1000) {
@@ -187,7 +208,7 @@ function fillSection(p, pat, section, bars, energy, ctx) {
     d.len = len;
     d.steps = Array.from({ length: len }, () => mkStep(false));
   }
-  const sec = section.id;
+  const sec = section.beh || section.id; /* v0.9.0 P4: canonical behavior (BREAK2→BREAK, DROP3→DROP, OUTRO2→OUTRO, BRIDGE→BREAK) */
   const degNote = (deg, oct) => root + 24 + degreeToSemitone(scaleIv, deg) + 12 * (oct || 0);
 
   /* KICK — 4-on-floor when it kicks; silent in BREAK/RISER (breakdown feel) */
@@ -435,7 +456,7 @@ const VARIANT_LANES = {
    repeats move in stereo as well. Applied on every launch path (see
    scenes.js SCENE MIX SNAPSHOTS). */
 function mixForSection(sec, k) {
-  const e = sec.energyMid, id = sec.id;
+  const e = sec.energyMid, id = sec.beh || sec.id; /* v0.9.0 P4: behavior key */
   const r = v => Math.round(v * 1000) / 1000;
   const pan = k ? (k % 2 ? 0.12 : -0.12) : 0;
   const T = {};
@@ -470,9 +491,11 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   const seedInt = (typeof seed === 'number' ? seed : parseInt(fnvish(String(seed)), 16) >>> 0) | 0;
   const label = seedLabel || String(seed);
 
-  /* 1. form: bars + energies (per-style chain; energyVar jitters HI-TECH) */
+  /* 1. form: bars + energies — v0.9.0 P4: lengths >8 min use the 11-section
+     EXTENDED_CHAIN (DROP3 + double-BREAK + BRIDGE + OUTRO2); 3/5/8-min keep
+     the exact per-style 7-section chains (byte-identical outputs, pinned). */
   const rc = style.recipe || {};
-  const chain = style.chain || SECTION_CHAIN;
+  const chain = targetMinutes > 8 ? EXTENDED_CHAIN : (style.chain || SECTION_CHAIN);
   const rawTotal = (targetMinutes * bpm) / 4;           /* 1 bar = 4 beats */
   const totalBars = Math.max(28, Math.round(rawTotal / 4) * 4); /* multiple of 4 */
   const bars = allocateBars(totalBars, chain.map(s => s.w));
@@ -515,7 +538,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   const sceneMeta = []; /* scene idx → {sec, k} for the v0.8.0 snapshot pass */
   for (let i = 0; i < sections.length; i++) {
     const sec = sections[i];
-    const motif = sectionMotif(seedInt, sec.id, baseMotif);
+    const motif = sectionMotif(seedInt, sec.beh || sec.id, baseMotif); /* v0.9.0 P4: behavior key */
     secMotifs[sec.id] = motif;
     const patName = 'C' + (i + 1);
     const pat = { name: patName, data: {} };

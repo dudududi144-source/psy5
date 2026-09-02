@@ -12,7 +12,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { compose, COMPOSER_STYLES, SECTION_CHAIN, sectionsFingerprint, variantStepDiff, VARIANT_DIFF_MIN, KICK_VEL_MAX_DELTA } from '../js/composer.js'
+import { compose, COMPOSER_STYLES, SECTION_CHAIN, sectionsFingerprint, variantStepDiff, VARIANT_DIFF_MIN, KICK_VEL_MAX_DELTA, COMPOSER_LENGTHS, allocateBars } from '../js/composer.js'
 import { songSteps } from '../js/bounce.js'
 import { SCALES } from '../js/model.js'
 import { PROGRESSION_TEMPLATES, pickProgression, chordDegreeAt, chordClasses } from '../foundation/music/progression.mjs'
@@ -515,3 +515,100 @@ describe('chord progression engine (v0.9.0 P1)', () => {
   })
 })
 
+
+/* ============ COMPOSER GROWTH (v0.9.0 P4 — 12 and 20 minute forms) ========
+ * Lengths >8 min compose the 11-section EXTENDED_CHAIN (DROP3 + a second
+ * BREAK + BRIDGE + OUTRO2); 3/5/8-min outputs stay byte-identical (the
+ * legacy-9 pins above are the proof). Memory tiers: full-song renders
+ * refuse beyond SONG_HARD_MAX_SEC (30 min) BEFORE any Web Audio work;
+ * stems/sections keep the 10-min SONG_MAX_SEC cap (songStemsGuard). */
+describe('composer growth (v0.9.0 P4)', () => {
+  const EXTENDED_IDS = ['INTRO', 'BUILD', 'DROP', 'BREAK', 'RISER', 'DROP2', 'BREAK2', 'BRIDGE', 'DROP3', 'OUTRO', 'OUTRO2']
+
+  test('allocateBars walks the PASSED weight list (Run-15 NaN regression)', () => {
+    const two = allocateBars(100, [0.5, 0.5])
+    expect(two.length).toBe(2) /* the old code returned 7 entries (NaN-chain bug) */
+    expect(two.reduce((a, b) => a + b, 0)).toBe(100)
+    expect(two).toEqual([52, 48]) /* remainder absorber hits the longest (tie -> later) */
+    expect(allocateBars(80, [0.25, 0.25, 0.25, 0.25]).reduce((a, b) => a + b, 0)).toBe(80)
+    const ext = allocateBars(436, [0.07, 0.09, 0.12, 0.08, 0.07, 0.12, 0.08, 0.09, 0.13, 0.08, 0.07])
+    expect(ext.length).toBe(11)
+    expect(ext.reduce((a, b) => a + b, 0)).toBe(436)
+    for (const b of ext) { expect(b).toBeGreaterThanOrEqual(4); expect(b % 4).toBe(0) }
+  })
+
+  test('COMPOSER_LENGTHS now carries 12 and 20', () => {
+    expect(COMPOSER_LENGTHS).toEqual([3, 5, 8, 12, 20])
+  })
+
+  test('12/20-min forms: 11 sections in the documented extended order, every style', () => {
+    for (const styleId of Object.keys(COMPOSER_STYLES)) {
+      for (const minutes of [12, 20]) {
+        const r = compose(styleId, minutes, SEED)
+        expect(r.form.sections.map(s => s.id)).toEqual(EXTENDED_IDS)
+        expect(r.form.totalBars).toBe(r.form.sections.reduce((a, s) => a + s.bars, 0))
+        for (const s of r.form.sections) { expect(s.bars).toBeGreaterThanOrEqual(4); expect(s.bars % 4).toBe(0) }
+        /* extended-form tiers: DROP3 exists, two BREAK-family sections,
+           BRIDGE and OUTRO2 present */
+        expect(r.form.sections.filter(s => s.id.startsWith('DROP')).length).toBe(3)
+        expect(r.form.sections.filter(s => s.id.startsWith('BREAK') || s.id === 'BRIDGE').length).toBe(3)
+        expect(r.form.sections.filter(s => s.id.startsWith('OUTRO')).length).toBe(2)
+      }
+    }
+  })
+
+  test('12/20-min length accuracy ≤±5% and determinism (all styles)', () => {
+    for (const styleId of Object.keys(COMPOSER_STYLES)) {
+      for (const minutes of [12, 20]) {
+        const a = compose(styleId, minutes, SEED)
+        const b = compose(styleId, minutes, SEED)
+        expect(JSON.stringify(a)).toBe(JSON.stringify(b))
+        const err = Math.abs(a.form.lengthSec - minutes * 60) / (minutes * 60)
+        expect(err).toBeLessThanOrEqual(0.05)
+      }
+    }
+  })
+
+  test('vmin ≥ 0.15 holds at 12/20-min across all 5 styles', () => {
+    let minV = 1
+    for (const styleId of Object.keys(COMPOSER_STYLES)) {
+      for (const minutes of [12, 20]) {
+        minV = Math.min(minV, compose(styleId, minutes, SEED).stats.minVariantDiff)
+      }
+    }
+    expect(minV).toBeGreaterThanOrEqual(VARIANT_DIFF_MIN)
+  })
+
+  test('extended scenes reference valid patterns; behavior mapping keeps breakdowns breakdown-y', () => {
+    const p = compose('FULL-ON', 12, SEED).project
+    for (const sc of p.scenes) expect(p.patterns[sc.pattern]).toBeTruthy()
+    /* BRIDGE/BREAK2 behave like BREAK: no kick, half-time snare */
+    const bridgePat = p.patterns[p.scenes.find(s => s.name === 'BRIDGE')!.pattern]!
+    expect(bridgePat.data[0].steps.some(s => s.on)).toBe(false) /* kick silent */
+    expect(bridgePat.data[1].steps.some(s => s.on)).toBe(true)  /* snare present */
+    /* DROP3 behaves like DROP: full 4-on-floor kick */
+    const drop3Pat = p.patterns[p.scenes.find(s => s.name === 'DROP3')!.pattern]!
+    const kickHits = drop3Pat.data[0].steps.filter(s => s.on).length
+    expect(kickHits).toBeGreaterThanOrEqual(16)
+    /* mix snapshots follow the behavior mapping (BREAK2 gets the BREAK mix) */
+    const break2 = p.scenes.find(s => s.name === 'BREAK2')!
+    expect(break2.mix).toBeTruthy()
+    expect(break2.mix!.tracks['5']!.sendA).toBeGreaterThan(0.2) /* spatial BREAK sends */
+  })
+
+  test('SONG_HARD_MAX_SEC: renderSong refuses >30 min BEFORE Web Audio (null, no OfflineAudioContext)', async () => {
+    const { renderSong, SONG_HARD_MAX_SEC } = await import('../js/bounce.js')
+    expect(SONG_HARD_MAX_SEC).toBe(1800)
+    const p = compose('FULL-ON', 20, SEED).project
+    const over = JSON.parse(JSON.stringify(p))
+    over.arranger.on = true
+    over.arranger.steps = [{ scene: 0, bars: 3000 }] /* 3000 bars @145 ≈ 4965 s ≫ 1800 */
+    const r = await renderSong(over)
+    expect(r).toBeNull()
+    /* a legal long-form (20 min) passes the hard cap (guard is >1800) */
+    const { songDurationSec } = await import('../js/bounce.js')
+    const d20 = songDurationSec(p)
+    expect(d20.withTail).toBeLessThanOrEqual(SONG_HARD_MAX_SEC)
+    expect(d20.withTail).toBeGreaterThan(600) /* genuinely long-form territory */
+  })
+})

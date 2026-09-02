@@ -125,7 +125,8 @@ import { applySceneMix } from './scenes.js';
 
 export const SONG_LEAD = .05;       /* s — attack headroom, matches loop bounce t0 */
 export const SONG_TAIL_STEPS = 32;  /* 2 bars of 16 steps — FX release tail */
-export const SONG_MAX_SEC = 600;    /* memory guard: refuse renders beyond 10 min */
+export const SONG_MAX_SEC = 600;    /* memory guard: stems/sections refuse beyond 10 min */
+export const SONG_HARD_MAX_SEC = 1800; /* v0.9.0 P4: full-song renders refuse beyond 30 min (10–30 min = explicit confirm + progress in the UI) */
 export const SONG_STEMS_BUDGET_MIN = 60; /* v0.8.0: total stem budget in audio-minutes (Σ stems × duration) */
 
 /* songSteps — the single source of truth for the song timeline walk.
@@ -353,6 +354,11 @@ const bounds=(Array.isArray(opts.bounds)&&(opts.bounds[1]|0)>(opts.bounds[0]|0))
 const plan=songSchedule(cp,t0);
 const sd=plan.stepDur;
 if(!plan.totalSteps)return null;
+/* v0.9.0 P4 HARD CAP — refused BEFORE any Web Audio work (unit-tested null
+   return): the memory footprint of an OfflineAudioContext render scales
+   with sample count; past 30 min the 40 MB+ stereo float32 buffer plus the
+   engine graph is a guaranteed tab death on mobile-class hardware. */
+if(plan.total>SONG_HARD_MAX_SEC)return null;
 const N=Math.ceil(plan.total*sr);
 /* slice metadata for bounds (the render itself is ALWAYS the full song) */
 const startFrame=bounds?Math.max(0,Math.round(sr*((t0+bounds[0]*16*sd)-SONG_LEAD))):0;

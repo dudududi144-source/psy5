@@ -1,7 +1,7 @@
 import { $, toast, I, pushHist, after, saveProject, loadProjectObj, PERF } from '../state.js';
 import { startSched, stopSched } from '../scheduler.js';
 import { clamp, GROOVES, loopLen } from '../model.js';
-import { renderBounce, stemTracks, wavEncode, pcmFromBuffer, renderSong, songDurationSec, songFrames, songRenderController, songMidi, SONG_MAX_SEC, songStemTracks, songStemsGuard } from '../bounce.js';
+import { renderBounce, stemTracks, wavEncode, pcmFromBuffer, renderSong, songDurationSec, songFrames, songRenderController, songMidi, SONG_MAX_SEC, SONG_HARD_MAX_SEC, songStemTracks, songStemsGuard } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
 import { encodeShare } from '../share.js';
 import { padHit } from './perform.js';
@@ -36,7 +36,11 @@ toast('STEMS ✓ '+done+' file'+(done===1?'':'s')+' · '+N+' samples each');$('b
 else if(mode==='song'){const steps=songSteps(I.p);
 if(!steps.length){toast('SONG: arranger is empty — build [scene,bars] sections first');b.disabled=false;b.textContent='RENDER WAV';return}
 const d=songDurationSec(I.p);
-if(d.withTail>SONG_MAX_SEC){toast('SONG: '+(d.withTail/60).toFixed(1)+' min exceeds the 10-minute render guard — shorten the arranger');b.disabled=false;b.textContent='RENDER WAV';return}
+if(d.withTail>SONG_HARD_MAX_SEC){toast('SONG: '+(d.withTail/60).toFixed(1)+' min exceeds the 30-minute hard render cap — shorten the arranger');b.disabled=false;b.textContent='RENDER WAV';return}
+if(d.withTail>SONG_MAX_SEC&&!confirm('LONG-FORM RENDER — '+((d.withTail/60)|0)+' min of audio\n\nRenders the FULL arrangement offline (a 40 MB+ buffer). This needs a capable machine; the progress modal can CANCEL mid-render.\nStems and SECTION bounce stay capped at 10 min and will refuse.\nContinue?'))return;
+/* v0.9.0 P4 documented storage limit: long-form projects exceed the ~5 MB
+   localStorage quota (12-min \u2248 3.8 MB, 20-min \u2248 6.4 MB JSON) \u2014 SAVE will
+   show SAVE FAILED by design; EXPORT (file) and SHARE are unaffected. */
 /* v0.8.0 SONG STEMS — the STEMS checkbox in the song bounce path: one WAV
    per non-empty track via the SAME renderSong (trackFilter — no fork),
    sequential downloads with progress; memory caps from songStemsGuard */
