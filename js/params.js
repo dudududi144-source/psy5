@@ -16,6 +16,27 @@
 const cl = (v, a, b) => v < a ? a : (v > b ? b : v);
 import { ensureVoice } from './samplestore.js';
 
+/* ── insert FX model (v0.10.0 P3) — canonical backfill + clamp, the
+   ensureMaster pattern. Defaults are EXACT bypass: drive 0 (dry path),
+   crush 16 (dry path), filtOn 0 (node removed). ── */
+const INS_DEFAULTS = { drive: 0, crush: 16, filtOn: 0, filtFreq: 20000, filtQ: 1 };
+const INS_RANGES = { drive: [0, 100], crush: [2, 16], filtOn: [0, 3], filtFreq: [20, 20000], filtQ: [0.1, 18] };
+function ensureIns(t) {
+  if (!t || typeof t !== 'object') return t;
+  if (!t.ins || typeof t.ins !== 'object' || Array.isArray(t.ins)) t.ins = {};
+  const s = t.ins;
+  for (const k of Object.keys(INS_DEFAULTS)) {
+    const [lo, hi] = INS_RANGES[k];
+    let v = s[k];
+    if (v == null || !isFinite(v)) v = INS_DEFAULTS[k];
+    v = Math.min(hi, Math.max(lo, v));
+    if (k === 'filtOn' || k === 'drive' || k === 'crush') v = Math.round(v);
+    else v = Math.round(v * 1000) / 1000;
+    s[k] = v;
+  }
+  return t;
+}
+
 function P(id, label, min, max, def, target, apply) {
   return { id, label, min, max, def, target, apply: (t, v) => apply(t, cl(v, min, max)) };
 }
@@ -52,6 +73,15 @@ export const PARAMS = [
   P('smpRev',  'SMP reverse',  0, 1,   0,   'track', (t, v) => { ensureVoice(t).sampleParams.reverse = v >= 0.5 ? 1 : 0 }),
   P('smpAtk',  'SMP attack',   0, 100, 0,   'track', (t, v) => { ensureVoice(t).sampleParams.attackMs = Math.round(v) }),
   P('smpRel',  'SMP release',  0, 500, 20,  'track', (t, v) => { ensureVoice(t).sampleParams.releaseMs = Math.round(v) }),
+  /* ── per-track INSERT FX (v0.10.0 P3): drive/crush/filter pre-send.
+     All five are registry params → automatable lanes, ARM-AUTO recordable,
+     MIDI-learnable, scene-snapshot-able by construction. Defaults are
+     EXACT bypass (zero behavior change). ── */
+  P('insDrive',    'INS drive',    0, 100,   0,    'track', (t, v) => { ensureIns(t).ins.drive = Math.round(v) }),
+  P('insCrush',    'INS crush',    2, 16,    16,   'track', (t, v) => { ensureIns(t).ins.crush = Math.round(v) }),
+  P('insFiltOn',   'INS filter',   0, 3,     0,    'track', (t, v) => { ensureIns(t).ins.filtOn = Math.round(v) }),
+  P('insFiltFreq', 'INS cutoff',   20, 20000, 20000,'track', (t, v) => { ensureIns(t).ins.filtFreq = v }),
+  P('insFiltQ',    'INS reso',     0.1, 18,  1,    'track', (t, v) => { ensureIns(t).ins.filtQ = v }),
   /* ── project-level (lane.track = -1) ── */
   P('masterVol', 'Master',    0, 1, 0.85, 'project', (p, v) => { p.masterVol = v }),
   /* ── master section (v0.8.0): EQ3 + glue comp — NEUTRAL defaults (EQ 0 dB,
@@ -116,4 +146,4 @@ function laneModeBackfill(param, mode) {
   if (mode === 'lock' || mode === 'state') return mode;
   return SOUND_IDS.has(param) ? 'lock' : 'state';
 }
-export { paramById, paramApply, paramNorm, paramDenorm, paramsForTrack, laneModeBackfill, SOUND_IDS, ensureMaster, MASTER_IDS, MASTER_DEFAULTS, MASTER_RANGES };
+export { paramById, paramApply, paramNorm, paramDenorm, paramsForTrack, laneModeBackfill, SOUND_IDS, ensureMaster, MASTER_IDS, MASTER_DEFAULTS, MASTER_RANGES, ensureIns, INS_DEFAULTS, INS_RANGES };

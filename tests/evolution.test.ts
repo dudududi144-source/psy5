@@ -18,7 +18,7 @@ import { SCALES, stepEvents } from '../js/model.js'
 import { evolutionState, evolutionSeedOf, evolvedSongEvents, evolvedLiveEvents, absBarOf } from '../js/evolution.js'
 
 const SEED = 424242
-const OFF_PIN = '3feaf9cb45503864' /* post-P1 OFF baseline (Run 17 Phase 2 record; 4385 events) */
+const OFF_PIN = 'b35b75f6a82e48ae' /* post-P3 OFF baseline (v0.10.0: composer ins lanes ride the ev.lock channel per v0.5.0 lane semantics; 4385 events — count unchanged; v0.9.0 value 3feaf9cb45503864 recorded in CHANGELOG) */
 const GATE_SEED = 777
 const GATE_MIN_DIFF = 200
 

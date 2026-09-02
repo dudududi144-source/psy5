@@ -616,7 +616,8 @@ const ok31=notes>5000&&viol===0&&det31&&divOk;
 gate('G31','chord progression engine: every bass/lead/pad/arp note ∈ the active bar\'s diatonic triad via the shared songSteps expansion (0 violations), compose determinism ×3, ≥8 distinct progressions / 20 seeds / style',ok31,'notes='+notes+' violations='+viol+' det='+det31+' diversity='+JSON.stringify(div))}catch(e){gate('G31','chord progression engine',false,'ERR '+e.message)}
 /* G32 — per-bar evolution (offline — CI-asserted, v0.9.0 P2): the strict
    OFF contract first — evolution OFF/absent must produce the EXACT post-P1
-   schedule (evHash == pinned 3feaf9cb45503864, 4385 events). Then ON
+   schedule (evHash == pinned b35b75f6a82e48ae, 4385 events — v0.10.0 value;
+   the composer's ins lanes ride the ev.lock channel per v0.5.0 semantics). Then ON
    (seed 777, intensity 35): ≥200 schedule events differ vs OFF (seed
    measured with 3.5× margin — 703 actual), replay determinism (two walks
    hash-identical), intensity-0 == OFF (op probabilities all zero → the
@@ -624,7 +625,7 @@ gate('G31','chord progression engine: every bass/lead/pad/arp note ∈ the activ
 try{
 const c32=compose('FULL-ON',3,424242);const p32=JSON.parse(JSON.stringify(c32.project));
 const off32=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
-const offOk=off32.evs.length===4385&&evHash(off32.evs)==='3feaf9cb45503864';
+const offOk=off32.evs.length===4385&&evHash(off32.evs)==='b35b75f6a82e48ae';
 const key32=e=>e.s+'|'+e.track;const sig32=e=>JSON.stringify([e.t.toFixed(6),e.vel.toFixed(3),e.note,JSON.stringify(e.lock||{})]);
 const diff32=(A,B)=>{const ma=new Map(A.map(e=>[key32(e),sig32(e)])),mb=new Map(B.map(e=>[key32(e),sig32(e)]));let d=0;for(const[k,v]of ma)if(mb.get(k)!==v)d++;for(const k of mb.keys())if(!ma.has(k))d++;return d};
 evolutionState(p32);p32.evolution.on=true;p32.evolution.intensity=35;p32.evolution.seed=777;
@@ -633,8 +634,8 @@ const on32b=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
 const p32z=JSON.parse(JSON.stringify(c32.project));evolutionState(p32z);p32z.evolution.on=true;p32z.evolution.intensity=0;p32z.evolution.seed=777;
 const z32=songSchedule(JSON.parse(JSON.stringify(p32z)),0.05);
 const d32=diff32(off32.evs,on32.evs);
-const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='3feaf9cb45503864';
-gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4385) diff='+d32+'/4385 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='3feaf9cb45503864')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
+const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='b35b75f6a82e48ae';
+gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4385) diff='+d32+'/4385 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='b35b75f6a82e48ae')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
 /* G33 — song library (offline — CI-asserted, v0.9.0 P3): recipes are
    RECIPES — 3 stored (style,seed,len) recipes compose twice → identical
    JSON + non-empty scenes + length within ±5%. Persistence: the library
@@ -724,6 +725,51 @@ const rM=await renderSong(p34m,{trackFilter:0,samples:cache34});
 const fbOk=(rM.sampleFallbacks|0)>0&&rms34(rM.buf)>0.01;
 const ok34=loadOk&&rmsK>0.01&&rmsB>0.01&&ratio>0.4&&ratio<0.65&&revShift>Math.round(44100*0.05)&&maxDiff34<1e-6&&fbOk;
 gate('G34','sample voice: engine-path load, mixed render (sample kick + synth bass both audible), tune+12 halves the support, reverse flips the onset order, two renders maxDiff<1e-6, missing→synth fallback counted',ok34,'rmsK='+rmsK.toFixed(4)+' rmsB='+rmsB.toFixed(4)+' half='+ratio.toFixed(3)+' revShift='+revShift+'f maxDiff='+maxDiff34.toExponential(2)+' fb='+fbOk+' spawns='+rK.sampleSpawns+' steals='+rK.sampleSteals)}catch(e){gate('G34','sample voice',false,'ERR '+e.message)}
+/* G35 — PER-TRACK INSERT FX (offline — CI-asserted, v0.10.0 P3):
+   (a) NEUTRAL: a lane-free buildStyle project renders identically before and
+       after a full ins perturb→restore round-trip ON THE SAME ENGINE
+       (syncMix-anchored, exactly what the live mixer does) — maxDiff < 1e-6
+       (expected 0: drive returns to the exact dry path, crush to the
+       null-curve passthrough, the filter node is removed again);
+   (b) STRUCTURAL: after restore no filter node exists and the crush
+       WaveShaper is back to the null-curve passthrough on every chain;
+   (c) DRIVE probe (non-vacuous): a saw bass stem crest DROPS with drive 85
+       (soft-clip squashes peaks) — crest change logged, > 0.5 dB;
+   (d) LP probe (non-vacuous): a hat stem (broadband noise) through LP
+       200 Hz loses its high band — first-difference RMS drop > 20 dB. */
+try{
+const p35=buildStyle('PSYTRANCE',42);
+const rA=await renderBounce(p35,2);
+/* (a)+(b): perturb → restore on ONE engine, then render */
+const flip35=(on)=>{p35.tracks.forEach(t=>{paramApply(t,'insDrive',on?50:0);paramApply(t,'insCrush',on?4:16);paramApply(t,'insFiltOn',on?2:0);paramApply(t,'insFiltFreq',on?800:20000);paramApply(t,'insFiltQ',on?6:1)})};
+const sch35=bounceSchedule(p35,2,.05);
+const oc35=new OfflineAudioContext(2,Math.ceil(sch35.total*44100),44100);
+const eng35=new PooledEngine(oc35);
+eng35.syncMix(p35);
+for(const e of sch35.evs)eng35.trigger(p35.tracks[e.track],e.t,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sch35.stepDur);
+/* bounceSchedule evs carry absolute t — trigger exactly like renderBounce does */
+flip35(true);eng35.syncMix(p35);flip35(false);eng35.syncMix(p35);
+const buf35=await oc35.startRendering();
+let maxDiff35=0;{const dA=rA.buf.getChannelData(0),dB=buf35.getChannelData(0);const n=Math.min(dA.length,dB.length);for(let i=0;i<n;i++){const d=Math.abs(dA[i]-dB[i]);if(d>maxDiff35)maxDiff35=d}}
+const structOk=eng35.chains.every(ch=>!ch.insFilt&&ch.cWS.curve===null);
+/* (c): drive crest on the saw bass stem */
+p35.tracks.forEach(t=>{paramApply(t,'insDrive',0)});
+const rC0=await renderBounce(p35,2,{trackIdx:4});
+p35.tracks.forEach(t=>{paramApply(t,'insDrive',85)});
+const rC1=await renderBounce(p35,2,{trackIdx:4});
+p35.tracks.forEach(t=>{paramApply(t,'insDrive',0)});
+const crest=buf=>{let pk=0,s=0,n=0;for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>pk)pk=a;s+=d[i]*d[i];n++}}const rms=Math.sqrt(s/n);return rms>0?pk/rms:0};
+const crest0=20*Math.log10(crest(rC0.buf)),crest1=20*Math.log10(crest(rC1.buf));
+/* (d): LP 200 Hz on the hat stem — first-difference (HF) RMS drop */
+const hpRms=buf=>{let s=0,n=0;for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=1;i<d.length;i++){const h=d[i]-d[i-1];s+=h*h;n++}}return Math.sqrt(s/n)};
+const rH0=await renderBounce(p35,2,{trackIdx:2});
+p35.tracks.forEach(t=>{paramApply(t,'insFiltOn',1);paramApply(t,'insFiltFreq',200);paramApply(t,'insFiltQ',0.7)});
+const rH1=await renderBounce(p35,2,{trackIdx:2});
+p35.tracks.forEach(t=>{paramApply(t,'insFiltOn',0);paramApply(t,'insFiltFreq',20000)});
+const hp0=hpRms(rH0.buf),hp1=hpRms(rH1.buf);
+const dropDb=20*Math.log10(hp0/Math.max(hp1,1e-9));
+const ok35=maxDiff35<1e-6&&structOk&&(crest0-crest1)>0.5&&dropDb>20;
+gate('G35','insert FX: neutral (perturb→restore renders identical, maxDiff<1e-6; filter node removed, crush back to null-curve), drive squashes saw crest (>0.5 dB, logged), LP 200 Hz drops the hat high band >20 dB',ok35,'maxDiff='+maxDiff35.toExponential(2)+' struct='+structOk+' crest '+crest0.toFixed(2)+'→'+crest1.toFixed(2)+' dB hpDrop='+dropDb.toFixed(1)+' dB')}catch(e){gate('G35','insert FX',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

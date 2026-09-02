@@ -50,6 +50,11 @@ describe('param registry', () => {
         const map: any = { smpGain: 'gain', smpTune: 'tune', smpStart: 'startPct', smpEnd: 'endPct', smpRev: 'reverse', smpAtk: 'attackMs', smpRel: 'releaseMs' }
         const want = pd.id === 'smpRev' ? (pd.min >= 0.5 ? 1 : 0) : (pd.id === 'smpAtk' || pd.id === 'smpRel') ? Math.round(pd.min) : pd.min
         expect((t as any).sampleParams[map[pd.id]]).toBe(want)
+      } else if (pd.id.startsWith('ins')) {
+        /* v0.10.0 insert-FX params → track.ins (ensureIns path) */
+        const map: any = { insDrive: 'drive', insCrush: 'crush', insFiltOn: 'filtOn', insFiltFreq: 'filtFreq', insFiltQ: 'filtQ' }
+        const want = (pd.id === 'insDrive' || pd.id === 'insCrush' || pd.id === 'insFiltOn') ? Math.round(pd.min) : pd.min
+        expect((t as any).ins[map[pd.id]]).toBe(want)
       } else {
         expect(t.sound[pd.id]).toBe(pd.min)
       }

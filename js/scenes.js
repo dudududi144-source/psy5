@@ -37,7 +37,7 @@
      session (G27 pins the exact sequence for a fixed seed). */
 import { LIMITS } from './limits.js';
 import { deep, fnv, mulberry32 } from './model.js';
-import { paramApply } from './params.js';
+import { paramApply, ensureIns } from './params.js';
 
 function sceneAdd(p) {
   if (!p || p.scenes.length >= LIMITS.MAX_SCENES) return -1;
@@ -112,6 +112,10 @@ function chainNext(p) {
    automation lanes on top (documented precedence). */
 const MIX_TRACK_FIELDS = [
   ['vol', 0, 1], ['pan', -1, 1], ['sendA', 0, 1], ['sendB', 0, 1], ['scAmount', 0, 100],
+  /* v0.10.0: optional INSERT-FX snapshot fields — old snapshots load
+     unchanged (absent fields are skipped); new snapshots carry them in
+     canonical field order. */
+  ['insDrive', 0, 100], ['insFiltFreq', 20, 20000],
 ];
 /* master payload — validated + persisted from v0.8.0; applied via paramApply
    (unregistered ids are skipped, so pre-master-engine loads stay inert) */
@@ -177,16 +181,21 @@ function sceneSetMix(p, i, mix) {
 function captureSceneMix(p) {
   const tracks = {};
   (p.tracks || []).forEach((t, ti) => {
+    const ins = ensureIns(t).ins;
     tracks[ti] = {
       vol: t.mix.vol, pan: t.mix.pan,
       sendA: t.mix.sendA, sendB: t.mix.sendB,
       scAmount: t.scAmount == null ? 0 : t.scAmount,
+      insDrive: ins.drive, insFiltFreq: ins.filtFreq,
     };
   });
   const out = { tracks };
   if (p.master && typeof p.master === 'object') out.master = deep(p.master);
   return out;
 }
+
+/* snapshot field → registry id (v0.10.0: includes the INSERT-FX params) */
+const SNAP_PARAM = { vol: 'mix.vol', pan: 'mix.pan', sendA: 'mix.sendA', sendB: 'mix.sendB', scAmount: 'scAmount', insDrive: 'insDrive', insFiltFreq: 'insFiltFreq' };
 
 /* applySceneMix — THE snapshot application primitive (see the block comment
    above). Writes through paramApply (knob-equivalent, clamped); master ids
@@ -201,7 +210,7 @@ function applySceneMix(p, i) {
     const e = snap.tracks[k];
     for (const [f] of MIX_TRACK_FIELDS) {
       if (e[f] == null) continue;
-      paramApply(t, f === 'vol' ? 'mix.vol' : (f === 'pan' ? 'mix.pan' : (f === 'sendA' ? 'mix.sendA' : (f === 'sendB' ? 'mix.sendB' : 'scAmount'))), e[f]);
+      paramApply(t, SNAP_PARAM[f] || f, e[f]);
     }
   }
   if (snap.master) {

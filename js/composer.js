@@ -605,18 +605,35 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   p.currentPattern = 'C1'; p.activeScene = 0;
   p.arranger = { v: 1, on: true, steps: arrSteps, idx: 0, barsIn: 0 };
 
-  /* 4. lane suggestions (v0.5.0 registry, 'state' lanes) */
+  /* 4. lane suggestions (v0.5.0 registry, 'state' lanes) — v0.10.0 adds
+     INSERT-FX automation through the SAME registry lane mechanism:
+     BUILD gets insFiltFreq opening lanes on the LEAD (5) and PAD (6)
+     tracks; RISER gets an insFiltFreq opening + an insDrive rise on the
+     PERC track (3). The kick (track 0) NEVER gets inserts — sacred, like
+     its pattern. Base states carry ins {filtOn:1,...} (mode-static per
+     track so offline renders are time-correct — see engine applyIns;
+     drive is a trim/wet/dry AudioParam crossfade, never a curve swap).
+     Lane evaluation follows the existing project-wide phase semantics
+     (the same shape as the v0.5.0 cutoff lane). */
   const lanes = [];
+  const trackIns = (i, patch) => { const t = p.tracks[i]; if (!t) return; t.ins = Object.assign({ drive: 0, crush: 16, filtOn: 0, filtFreq: 20000, filtQ: 1 }, t.ins || {}, patch) };
   const build = formSections.find(s => s.id === 'BUILD');
   if (build) {
     const len = Math.min(build.bars, 8) * 16;
     lanes.push({ track: 5, param: 'cutoff', mode: 'state', pts: [[0, 600], [Math.floor(len / 2), 2400], [len - 1, 6000]] });
+    trackIns(5, { filtOn: 1, filtFreq: 500, filtQ: 0.8 });
+    lanes.push({ track: 5, param: 'insFiltFreq', mode: 'state', pts: [[0, 500], [Math.floor(len / 2), 5000], [len - 1, 14000]] });
+    trackIns(6, { filtOn: 1, filtFreq: 400, filtQ: 0.8 });
+    lanes.push({ track: 6, param: 'insFiltFreq', mode: 'state', pts: [[0, 400], [Math.floor(len / 2), 3500], [len - 1, 9000]] });
   }
   const riser = formSections.find(s => s.id === 'RISER');
   if (riser) {
     const len = Math.min(riser.bars, 8) * 16;
     lanes.push({ track: 6, param: 'mix.sendA', mode: 'state', pts: [[0, 0.05], [len - 1, 0.9]] });
     lanes.push({ track: 6, param: 'mix.sendB', mode: 'state', pts: [[0, 0.05], [len - 1, 0.85]] });
+    trackIns(3, { filtOn: 1, filtFreq: 600, filtQ: 1.2 });
+    lanes.push({ track: 3, param: 'insFiltFreq', mode: 'state', pts: [[0, 600], [len - 1, 14000]] });
+    lanes.push({ track: 3, param: 'insDrive', mode: 'state', pts: [[0, 0], [Math.floor(len / 2), 25], [len - 1, 60]] });
   }
   p.lanes = lanes.concat(variantLanes);
 

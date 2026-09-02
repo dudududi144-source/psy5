@@ -1,5 +1,7 @@
 import { clamp, MAX_TRACKS, mulberry32 } from './model.js';
 import { ensureVoice, samplePlayback } from './samplestore.js';
+import { ensureIns } from './params.js';
+import { driveCurve, crushCurve, driveTrim } from '../foundation/dsp/inserts.mjs';
 import { planDuck, nextState, duckParams } from '../foundation/dsp/sidechain.mjs';
 import { delaySecondsFor, delayFbClamp, delayDivClamp, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../foundation/dsp/sends.mjs';
 
@@ -21,7 +23,13 @@ class PooledEngine{constructor(ctx,opts){opts=opts||{};this.poolSizes={synthVoic
    and the offline A/B tests). */
 this.masterFlat=!!opts.masterFlat;if(!this.masterFlat){const eqL=this.eqLow=ctx.createBiquadFilter();eqL.type='lowshelf';eqL.frequency.value=100;const eqM=this.eqMid=ctx.createBiquadFilter();eqM.type='peaking';eqM.frequency.value=1000;eqM.Q.value=.8;const eqH=this.eqHigh=ctx.createBiquadFilter();eqH.type='highshelf';eqH.frequency.value=8000;const gc=this.glue=ctx.createDynamicsCompressor();gc.threshold.value=-20;gc.knee.value=6;gc.ratio.value=2;gc.attack.value=.01;gc.release.value=.15;const gm=this.glueMake=ctx.createGain();gm.gain.value=1;this.glueOn=false;this.master.connect(eqL);eqL.connect(eqM);eqM.connect(eqH);eqH.connect(comp);/* compOn 0: glue OUT of the chain */gc.connect(gm);gm.connect(comp)}const dIn=this.dIn=ctx.createGain();const del=this.delay=ctx.createDelay(2);del.delayTime.value=.3;/* feedback loop with a lowpass inside — dark, analog-style repeats */const dLp=this.dLp=ctx.createBiquadFilter();dLp.type='lowpass';dLp.frequency.value=4500;const fb=this.fb=ctx.createGain();fb.gain.value=.35;const dOut=this.dOut=ctx.createGain();dOut.gain.value=.8;dIn.connect(del);del.connect(dLp);dLp.connect(fb);fb.connect(del);del.connect(dOut);dOut.connect(this.master);const rIn=this.rIn=ctx.createGain();const conv=this.conv=ctx.createConvolver();conv.buffer=this.mkIR();const rOut=this.rOut=ctx.createGain();rOut.gain.value=.8;rIn.connect(conv);conv.connect(rOut);rOut.connect(this.master);if(this.masterFlat){this.master.connect(comp)}comp.connect(an);an.connect(ctx.destination);this.noise=this.mkNoise();this.chains=[];this.scCache=[];this.duckState=[];this.duckEvents=0;this._plan={};for(let t=0;t<MAX_TRACKS;t++){const input=ctx.createGain();/* sidechain duck: ONE persistent GainNode per bus, created at init —
 kick events automate it (no per-hit nodes). Idle gain = 1 → zero
-effect until a track's scAmount > 0. */const duck=ctx.createGain();duck.gain.value=1;const pan=ctx.createStereoPanner?ctx.createStereoPanner():ctx.createGain();const sA=ctx.createGain(),sB=ctx.createGain();sA.gain.value=0;sB.gain.value=0;input.connect(duck);duck.connect(pan);pan.connect(this.master);pan.connect(sA);sA.connect(dIn);pan.connect(sB);sB.connect(rIn);this.chains.push({input,pan,duck,sA,sB});this.scCache.push(null);/* per-chain duck envelope state — preallocated, mutated in place */this.duckState.push({t0:-1,dip:1,attack:0,release:0,end:0})}this.synthPool=[];this.drumPool=[];for(let i=0;i<this.poolSizes.synthVoices;i++)this.synthPool.push(new SynthVoice(ctx,this));for(let i=0;i<this.poolSizes.drumVoices;i++)this.drumPool.push(new DrumVoice(ctx,this));this.spawnCount=0;this._voiceSeq=0;this.stealCount=new Uint32Array(4);this.tier0StealAttempts=0;this.dedicated={};this.trackCount=new Uint32Array(MAX_TRACKS);/* ── SAMPLE VOICE state (v0.10.0 P2) ── pre-decoded AudioBuffer cache
+effect until a track's scAmount > 0. */const duck=ctx.createGain();duck.gain.value=1;const pan=ctx.createStereoPanner?ctx.createStereoPanner():ctx.createGain();const sA=ctx.createGain(),sB=ctx.createGain();sA.gain.value=0;sB.gain.value=0;/* v0.10.0 INSERT chain: input → [drive: dTrim→dWS→dWet ‖ dDry] → cIn → cWS → [filt?] → duck → pan.
+EXACT-BYPASS defaults: drive 0 = dry path only (dTrim 1, dWet 0, dDry 1 —
+the wet branch contributes exact zeros), crush 16 = null-curve WaveShaper
+passthrough, filter REMOVED from the chain. The drive transfer curve is
+precomputed ONCE (foundation driveCurve, k=10); AMOUNT is an automatable
+input-trim AudioParam — curve swaps are not time-anchorable, so offline
+renders stay time-correct (foundation/dsp/inserts.mjs header). */const dTrim=ctx.createGain(),dWS=ctx.createWaveShaper(),dWet=ctx.createGain(),dDry=ctx.createGain(),cIn=ctx.createGain(),cWS=ctx.createWaveShaper();dWS.curve=this._driveC||(this._driveC=driveCurve());dWet.gain.value=0;dDry.gain.value=1;input.connect(dTrim);dTrim.connect(dWS);dWS.connect(dWet);dWet.connect(cIn);input.connect(dDry);dDry.connect(cIn);cIn.connect(cWS);cWS.connect(duck);duck.connect(pan);pan.connect(this.master);pan.connect(sA);sA.connect(dIn);pan.connect(sB);sB.connect(rIn);this.chains.push({input,pan,duck,sA,sB,dTrim,dWet,dDry,cWS,insFilt:null,insFSig:'off',cCurved:0});this.scCache.push(null);/* per-chain duck envelope state — preallocated, mutated in place */this.duckState.push({t0:-1,dip:1,attack:0,release:0,end:0})}this.synthPool=[];this.drumPool=[];for(let i=0;i<this.poolSizes.synthVoices;i++)this.synthPool.push(new SynthVoice(ctx,this));for(let i=0;i<this.poolSizes.drumVoices;i++)this.drumPool.push(new DrumVoice(ctx,this));this.spawnCount=0;this._voiceSeq=0;this.stealCount=new Uint32Array(4);this.tier0StealAttempts=0;this.dedicated={};this.trackCount=new Uint32Array(MAX_TRACKS);/* ── SAMPLE VOICE state (v0.10.0 P2) ── pre-decoded AudioBuffer cache
 (context-independent — the SAME buffers serve live + offline renders),
 per-track active-voice registry (cap 8, oldest-stolen — pool discipline),
 honest counters for gates/evidence. opts.samples seeds the cache (offline
@@ -32,7 +40,27 @@ mkIR(){/* deterministic synthetic stereo IR (PSY6): seeded decorrelated noise
 Generated at init — no external files, no Math.random. Same seeds →
 byte-identical IR on every machine. */const c=this.ctx,len=Math.round(c.sampleRate*IR_LEN_S),b=c.createBuffer(2,len,c.sampleRate);b.getChannelData(0).set(irChannel(len,IR_SEEDS[0],IR_DECAY));b.getChannelData(1).set(irChannel(len,IR_SEEDS[1],IR_DECAY));return b}
 syncMix(p,when){const at=(when==null)?this.ctx.currentTime:when;this.applyMaster(p,at);const anySolo=p.tracks.some(t=>t.mix.solo);p.tracks.forEach((t,i)=>{const ch=this.chains[i];if(!ch)return;const m=t.mix,aud=!m.mute&&(!anySolo||m.solo);const g=aud?m.vol*m.vol:0;ch.input.gain.setTargetAtTime(g,at,.02);if(ch.pan.pan)ch.pan.pan.setTargetAtTime(clamp(m.pan,-1,1),at,.02);/* sendA/sendB are POST-FADER taps (taken after the strip fader+pan) —
-the two shared send buses feed the master chain input */ch.sA.gain.setTargetAtTime(m.sendA,at,.02);ch.sB.gain.setTargetAtTime(m.sendB,at,.02);this.scCache[i]=duckParams(t)});/* BPM-synced delay: division 1/8|3/16|1/4 (default 3/16) + feedback 0..80% */const fx=p.fx||{};this.delay.delayTime.setTargetAtTime(delaySecondsFor(delayDivClamp(fx.delayDiv),p.bpm),at,.08);this.fb.gain.setTargetAtTime(delayFbClamp(fx.delayFb),at,.08)}
+the two shared send buses feed the master chain input */ch.sA.gain.setTargetAtTime(m.sendA,at,.02);ch.sB.gain.setTargetAtTime(m.sendB,at,.02);this.scCache[i]=duckParams(t);this.applyIns(i,t,at)});/* BPM-synced delay: division 1/8|3/16|1/4 (default 3/16) + feedback 0..80% */const fx=p.fx||{};this.delay.delayTime.setTargetAtTime(delaySecondsFor(delayDivClamp(fx.delayDiv),p.bpm),at,.08);this.fb.gain.setTargetAtTime(delayFbClamp(fx.delayFb),at,.08)}
+/* ── per-track INSERT FX apply (v0.10.0 P3) ──
+Called from syncMix with the SAME time anchor as the mix glides (live:
+currentTime/launch anchor; offline render: the step's exact time — filter
+freq/Q and drive trim/wet/dry are AudioParam automations, time-correct in
+offline bounces). MODE changes (drive 0↔nonzero wet/dry swap, crush curve
+null↔staircase, filter insert/remove + type) rebuild immediately —
+documented click risk on mode changes only; the composer never lanes
+crush/filtOn, so composed renders are mode-static per track. */
+applyIns(i,t,at){const ch=this.chains[i];if(!ch)return;const ins=ensureIns(t).ins;const d=ins.drive>0,cOn=ins.crush<16,fOn=ins.filtOn>0;
+/* drive: trim glides (setTargetAtTime); the wet/dry BYPASS gate uses
+setValueAtTime — an exponential approach never exactly reaches its target,
+and the neutral contract needs the dry path EXACTLY 1 / wet EXACTLY 0 after
+a restore. The 0↔1 swap is a mode change (documented click risk). */
+ch.dTrim.gain.setTargetAtTime(driveTrim(ins.drive),at,.03);ch.dWet.gain.setValueAtTime(d?1:0,at);ch.dDry.gain.setValueAtTime(d?0:1,at);
+/* crush: null-curve passthrough ↔ staircase curve (immediate swap) */
+if(!this._crushC)this._crushC={};
+if(!cOn){if(ch.cWS.curve!==null)ch.cWS.curve=null}else if(ch.cCurved!==ins.crush){if(!this._crushC[ins.crush])this._crushC[ins.crush]=crushCurve(ins.crush);ch.cWS.curve=this._crushC[ins.crush];ch.cCurved=ins.crush}
+/* filter: presence rebuild + anchored freq/Q */
+const fSig=fOn?(ins.filtOn===1?'lp':ins.filtOn===2?'hp':'bp'):'off';
+if(fSig!==ch.insFSig){ch.insFSig=fSig;if(ch.insFilt){try{ch.insFilt.disconnect()}catch(e){}ch.insFilt=null}if(fOn){const f=ch.insFilt=this.ctx.createBiquadFilter();f.type=fSig==='lp'?'lowpass':fSig==='hp'?'highpass':'bandpass';f.frequency.value=ins.filtFreq;f.Q.value=ins.filtQ;ch.cWS.disconnect();ch.cWS.connect(f);f.connect(ch.duck)}else{ch.cWS.disconnect();ch.cWS.connect(ch.duck)}}else if(fOn){ch.insFilt.frequency.setTargetAtTime(ins.filtFreq,at,.03);ch.insFilt.Q.setTargetAtTime(ins.filtQ,at,.03)}}
 /* ── master section apply (v0.8.0) ──
 applyMaster(p, when) — the ONE master-apply path (syncMix calls it with the
 same time anchor as the mix glides; the offline render anchors it at step

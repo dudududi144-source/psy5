@@ -370,12 +370,14 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
        bass/lead/pad/arp per the active progression, so all whole-project
        hashes moved vs v0.8.0 (v0.8.0 values recorded in CHANGELOG 0.8.0:
        FULL-ON 338e…/1d9c…/3db8…, DARK-PSY 038f…/6290…/766a…, PROGRESSIVE
-       d8c7…/c73d…/d6bb…). Determinism re-proven: same seed → byte-identical;
+       d8c7…/c73d…/d6bb…). v0.10.0: hashes moved AGAIN (composer ins lanes
+       + ins base states ride the project JSON; v0.9.0 values recorded in
+       CHANGELOG 0.10.0). Determinism re-proven: same seed → byte-identical;
        rhythm tracks byte-identical to v0.8.0 (pinned in the harmony suite). */
     const pins: Record<string, string[]> = {
-      'FULL-ON': ['38651edda8df6cc8', 'fa4d72e80c483cd2', 'd5663948fe1e9727'],
-      'DARK-PSY': ['e9d9e73a3350b54b', '617e80edf1f70b77', '4867687a52d13d02'],
-      'PROGRESSIVE': ['d724150eef4b7e93', '1a61027f125006af', 'd14ce4b11a17e6f3'],
+      'FULL-ON': ['ffb3e7c9350ccfb6', 'bcb04a99c5b8c883', '2fc28523aae7aa1c'],
+      'DARK-PSY': ['4d40a1820bc5c99f', '913650f484f5eee5', '2ab09cc2e6407cdd'],
+      'PROGRESSIVE': ['0e306937f6cca52c', '661848d2df4f0126', '5bddafec47419910'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {

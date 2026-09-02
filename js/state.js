@@ -1,6 +1,6 @@
 import { clamp, mulberry32, loopLen, M_ENERGY, M_SPACE } from './model.js';
 import { COMPOSER_STYLES } from './composer.js';
-import { laneModeBackfill, paramApply, paramById, paramDenorm, ensureMaster } from './params.js';
+import { laneModeBackfill, paramApply, paramById, paramDenorm, ensureMaster, ensureIns } from './params.js';
 import { recordPoint, quantStep } from './autorec.js';
 import { normalizeSceneMix, applySceneMix } from './scenes.js';
 import { ensureVoice } from './samplestore.js';
@@ -29,6 +29,7 @@ function midiPathToParam(path){
 const parts=String(path).split('.');
 if(parts[0]==='track'&&parts[2]==='mix')return{track:+parts[1],param:'mix.'+parts[3]};
 if(parts[0]==='track'&&parts[2]==='scAmount')return{track:+parts[1],param:'scAmount'};
+if(parts[0]==='track'&&parts[2]==='ins')return{track:+parts[1],param:'ins.'+parts[3]};/* v0.10.0 insert FX */
 if(parts[0]==='master'&&parts[1]==='vol')return{track:-1,param:'masterVol'};
 if(parts[0]==='master'&&parts.length===2)return{track:-1,param:parts[1]};
 if(parts[0]==='macro')return{track:-1,param:'macro.'+parts[1]};
@@ -37,7 +38,7 @@ function recordFromMidiPath(p,path){
 const map=midiPathToParam(path);if(!map||!p)return false;
 let raw=null;
 if(map.track>=0){const t=p.tracks[map.track];if(!t)return false;
-raw=map.param==='scAmount'?t.scAmount:t.mix[map.param.slice(4)]}
+raw=map.param==='scAmount'?t.scAmount:map.param.startsWith('ins.')?ensureIns(t).ins[map.param.slice(4)]:t.mix[map.param.slice(4)]}
 else if(map.param==='masterVol')raw=p.masterVol;
 else if(map.param.startsWith('macro.'))raw=p.macroVals[+map.param.slice(6)];
 else raw=p.master?ensureMaster(p)[map.param]:undefined;
@@ -80,6 +81,7 @@ function resolveMidiParam(p,path,v01){
   if(parts[0]==='track'){
     const t=p.tracks[+parts[1]];if(!t||!t.mix)return false;
     if(parts[2]==='scAmount'){t.scAmount=Math.round(v*100);return true}
+    if(parts[2]==='ins'){/* v0.10.0: insert FX via the registry (denorm → full range) */const id='ins.'+parts[3];return paramApply(t,id,paramDenorm(id,v))!=null}
     if(parts[2]==='mix'){
       if(parts[3]==='vol'){t.mix.vol=clamp(v,0,1);return true}
       if(parts[3]==='pan'){t.mix.pan=clamp(v*2-1,-1,1);return true}

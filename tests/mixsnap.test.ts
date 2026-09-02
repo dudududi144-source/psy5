@@ -81,7 +81,7 @@ describe('mix snapshot model (normalize/set/capture)', () => {
     p.tracks[4].mix.mute = true
     p.tracks[4].mix.solo = true
     const cap = captureSceneMix(p)
-    expect(cap.tracks[4]).toEqual({ vol: 0.33, pan: 0.25, sendA: 0.4, sendB: 0, scAmount: 60 })
+    expect(cap.tracks[4]).toEqual({ vol: 0.33, pan: 0.25, sendA: 0.4, sendB: 0, scAmount: 60, insDrive: 0, insFiltFreq: 20000 })
     expect(JSON.stringify(cap)).not.toContain('mute')
     expect(JSON.stringify(cap)).not.toContain('solo')
   })
