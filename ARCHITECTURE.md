@@ -488,3 +488,75 @@ b and ? were added.
 ---
 Architecture version: 1.4
 Status: IMPLEMENTED
+
+## 16. Scene Evolution + Pro Growth (v0.9.0)
+
+### Chord progression engine (`foundation/music/progression.mjs`)
+
+One seeded progression per project: 12 templates per style family (4/8-bar
+loops of diatonic degrees 0..6), picked by `fnv1a(seed + ':prog')`. A chord
+is the DIATONIC TRIAD (d, d+2, d+4) — mode-aware because the semitones come
+from the style's own scale (phrygian/minor/harmonic-minor). The project
+carries `p.harmony = { family, progId, progBars, degrees }` so gates, the
+library and evolution can re-derive chords without re-composing. The
+composer bakes per PATTERN bar (`chord = degrees[patternBar % progBars]`,
+offset 0 — section starts are harmonic anchors): bass roots, lead-motif
+snap (nearest chord-tone class, deterministic tie-break), pad root+fifth,
+arp chord-tone cycles. **Rhythm tracks never consume the progression**;
+their v0.8.0 bytes are pinned by 15 digests. The harmonic invariant is
+audited through the SHARED `songSteps` expansion (the same walk renderSong,
+songMidi and the live scheduler bookkeeping use) — 0 violations over 69k+
+notes in the bun suite, 0 over 8,448 in gate G31.
+
+### Evolution pipeline position (`js/evolution.js`)
+
+```
+scene launch (applySceneMix glide) → EVOLUTION (event-list transform) → lane automation (locks/registry)
+```
+
+Evolution rewrites the EVENT LIST at each step of the song walk — never the
+pattern data, never the timing grid. Base events come from `stepEvents`
+(the one deterministic per-step function every consumer already shares);
+ops are seeded per (evolution seed, absolute song bar, step-in-bar) via
+`barSeed`; results flow through the existing lock channel (voice-level
+param overrides) clamped to param-registry ranges. PRECEDENCE: where a lane
+covers a (track,param) pair at a step, the LANE WINS — evolution only fills
+lane-free pairs (documented in code and here). Bass rolls inject the chord
+root of the AUDIBLY active PATTERN bar (not the song bar — 8-bar progressions
+repeat inside longer sections and the baked harmony is what sounds). The
+offline walk knows the absolute bar directly; the live scheduler derives it
+from the arranger position (`absBarOf`) and pauses evolution when the
+arranger is off (no song position — manual launches stop the arranger).
+`p.evolution = { on: false, intensity: 35, seed? }` is materialized lazily;
+OFF/absent → `stepEvents` output is returned untouched (the byte-identity
+contract G32 pins).
+
+### Library = recipes (`js/library.js`)
+
+`p.library = null | { songs: [{id,name,style,seed,len,composerMeta}],
+activeSongId }`. A song is the compose() INPUT TUPLE — rendering means
+`compose(style, len, seed)` in memory (deterministic, byte-reproducible);
+no pattern data is duplicated. Ids derive from fnv of the recipe content +
+sequence (deterministic). Persistence: absent → null; a present library is
+rebuilt canonically inside `loadProjectObj` (invalid entries dropped,
+active pointer fixed) — the same load→save byte-stability discipline as
+scenes. Album continuity (stash/restore) lives in the UI glue
+(`js/ui/library.js`): LOAD and library-target COMPOSE NEW carry the album;
+the plain header COMPOSE starts fresh (intentional).
+
+### Form-growth tiers (`js/composer.js`)
+
+Lengths ≤8 min keep the per-style 7-section chains (byte-identical, pinned).
+Lengths >8 min compose the 11-section EXTENDED_CHAIN (INTRO, BUILD, DROP,
+BREAK, RISER, DROP2, BREAK2, BRIDGE, DROP3, OUTRO, OUTRO2 — weights sum 1)
+and map every section to a canonical BEHAVIOR (`beh`: DROP2/DROP3→DROP,
+BREAK2/BRIDGE→BREAK, OUTRO2→OUTRO) consumed by `fillSection`,
+`sectionMotif` and `mixForSection`, so grammar, snapshots and motif ops
+stay coherent on new sections. `allocateBars` walks the PASSED weight list
+(the Run-15 NaN regression is pinned). Memory tiers: full-song renders
+refuse >`SONG_HARD_MAX_SEC` (1800 s) before any Web Audio allocation
+(unit-tested null return); 10–30 min renders are user-confirmed with the
+progress/cancel modal; stems and SECTION bounce keep the 10-min
+`SONG_MAX_SEC` cap via `songStemsGuard`. Long-form project JSON exceeds the
+~5 MB localStorage quota (12-min ≈ 3.8 MB, 20-min ≈ 6.4 MB) — SAVE fails by
+design there; EXPORT/SHARE unaffected (documented in README + CHANGELOG).

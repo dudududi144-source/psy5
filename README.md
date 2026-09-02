@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 300 tests across 26 files — 300 pass / 0 fail (303842 expect() calls)
+bun test             # 336 tests across 28 files — 336 pass / 0 fail (326537 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -67,7 +67,9 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/limits.test.ts` | 14 | v0.5.0 ceilings: 16 tracks / 128 steps / 64 scenes, mixed loopLen, addTrack, step-alias regression, legacy byte-stability |
 | `tests/scenes.test.ts` | 14 | scene bank: add/duplicate/clear/reorder/rename/color/bars/fill, chain over 32+ scenes, launch semantics, persistence |
 | `tests/params.test.ts` | 12 | param registry completeness + clamps, recordPoint/quantStep math, applyLanes state-vs-lock, MIDI→lane mapping |
-| `tests/composer.test.ts` | 27 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed project-wide uniqueness, output integrity + v0.7.0 section variants (pairwise ≥ 0.15, KICK-SACRED bound, pinned form fingerprint, pinned legacy hashes) + FOREST/HI-TECH recipes |
+| `tests/composer.test.ts` | 41 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed project-wide uniqueness, output integrity + v0.7.0 section variants (pairwise ≥ 0.15, KICK-SACRED bound, pinned form fingerprint, pinned legacy hashes) + FOREST/HI-TECH recipes + v0.9.0 chord-progressions (harmonic invariant via the shared expansion, diversity, rhythm byte-identity) + 12/20-min growth (extended chain, allocateBars regression, SONG_HARD_MAX_SEC refusal) |
+| `tests/evolution.test.ts` | 15 | v0.9.0 per-bar evolution: OFF byte-identity contract (pinned post-P1 schedule), ON diff ≥200, replay determinism, intensity-0 == OFF, op hygiene (chord-root rolls, lane precedence, clamps), live absBar mapping |
+| `tests/library.test.ts` | 7 | v0.9.0 song library: recipe round-trip (compose → recipeFromProject → composeRecipe byte-identical), CRUD + deterministic ids, JSON/save/loadProjectObj/share persistence, legacy null, G33 support |
 | `tests/midifile.test.ts` | 9 | v0.7.0 MIDI export: format-1 writer, VLQ multi-byte, stable ordering, dependency-free parse-back, `.mid == WAV schedule` note-for-note identity, byte-identical exports |
 | `tests/follow.test.ts` | 13 | v0.7.0 follow actions: model validation, followBars precedence, all modes' 20-transition simulations, prob=0 fallback, seeded replayability, JSON + share round-trips |
 | `tests/mixsnap.test.ts` | 14 | v0.8.0 scene mix snapshots: canonical validation/clamps, registry application, walk-order launch trace, persistence + share round-trips, composer energy-curve payloads (kick excluded), determinism incl. snapshots, form-fp unchanged |
@@ -96,16 +98,17 @@ Honest subset classification (v0.4.0):
 | `G21`, `G22`, `G23`, `G24` | v0.5.0/v0.6.0 offline+pure set (long patterns / automation / composer / **song render**) | CI + local |
 | `G26` (MIDI export), `G27` (follow actions) | v0.7.0 offline+pure set (format-1 parse-back / seeded chain simulation) | CI + local |
 | `G28` (scene mix snapshots), `G29` (master EQ+glue), `G30` (song stems + section bounce) | v0.8.0 offline+pure set (snapshot RMS ratio + null-mix control / neutral tolerance + crest compression / stem frames + RMS ordering + slice equality) | CI + local |
+| `G31` (chord progression engine), `G32` (per-bar evolution), `G33` (song library) | v0.9.0 offline+pure set (0 chord-tone violations via the shared expansion + determinism + diversity / OFF==pin + ON diff ≥200 + replay + intensity-0 / recipes compose deterministically + save/share round-trips + canonical rebuild) | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.8.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **27 MAIN entries**, of
-which **25 are hard** (offline/pure — CI asserts all 25, including G24 song
+Gate-truth accounting (v0.9.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **32 MAIN entries**, of
+which **30 are hard** (offline/pure — CI asserts all 30, including G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
-G30 stems/sections) and **2 are evidence-only realtime** (G17 live capture,
-G25 record song — they run on-device every time, are reported as info in CI,
-and are exercised from the production URL at every release). WORKLET: 3/3
-reduced set. Numbering gaps G3/G4/G7/G20
+G30 stems/sections, G31 progressions, G32 evolution, G33 library) and
+**2 are evidence-only realtime** (G17 live capture, G25 record song — they
+run on-device every time, are reported as info in CI, and are exercised
+from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
 never existed in any shipped commit (verified with `git log -S` across all
 history) and are left unrenumbered.
 
@@ -205,6 +208,48 @@ standard MIDI file export, and seeded follow actions for performance.
   transitionCounter)`) — the same seed + start replays the identical
   sequence (G27 pins it). **PRECEDENCE: PLAY SONG always follows the
   arranger and ignores follow actions.**
+
+## Features (v0.9.0) — SCENE EVOLUTION + PRO GROWTH
+
+- **CHORD PROGRESSION ENGINE** — every composed project now carries a
+  seeded chord progression (`p.harmony`): 12 templates per style family
+  (4/8-bar diatonic loops, mode-aware triad voicings), picked by
+  `fnv1a(seed+':prog')`. Bass roots, lead-motif harmonization (nearest
+  chord-tone snap) and pad/arp voicings follow the active bar's chord;
+  kick/hats/perc/snare/fx are byte-identical to v0.8.0 (pinned digests).
+  **Harmonic invariant: 0 off-chord tonal notes across 69k+ audited notes**
+  via the shared songSteps expansion (G31). 10+ distinct progressions
+  across 20 seeds per style.
+- **PER-BAR EVOLUTION** (Perform tab → arranger panel) — opt-in
+  (`p.evolution`, default OFF) deterministic section morphing: hat density
+  shifts, chord-root bass rolls, ±1-scale-degree lead contour, perc ghosts,
+  cutoff/sendA creep — seeded per (evolution seed, song bar) through the
+  existing event machinery. Precedence documented: snapshot launch →
+  evolution → lane automation (lane-covered pairs win per-step). Live PLAY
+  SONG keys evolution to the arranger position — the same bar morphs
+  identically offline. **Evolution-OFF determinism contract: OFF renders
+  are BYTE-IDENTICAL to the pre-evolution engine (G32 pins the schedule
+  hash); intensity-0 behaves exactly like OFF; ON replays hash-identically.**
+- **SONG LIBRARY** — multi-song projects: the album stores composer
+  RECIPES (style/seed/length, ~100 bytes each), never snapshots; LOAD
+  re-renders the recipe in memory via the deterministic composer. ADD
+  CURRENT recovers the recipe of a composed project (free-form projects
+  honestly report "recipe unavailable"); COMPOSE NEW from the drawer keeps
+  the album (stash/restore); LOAD is confirm-if-dirty; the active song
+  badges "▶ playing" during PLAY SONG. The library rides save/export/
+  share/RESUME and `loadProjectObj` rebuilds it canonically. The plain
+  header COMPOSE starts a fresh project by design.
+- **12 AND 20 MINUTE FORMS** — lengths 3/5/8/12/20 min (±5%, measured max
+  error 0.48%). >8-min forms use an 11-section chain (DROP3, double-BREAK,
+  BRIDGE, OUTRO2) with behavior mapping (DROP3 plays like DROP, BRIDGE like
+  BREAK). 3/5/8-min outputs are byte-identical (pinned). Memory tiers:
+  full-song bounce refuses >30 min before any Web Audio work
+  (SONG_HARD_MAX_SEC); 10–30 min renders require explicit confirm and show
+  the progress/cancel modal; stems and SECTION bounce stay capped at
+  10 min. **Known storage limit (documented, honest): 12/20-min projects
+  exceed the ~5 MB localStorage quota (12-min ≈ 3.8 MB, 20-min ≈ 6.4 MB
+  JSON) — SAVE shows 'SAVE FAILED' by design; EXPORT (file) and SHARE are
+  unaffected; RESUME of long forms is best-effort.**
 
 ## Features (v0.8.0) — SCENE STATE + MASTER + STEMS
 

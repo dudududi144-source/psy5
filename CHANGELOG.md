@@ -3,6 +3,151 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.9.0] — Run 17: SCENE EVOLUTION + PRO GROWTH (rebuilt + published)
+
+> Provenance (honest): this release was engineered TWICE. Run 15 completed
+> it (commits 6b327da..51ce434) but the sandbox wiped before any push and
+> the work was lost (Run 16 confirmed zero traces; remote untouched). Run 17
+> re-implemented the SAME spec against 3d57cf6 (v0.8.0). Per the re-pin
+> doctrine, hash values that moved with the re-implementation are marked
+> **REBUILD VALUE** below — they are valid pins for THIS build, not the
+> lost Run 15 values. All invariants were re-proven with real numbers.
+
+### Added — chord progression engine (`feat: chord progression engine (harmonic coherence)`)
+
+- `foundation/music/progression.mjs` — 12 seeded progression templates per
+  style family × 5 families (60 total), each a 4- or 8-bar loop of diatonic
+  scale degrees (0..6). Deterministic pick: `fnv1a(seed + ':prog')` (last 8
+  hex digits mod 12). Chords are DIATONIC TRIADS (degree, degree+2,
+  degree+4) — mode-aware by construction (phrygian/minor/harmonic-minor
+  resolve the semitones from their own interval lists). Module validates
+  itself at load (fail-fast on a broken template).
+- Composer integration (`js/composer.js`): the project picks ONE progression
+  and carries it as `p.harmony = { family, progId, progBars, degrees }`.
+  Bass roots, lead-motif harmonization (nearest chord-tone class snap,
+  deterministic tie-break), pad root+fifth voicings and arp chord-tone
+  cycles all derive from the active bar's chord. **Rhythm tracks
+  (kick/snare/hat/perc/fx) never consume the progression** — byte-identical
+  to v0.8.0, pinned by 15 per-style×length digests (see tests). Section
+  patterns restart the loop at index 0 (section starts are harmonic anchor
+  points).
+- Invariants (G31, HARD, offline): **0 chord-tone violations across 8,448
+  tonal notes** in the e2e evidence (3 styles via the shared songSteps
+  expansion); the bun suite audits all 5 styles × 3/5/8 min = **69,056
+  notes with 0 violations** plus 60,390 more across seeds 777/12345/999999;
+  determinism ×3; **diversity 10/12 distinct progressions across 20 seeds,
+  every style** (≥8 required). vmin 0.306 ≥ 0.15.
+- Re-pins (REBUILD VALUES, v0.9.0): form-fp `d0c5f32f032f2a88` →
+  **`bb16ce280ff48f88`**; legacy-9 whole-project hashes moved (FULL-ON
+  `38651edda8df6cc8`/`fa4d72e80c483cd2`/`d5663948fe1e9727`, DARK-PSY
+  `e9d9e73a3350b54b`/`617e80edf1f70b77`/`4867687a52d13d02`, PROGRESSIVE
+  `d724150eef4b7e93`/`1a61027f125006af`/`d14ce4b11a17e6f3`); rhythm-track
+  digests PINNED UNCHANGED (v0.8.0 values in tests/composer.test.ts).
+
+### Added — per-bar evolution (`feat: per-bar evolution (deterministic section morphing)`)
+
+- `p.evolution = { on: false (DEFAULT), intensity 0..100 (default 35), seed
+  (defaults to the project seed) }` — materialized lazily (the p.arranger
+  pattern): projects that never touch evolution don't gain the field.
+- `js/evolution.js` — at every bar boundary while ON, seeded ops from
+  `barSeed(seed, 'evo:'+bar)` through the EXISTING step-level machinery:
+  hat density shifts (drop/ghost), bass roll injection on off-phrase 16ths
+  (chord-root of the AUDIBLY active pattern bar — harmony respected),
+  lead contour ±1 scale degree (direction seeded per bar), perc ghost
+  accents, cutoff/sendA creep through the event lock channel clamped to
+  param-registry ranges. **Precedence: snapshot launch → evolution → lane
+  automation; lane-covered (track,param) pairs WIN per-step** — evolution
+  only fills lane-free pairs. No second scheduler, no parallel engine.
+- Live path: the absolute song bar derives from the arranger position
+  (`absBarOf`) so PLAY SONG morphs identically to the offline render;
+  evolution pauses when the arranger is off (no song position). UI:
+  EVOLUTION toggle + intensity slider + bar-ops counter in the arranger
+  panel.
+- **The OFF contract (strict):** OFF/absent evolution → the song schedule
+  is BYTE-IDENTICAL to the post-P1 engine. G32 (HARD, offline):
+  OFF evHash == pinned **`3feaf9cb45503864`** (4,385 events, REBUILD
+  VALUE); ON (seed 777, intensity 35) **diff 703/4385 events** (seed
+  measured with 3.5× margin over the ≥200 gate); replay-identical (two
+  walks hash-equal, ON hash `90690e706e2534bb`); intensity-0 == OFF.
+- Re-pin note: OFF-pin semantics changed with P1's re-toned notes, so the
+  OFF pin here is the POST-P1 baseline (fresh compose render), as the spec
+  requires.
+
+### Added — song library (`feat: song library (multi-song projects)`)
+
+- `p.library = null (legacy) | { songs: [{id, name, style, seed, len,
+  composerMeta}], activeSongId }` — **RECIPES, NOT SNAPSHOTS**: a song
+  stores the compose() inputs; rendering = `compose(style, len, seed)` in
+  memory. ~100 bytes per song; the current free-form project stays fully
+  editable and independent. Ids are content-derived fnv hashes
+  (deterministic; no Math.random).
+- `js/library.js` core (DOM-free, bun-tested) + SONG LIBRARY drawer in the
+  Perform tab: list (name/style/seed/length/meta), ADD CURRENT (recipe
+  recovery from a composed project — style from `p.harmony.family`, seed
+  from the `C<seed>` label, length = nearest allowed; free-form projects
+  honestly report "recipe unavailable"), COMPOSE NEW (library-target: the
+  album is stashed before the load and restored after), LOAD
+  (confirm-if-dirty; re-renders the recipe; album carried), DELETE,
+  RENAME, active-song badge (shows "▶ playing" while its song plays).
+- Persistence: the library rides save/export/share/RESUME (absent → null).
+  `loadProjectObj` rebuilds it CANONICALLY (invalid songs dropped, active
+  pointer fixed, absent → null) — the known silent-drop pitfall fixed in
+  place. **Album continuity (Run 15's 51ce434 contract, pre-applied):
+  recipes survive LOAD and library-target COMPOSE NEW; the plain header
+  COMPOSE still starts fresh by design.**
+- G33 (HARD, offline): 3 recipes compose deterministically (±5% length,
+  non-empty scenes), REAL saveProject→loadStored round-trip carries the
+  album deep-equal, encodeShare→decodeShare round-trip carries it
+  (canonical comparison), loadProjectObj drops invalid entries, legacy
+  library-less projects load to null, drawer DOM wired.
+
+### Added — composer growth (`feat: composer growth (12 and 20 minute forms)`)
+
+- Length menu 3/5/8 → **3/5/8/12/20 minutes** (±5%). Lengths >8 min compose
+  the 11-section EXTENDED_CHAIN: INTRO, BUILD, DROP, BREAK, RISER, DROP2,
+  **BREAK2** (double-BREAK), **BRIDGE**, **DROP3**, OUTRO, **OUTRO2**.
+  Sections map to canonical BEHAVIORS (`beh`: DROP2/DROP3→DROP,
+  BREAK2/BRIDGE→BREAK, OUTRO2→OUTRO) so patterns, snapshots and motif ops
+  keep their musical grammar. 3/5/8-min outputs are BYTE-IDENTICAL (the
+  pinned legacy-9 hashes and form-fp did not move in P4 — verified).
+- **allocateBars fix (Run 15 catch, pre-applied)**: walks the PASSED weight
+  list — the old code mapped the hardcoded 7-section chain, producing NaN
+  bars at extended lengths. Regression-tested directly.
+- Memory tiers: full-song renders refuse beyond **SONG_HARD_MAX_SEC = 1800
+  s** BEFORE any Web Audio work (unit-tested null return); 10–30 min
+  renders run with an explicit confirm + the progress/cancel modal;
+  stems and SECTION bounce keep the 10-min SONG_MAX_SEC cap
+  (songStemsGuard unchanged).
+- **Documented storage limit (honest)**: long-form projects exceed the
+  ~5 MB localStorage quota (12-min ≈ 3.8 MB, 20-min ≈ 6.4 MB project JSON)
+  → SAVE shows 'SAVE FAILED' by design for 12/20-min projects; EXPORT
+  (file) and SHARE are unaffected; RESUME of long forms is best-effort.
+- Measured (all 5 styles × {12, 20} min): sections = 11; length error
+  **max 0.48%**; determinism byte-identical; **vmin 0.269** ≥ 0.15
+  (VARIANT_DIFF_MIN); 12-min ≈ 55–60 scenes / Σ416–464 bars, 20-min ≈
+  88–99 scenes / Σ692–776 bars (the scene bank scrolls; the composer
+  bypasses the 64-scene UI default by design).
+
+### Gates
+
+- Canonical inventory: 27 → **32 entries = 30 HARD** (offline/pure,
+  CI-asserted in tools/e2e.mjs) + **2 evidence-only realtime** (G17, G25).
+  New: **G31** chord progression engine, **G32** per-bar evolution,
+  **G33** song library (all offline, CI-asserted). Numbering gaps
+  G3/G4/G7/G20 remain documented and unrenumbered. Next free id: G34.
+- tools/e2e.mjs asserts **30/30 HARD** (+ WORKLET 3/3 from the live site
+  at release).
+
+### Battery
+
+- `bun test`: **336 tests across 28 files — 336 pass / 0 fail (326,537
+  expect() calls)**; `node tools/verify.mjs` GREEN (SW cache-version lock
+  `psy6-v0.9.0` ↔ CHANGELOG).
+
+
+All notable changes to the PSY6 device repository. Every claim below is
+reproducible with the command shown next to it.
+
 ## [0.8.0] — Run 11: SCENE STATE + MASTER + STEMS
 
 ### Added — scene mixer snapshots (`feat: scene mixer snapshots (arrangement-aware mix)`)
