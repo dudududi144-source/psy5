@@ -1,4 +1,5 @@
 import { stepEvents, loopLen, fnv } from './model.js';
+import { evolvedSongEvents } from './evolution.js';
 import { PooledEngine } from './engine.js';
 
 /* ============ BOUNCE — offline WAV render (PSY6) ============
@@ -167,7 +168,7 @@ const sd=60/p.bpm/4,evs=[],marks=[];
 for(const y of songSteps(p)){
 if(y.fill&&y.sectionStart){const scn=p.scenes[y.scene];
 if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)evs.push({s:y.abs,t:t0+y.abs*sd+k*sd/2,track:3,vel:.5+.05*k,note:48,lock:{},fill:true})}
-const list=stepEvents(p,y.phase);
+const list=evolvedSongEvents(p,y.abs,y.phase); /* v0.9.0: evolution-aware expansion — OFF returns stepEvents unchanged (byte-identical contract) */
 for(const e of list)evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock});
 if(y.sectionStart)marks.push({scene:y.scene,startStep:y.abs});
 }
@@ -241,7 +242,7 @@ export function songMidi(p) {
   const ppq = 480, stepTicks = ppq / 4, sd = 60 / cp.bpm / 4;
   const buckets = new Map(); /* track → notes[] */
   for (const y of songSteps(cp)) {
-    const list = stepEvents(cp, y.phase);
+    const list = evolvedSongEvents(cp, y.abs, y.phase); /* v0.9.0: evolution-aware (OFF → stepEvents unchanged) */
     for (const e of list) {
       if (!buckets.has(e.track)) buckets.set(e.track, []);
       buckets.get(e.track).push({
@@ -379,7 +380,7 @@ if(ctrl.cancelled){if(ctrl._onCancelled)try{ctrl._onCancelled()}catch(e){/* noop
 if(y.sectionStart){const scn0=cp.scenes[y.scene];/* v0.8.0: scene mix snapshot at the section launch — same primitive as the live quantized launch; applied on EVERY section start (also outside bounds: state continuity) */if(scn0&&scn0.pattern!=null&&applySceneMix(cp,y.scene))eng.syncMix(cp,t0+y.abs*sd)}
 if(y.fill&&y.sectionStart&&(tf==null||tf===3)){const scn=cp.scenes[y.scene];
 if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)eng.trigger(cp.tracks[3],t0+y.abs*sd+k*sd/2,{track:3,off:0,vel:.5+.05*k,note:48,lock:{}},sd)}
-const list=stepEvents(cp,y.phase);
+const list=evolvedSongEvents(cp,y.abs,y.phase); /* v0.9.0: evolution-aware (OFF → stepEvents unchanged) */
 for(const e of list){if(tf!=null&&e.track!==tf)continue;eng.trigger(cp.tracks[e.track],t0+y.abs*sd+e.off,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sd);evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock})}
 const auto=applyLanes(cp,y.phase);
 if(auto.mixed||auto.macroed){

@@ -9,6 +9,7 @@ import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval
 import { recordPoint, quantStep, applyLanes } from '../autorec.js';
 import { compose, minVariantDiff, VARIANT_DIFF_MIN, COMPOSER_STYLES } from '../composer.js';
 import { chordDegreeAt, chordClasses } from '../../foundation/music/progression.mjs';
+import { evolutionState } from '../evolution.js';
 import { paramApply } from '../params.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
 import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, evHash, songSteps, SONG_LEAD, songStemTracks, sectionFrames, songFrames } from '../bounce.js';
@@ -39,8 +40,8 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
-/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 28 entries as of v0.9.0) ──
- * MAIN engine, 28 entries on device — 26 hard (offline/pure, CI-asserted in
+/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 29 entries as of v0.9.0) ──
+ * MAIN engine, 29 entries on device — 27 hard (offline/pure, CI-asserted in
  * tools/e2e.mjs) + 2 evidence-only realtime gates (G17 live capture, G25
  * record song — ScriptProcessor tap on wall-clock; pass on-device, reported
  * as info in CI, never asserted there).
@@ -58,13 +59,14 @@ function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(
  *   G28 scene mix snapshots (offline)      · G29 master EQ+glue (offline)
  *   G30 song stems + section bounce (offline, v0.8.0)
  *   G31 chord progression engine (offline, v0.9.0)
+ *   G32 per-bar evolution (offline, v0.9.0)
  * WORKLET reduced set: 3 entries (G2, G14w, G15w) — offline worklet renders.
  * NUMBERING GAPS (documented, never renumbered — all historical evidence
  * cites these ids): G3, G4, G7 and G20 have NEVER existed in any shipped
  * commit (git log -S across all history); the sequence was assigned
  * topically and the gaps were left reserved-but-unused.
- * The device summary line "N/28" counts entries; the honest hard-pass count
- * cited in README/CI is 26 (28 − G17 − G25). */
+ * The device summary line "N/29" counts entries; the honest hard-pass count
+ * cited in README/CI is 27 (29 − G17 − G25). */
 async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;if(I.engine==='worklet'){logLine('info','== PSY6 SELF-GATE — WORKLET engine (reduced but real: G2 + G14w + G15w) ==');await gateWorklet()}else{logLine('info','== PSY6 SELF-GATE — MAIN pooled engine (OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner
@@ -608,6 +610,27 @@ const div={};let divOk=true;
 for(const sid of Object.keys(COMPOSER_STYLES)){const s=new Set();for(let i=0;i<20;i++)s.add(compose(sid,3,1000+i*77).stats.progression);div[sid]=s.size;if(s.size<8)divOk=false}
 const ok31=notes>5000&&viol===0&&det31&&divOk;
 gate('G31','chord progression engine: every bass/lead/pad/arp note ∈ the active bar\'s diatonic triad via the shared songSteps expansion (0 violations), compose determinism ×3, ≥8 distinct progressions / 20 seeds / style',ok31,'notes='+notes+' violations='+viol+' det='+det31+' diversity='+JSON.stringify(div))}catch(e){gate('G31','chord progression engine',false,'ERR '+e.message)}
+/* G32 — per-bar evolution (offline — CI-asserted, v0.9.0 P2): the strict
+   OFF contract first — evolution OFF/absent must produce the EXACT post-P1
+   schedule (evHash == pinned 3feaf9cb45503864, 4385 events). Then ON
+   (seed 777, intensity 35): ≥200 schedule events differ vs OFF (seed
+   measured with 3.5× margin — 703 actual), replay determinism (two walks
+   hash-identical), intensity-0 == OFF (op probabilities all zero → the
+   base list is returned untouched). */
+try{
+const c32=compose('FULL-ON',3,424242);const p32=JSON.parse(JSON.stringify(c32.project));
+const off32=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
+const offOk=off32.evs.length===4385&&evHash(off32.evs)==='3feaf9cb45503864';
+const key32=e=>e.s+'|'+e.track;const sig32=e=>JSON.stringify([e.t.toFixed(6),e.vel.toFixed(3),e.note,JSON.stringify(e.lock||{})]);
+const diff32=(A,B)=>{const ma=new Map(A.map(e=>[key32(e),sig32(e)])),mb=new Map(B.map(e=>[key32(e),sig32(e)]));let d=0;for(const[k,v]of ma)if(mb.get(k)!==v)d++;for(const k of mb.keys())if(!ma.has(k))d++;return d};
+evolutionState(p32);p32.evolution.on=true;p32.evolution.intensity=35;p32.evolution.seed=777;
+const on32=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
+const on32b=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
+const p32z=JSON.parse(JSON.stringify(c32.project));evolutionState(p32z);p32z.evolution.on=true;p32z.evolution.intensity=0;p32z.evolution.seed=777;
+const z32=songSchedule(JSON.parse(JSON.stringify(p32z)),0.05);
+const d32=diff32(off32.evs,on32.evs);
+const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='3feaf9cb45503864';
+gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4385) diff='+d32+'/4385 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='3feaf9cb45503864')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

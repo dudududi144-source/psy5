@@ -5,9 +5,10 @@
  * arranger range through the ONE renderSong ({bounds:[startBar,endBar)}) —
  * the section as it appears in the song (phase continuity + bleed real) —
  * and downloads psy6-section-<sceneName>-<idx>.wav. */
-import { $, I, toast } from '../state.js';
+import { $, I, toast, pushHist } from '../state.js';
 import { arrState, arrToggle, arrAddStep, arrRemoveStep, arrSetStep, arrMoveStep, arrInsertStep, arrSongInfo, arrBarHook, arrInstrument, arrView } from '../arranger.js';
 import { renderSong, songRenderController, sectionFrames, pcmFromBuffer, wavEncode, songDurationSec, SONG_MAX_SEC } from '../bounce.js';
+import { evolutionState, evolutionStats } from '../evolution.js';
 
 function sceneLabel(i) {
   const p = I.p;
@@ -30,6 +31,17 @@ function renderArranger() {
   const tb = $('bArr');
   if (tb) { tb.textContent = v.on ? 'ARRANGER ON' : 'ARRANGER OFF'; tb.classList.toggle('on', v.on); }
   let html = '';
+  /* v0.9.0 PER-BAR EVOLUTION strip — toggle + intensity + bar-ops evidence.
+     OFF (default) renders the song byte-identical to the pre-v0.9.0 engine
+     (the G32 OFF-pin contract); ON applies seeded per-bar ops through the
+     same event machinery (no second scheduler). Precedence: snapshot
+     launch → evolution → lane automation (lane-covered pairs win). */
+  const ev = evolutionState(I.p);
+  html += '<div style="display:flex;gap:6px;align-items:center;margin:2px 0 6px;flex-wrap:wrap">'
+    + '<button id="bEvo"' + (ev.on ? ' class="on"' : '') + ' title="PER-BAR EVOLUTION — deterministic section morphing while the song plays. Seeded by (evolution seed, song bar); replayable. OFF renders the song byte-identical to the pre-v0.9.0 engine.">EVOLUTION ' + (ev.on ? 'ON' : 'OFF') + '</button>'
+    + '<input id="evoInt" type="range" min="0" max="100" value="' + ev.intensity + '" style="width:90px" title="evolution intensity 0–100 — scales op probability and deltas (0 behaves like OFF)">'
+    + '<span class="mono" style="font-size:9px;color:var(--dim)">intensity ' + ev.intensity + ' · bar-ops ' + evolutionStats().ops + '</span>'
+    + '</div>';
   if (!v.steps.length) html += '<div class="note">No sections yet — ADD builds the [scene, bars] chain.</div>';
   /* ── SONG TIMELINE (Run 9): one block per [scene,bars], width ∝ bars ── */
   if (v.steps.length) {
@@ -91,6 +103,11 @@ function renderArranger() {
     + (v.on ? '<span class="mono" style="font-size:9px;color:var(--dim)">bar ' + v.barsIn + '/' + (v.steps[v.idx] ? v.steps[v.idx].bars : '—') + (v.playing ? '' : ' · paused') + '</span>' : '')
     + '</div>';
   body.innerHTML = html;
+  /* v0.9.0 evolution strip wiring */
+  const bEvo = body.querySelector('#bEvo');
+  if (bEvo) bEvo.onclick = function () { pushHist(); const e = evolutionState(I.p); e.on = !e.on; I.renderDirty = true; renderArranger(); };
+  const evoInt = body.querySelector('#evoInt');
+  if (evoInt) evoInt.onchange = function () { const e = evolutionState(I.p); e.intensity = Math.max(0, Math.min(100, Math.round(+this.value || 0))); I.renderDirty = true; renderArranger(); };
   body.querySelectorAll('.arrScene').forEach((sel) => { sel.onchange = function () { arrSetStep(+this.dataset.i, { scene: +this.value }); }; });
   body.querySelectorAll('.arrBars').forEach((inp) => { inp.onchange = function () { arrSetStep(+this.dataset.i, { bars: +this.value }); }; });
   body.querySelectorAll('.arrDel').forEach((b) => { b.onclick = function () { arrRemoveStep(+this.dataset.i); }; });
