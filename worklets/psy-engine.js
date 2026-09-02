@@ -850,7 +850,14 @@ class PadVoice {
   }
 }
 
-// ─── Voice: Hat (differentiated pink noise, PSY3 engine.py hat) ────────────
+// ─── Voice: Hat (v0.12.0 metallic stack, parity with js/engine.js v2) ──────
+// Six inharmonic square oscillators (the same 806-style ratio set as the
+// main-thread hat: R=[2.0, 3.0, 4.16, 5.43, 6.79, 8.21] on a 40 Hz base —
+// non-integer ratios put the partial lattice off integer multiples →
+// metallic) + a differentiated-noise touch. Per-sample phase accumulators,
+// fully deterministic. The worklet trigger signature carries no tone param
+// (world params have no hat-tone field) — brightness is fixed here; the
+// main-thread voice maps tone → HP corner. Documented parity difference.
 
 class HatVoice {
   constructor() {
@@ -858,6 +865,9 @@ class HatVoice {
     this.t = 0;
     this.noise = new PinkNoise();
     this.prevNoise = 0;
+    this.ph = new Float32Array(6);
+    this.prevMet = 0;
+    this.ratios = [2.0, 3.0, 4.16, 5.43, 6.79, 8.21];
   }
 
   trigger(time, open, amp, sr) {
@@ -868,6 +878,7 @@ class HatVoice {
     this.decay = open ? 0.22 : 0.03;
     this.prevNoise = 0;
     this.noise.reset();
+    this.ph.fill(0);
   }
 
   render(currentTime, sr) {
@@ -875,12 +886,21 @@ class HatVoice {
     this.t += 1 / sr;
     if (this.t > this.decay * 1.5) { this.active = false; return [0, true]; }
 
+    // 6 inharmonic squares (per-sample accumulation, deterministic)
+    let met = 0;
+    for (let i = 0; i < 6; i++) {
+      met += (this.ph[i] < 0.5 ? 1 : -1) / 6;
+      this.ph[i] += 40 * this.ratios[i] / sr;
+      if (this.ph[i] >= 1) this.ph[i] -= 1;
+    }
+    // highpass via differentiation (fast, stable at any sr) + noise touch
     const n = this.noise.process();
-    // Highpass via differentiation
-    const hp = n - this.prevNoise;
+    const hpN = n - this.prevNoise;
+    const hpMet = met - this.prevMet;
+    this.prevMet = met;
     this.prevNoise = n;
     const env = Math.exp(-this.t / this.decay);
-    const sample = hp * env * 0.5 * this.amp / 0.12;
+    const sample = (hpMet * 0.55 + hpN * 0.18) * env * 0.5 * this.amp / 0.12;
     return [sample, false];
   }
 }

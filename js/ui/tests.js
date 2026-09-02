@@ -927,6 +927,68 @@ const zcA=zc38(wA,a0,b0),zcB=zc38(rB.buf.getChannelData(0),a0,b0);
 const lockOk=zcA>=10&&(zcB-zcA)>=3;
 const ok38=acc>=0.9&&allHit&&mono&&lockOk;
 gate('G38','slices: deterministic detector hits >=90% of truth transients within 2 hops, sequential per-step slice locks render a hit in every step window with monotonically increasing peaks, the per-step lock provably overrides the track sliceIdx (step-0 zero-crossing rate shifts with the locked slice content)',ok38,'acc='+(acc*100).toFixed(0)+'% hits='+hits+'/7 windows8='+allHit+' mono='+mono+' zcA='+zcA+' zcB='+zcB+' nSlices='+nS)}catch(e){gate('G38','slices',false,'ERR '+e.message)}
+/* G39 — DRUM ENGINE v2 (offline — CI-asserted, v0.12.0 P1):
+   The four rebuilt multi-layer voices, each rendered SOLO (one hit, fresh
+   OfflineAudioContext + PooledEngine — the Phase-0 baseline methodology)
+   and measured spectrally. The v0.11.0 BEFORE numbers (measured with the
+   identical analyzer, saved to r20/baseline-v1-acoustic.json) are quoted
+   inline so the gate evidence doubles as the A/B record:
+   kick  — sub preserved: <150 Hz energy ratio >= .45 (v1 .9888 / v2 .997);
+           CLICK LAYER real: first-difference RMS over the first 6 ms
+           >= .05 (v1 .0151 → v2 .103 — ×6.8 transient content); pitch env
+           descends: ZCR(10 ms) > ZCR(30 ms) (v1 600>367 / v2 1000>433);
+   hat   — bright: spectral centroid >= 6 kHz (v1 13103 / v2 12249);
+           METALLIC: the top-8 peaks in 5–15 kHz form an INHARMONIC
+           lattice — gap irregularity (cv of the 7 consecutive gaps)
+           >= .2, while a degenerate square comb (rim, tune .3, measured
+           live in this gate) scores cv <= .1 (uniform gaps);
+   clap  — multi-burst: >= 4 envelope bursts with an 8 ms refractory
+           (v1 = 3 — the four-burst structure is the v2 change);
+   snare — dual-band: tone band (150–1500 Hz) AND noise band (2–8 kHz)
+           energy ratios both above .04 (tone layer + noise layer both
+           present);
+   determinism — every voice re-rendered in a fresh context: maxDiff
+           < 1e-6 (the through-graph standard of the G34/G36 family;
+           Chrome's offline chunk scheduling occasionally yields ~3e-7
+           tails — == 0 holds for the pure per-sample engines). */
+try{
+const SR39=44100;
+const mk39=(oc,sound)=>{const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g39',name:'g39-'+sound.type,sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return eng};
+const hit39=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR39*dur),SR39);const eng=mk39(oc,sound);return await oc.startRendering()};
+const fft39=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const nc=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=nc}}}};
+function an39(d){const N=d.length;let peak=0,onset=-1,last=-1;for(let i=0;i<N;i++){const a=Math.abs(d[i]);if(a>peak)peak=a;if(a>1e-3){if(onset<0)onset=i;last=i}}
+if(onset<0)return{peak:0,subRatio:0,toneRatio:0,noiseRatio:0,centroid:0,cv:0,diff6:0,zcr10:0,zcr30:0,bursts:0};
+let FW=2048;const sup=last+1-onset;if(sup<FW*1.5)FW=512;const hop=FW/2,bins=new Float64Array(FW/2),win=new Float64Array(FW);for(let i=0;i<FW;i++)win[i]=.5-.5*Math.cos(2*Math.PI*i/(FW-1));const seg=new Float64Array(FW);let frames=0;for(let st=onset;st+FW<=Math.min(N,last+1);st+=hop){for(let i=0;i<FW;i++)seg[i]=d[st+i]*win[i];const re=new Float64Array(FW),im=new Float64Array(FW);re.set(seg);fft39(re,im);for(let k=1;k<FW/2;k++)bins[k]+=Math.sqrt(re[k]*re[k]+im[k]*im[k]);frames++}
+if(!frames){for(let i=0;i<Math.min(FW,sup);i++)seg[i]=d[onset+i]*win[i];const re=new Float64Array(FW),im=new Float64Array(FW);re.set(seg);fft39(re,im);for(let k=1;k<FW/2;k++)bins[k]=Math.sqrt(re[k]*re[k]+im[k]*im[k]);frames=1}
+for(let k=1;k<bins.length;k++)bins[k]/=frames;const binHz=SR39/FW;let sum=0,wsum=0,sub=0,tot=0,tone=0,noise=0;for(let k=1;k<bins.length;k++){const m=bins[k],f=k*binHz;sum+=m;wsum+=f*m;tot+=m*m;if(f<150)sub+=m*m;if(f>=150&&f<=1500)tone+=m*m;if(f>=2000&&f<=8000)noise+=m*m}
+/* top-8 peaks in 5–15 kHz (local maxima, adjacent-bin dedup) + gap
+   irregularity: a HARMONIC voice is one comb — consecutive peak gaps are
+   all equal (cv = std/mean of the 7 gaps ≈ 0); the metallic stack mixes
+   SIX inharmonic square families — gaps are irregular (cv high). This is
+   the harmonic-incoherence test: cv >= .2 asserts inharmonicity. */
+const pk=[];for(let k=Math.round(5000/binHz);k<Math.min(bins.length,Math.round(15000/binHz))-1;k++)if(bins[k]>bins[k-1]&&bins[k]>=bins[k+1])pk.push([bins[k],k*binHz]);pk.sort((a,b)=>b[0]-a[0]);const top=pk.slice(0,8).map(x=>x[1]).sort((a,b)=>a-b);
+let cv=0;if(top.length>=4){const gaps=[];for(let i=1;i<top.length;i++)gaps.push(top[i]-top[i-1]);const mean=gaps.reduce((a,b)=>a+b,0)/gaps.length;if(mean>0){const va=gaps.reduce((a,b)=>a+(b-mean)*(b-mean),0)/gaps.length;cv=Math.sqrt(va)/mean}}
+const n6=Math.min(Math.round(.006*SR39),N-onset);let se=0;for(let i=1;i<n6;i++){const h=d[onset+i]-d[onset+i-1];se+=h*h}const diff6=Math.sqrt(se/Math.max(n6-1,1));
+const zcr=span=>{const n=Math.min(Math.round(span*SR39),N-onset);let c=0;for(let i=1;i<n;i++)if((d[onset+i-1]<0)!==(d[onset+i]<0))c++;return c/(n/SR39)};
+let env=0,bursts=0,refr=0,prevA=false;const aC=Math.exp(-1/(.0005*SR39));for(let i=onset;i<=last;i++){env=aC*env+(1-aC)*Math.abs(d[i]);const ab=env>.2*peak;if(refr>0){refr--;prevA=ab;continue}if(ab&&!prevA){bursts++;refr=Math.round(.008*SR39)}prevA=ab}
+return{peak:+peak.toFixed(4),subRatio:+(sub/Math.max(tot,1e-12)).toFixed(3),toneRatio:+(tone/Math.max(tot,1e-12)).toFixed(3),noiseRatio:+(noise/Math.max(tot,1e-12)).toFixed(3),centroid:+(wsum/Math.max(sum,1e-12)).toFixed(0),cv:+cv.toFixed(3),diff6:+diff6.toFixed(4),zcr10:+zcr(.01).toFixed(0),zcr30:+zcr(.03).toFixed(0),bursts}}
+const m39={};const b39={};let det39=0;
+for(const[nm,sd]of Object.entries({kick:{type:'kick',tune:.9,decay:.6,tone:1,punch:.7},snare:{type:'snare',tune:1.1,decay:.8,tone:1.2,punch:0},hatC:{type:'hatC',tune:1,decay:.5,tone:1.3,punch:0},clap:{type:'clap',tune:1,decay:1.4,tone:1,punch:0}})){
+b39[nm]=await hit39(sd,1.6);m39[nm]=an39(b39[nm].getChannelData(0));
+/* determinism: fresh-context re-render → PCM maxDiff */
+const b2=await hit39(sd,1.6);const a=b39[nm].getChannelData(0),bb=b2.getChannelData(0);for(let i=0;i<Math.min(a.length,bb.length);i++){const e2=Math.abs(a[i]-bb[i]);if(e2>det39)det39=e2}}
+/* the degenerate harmonic reference: a low-tuned square voice (rim, tune .3
+   → 525 Hz comb) must score cv ≈ 0 (uniform comb gaps) — proves the
+   incoherence test bites on a harmonic voice */
+m39.rimRef=an39((await hit39({type:'rim',tune:.3,decay:1,tone:1.5,punch:0},.5)).getChannelData(0));
+const K=m39.kick,S=m39.snare,H=m39.hatC,C=m39.clap;
+const kickOk=K.subRatio>=.45&&K.diff6>=.05&&K.zcr10>K.zcr30;
+const hatOk=H.centroid>=6000&&H.cv>=.2&&m39.rimRef.cv<=.1&&H.cv>m39.rimRef.cv;
+const clapOk=C.bursts>=4;
+const snareOk=S.toneRatio>=.04&&S.noiseRatio>=.04;
+const detOk=det39<1e-6;
+const ok39=kickOk&&hatOk&&clapOk&&snareOk&&detOk;
+gate('G39','drum engine v2: kick sub>=.45 + click diff6>=.05 (v1 .0151) + pitch-env ZCR descent; hat centroid>=6k + inharmonic (gap cv>=.2; degenerate square comb cv<=.1); clap >=4 bursts (v1=3); snare dual-band >=.04; all four voices deterministic maxDiff<1e-6',ok39,'kick sub='+K.subRatio+' diff6='+K.diff6+'(v1 .0151) zcr '+K.zcr10+'>'+K.zcr30+' | hat c='+H.centroid+' cv='+H.cv+'(rim cv='+m39.rimRef.cv+') | clap b='+C.bursts+'(v1 3) | snare t='+S.toneRatio+' n='+S.noiseRatio+' | detMaxDiff='+det39.toExponential(2))}catch(e){gate('G39','drum engine v2',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

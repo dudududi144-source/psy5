@@ -114,10 +114,90 @@ connect(bus){if(this.bus!==bus){this.vca.disconnect();this.vca.connect(bus.input
 noteOn(tr,when,ev,stepDur){const p=Object.assign({},tr.sound,ev.lock||{});this.connect(this.eng.chains[tr.idx]);const f=440*Math.pow(2,(clamp(ev.note,12,108)-69)/12);const gate=(p.gate||.6);const dur=stepDur*gate*2;const rel=Math.max(p.rel||.15,.02);const end=when+dur;this.osc1.type=p.wave1||'sawtooth';this.osc2.type=p.wave2||'sawtooth';this.osc1.frequency.setValueAtTime(f,when);this.osc2.frequency.setValueAtTime(f*Math.pow(2,p.oct2||0),when);this.osc2.detune.setValueAtTime(p.detune||0,when);this.g1.gain.setValueAtTime(.6,when);this.g2.gain.setValueAtTime(.45,when);const cut=clamp(p.cutoff||1500,60,16000);const res=clamp(p.res||1,.2,24);this.filter.type=p.fType||'lowpass';this.filter.Q.setValueAtTime(res,when);this.filter.frequency.cancelScheduledValues(when);this.filter.frequency.setValueAtTime(Math.min(cut*3,16000),when);this.filter.frequency.exponentialRampToValueAtTime(cut,when+Math.max((p.atk||.005)+(p.dec||.3)*.7,.01));if(p.lfoRate>0&&p.lfoDest==='cutoff'){this.lfo.frequency.setValueAtTime(p.lfoRate,when);this.lfoGain.gain.setValueAtTime((p.lfoDepth||0)*3000,when)}else this.lfoGain.gain.setValueAtTime(0,when);const vca=this.vca.gain;const vel=ev.vel;const atk=Math.max(p.atk||.005,.003);vca.cancelScheduledValues(when);vca.setValueAtTime(0,when);vca.linearRampToValueAtTime(vel*.5,when+atk);vca.setTargetAtTime(vel*.5*(p.sus!=null?p.sus:.6),when+atk,Math.max((p.dec||.3)/3,.01));vca.setTargetAtTime(.0001,end,Math.max(rel/3,.008))}
 panic(){try{this.vca.gain.cancelScheduledValues(0);this.vca.gain.setValueAtTime(0,this.ctx.currentTime)}catch(e){}}
 }
-class DrumVoice{constructor(ctx,eng){this.ctx=ctx;this.eng=eng;this.bus=null;this.noise=ctx.createBufferSource();this.noise.buffer=eng.noise;this.noise.loop=true;this.noiseGain=ctx.createGain();this.noiseGain.gain.value=0;this.nFilter=ctx.createBiquadFilter();this.nFilter.type='bandpass';this.noise.connect(this.nFilter);this.nFilter.connect(this.noiseGain);this.osc=ctx.createOscillator();this.osc.type='sine';this.oscGain=ctx.createGain();this.oscGain.gain.value=0;this.osc.connect(this.oscGain);this.out=ctx.createGain();this.noiseGain.connect(this.out);this.oscGain.connect(this.out);this.noise.start();this.osc.start()}
-connect(bus){if(this.bus!==bus){this.out.disconnect();this.out.connect(bus.input);this.bus=bus}}
-hit(tr,when,vel,lock){const p=Object.assign({},tr.sound,lock||{});this.connect(this.eng.chains[tr.idx]);const tune=p.tune||1,decay=p.decay||1,tone=p.tone||1,punch=p.punch||0;const type=p.type||tr.type||'kick';const ng=this.noiseGain.gain,og=this.oscGain.gain;ng.cancelScheduledValues(when);og.cancelScheduledValues(when);ng.setValueAtTime(0,when);og.setValueAtTime(0,when);if(type==='kick'){const dur=.12+.5*decay;this.osc.frequency.setValueAtTime(180*tune,when);this.osc.frequency.exponentialRampToValueAtTime(Math.max(36*tune,24),when+.09);og.setValueAtTime(vel*1.1,when);og.exponentialRampToValueAtTime(.0001,when+dur);if(punch>0){ng.setValueAtTime(vel*punch*.8,when);ng.exponentialRampToValueAtTime(.0001,when+.02);this.nFilter.frequency.setValueAtTime(2500,when)}}else if(type==='snare'){const dur=.1+.16*decay;this.osc.type='triangle';this.osc.frequency.setValueAtTime(195*tune,when);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+dur*.7);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1900*tone,when);this.nFilter.Q.value=.8;ng.setValueAtTime(vel*.85,when);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='clap'){const dur=.25+.15*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1150*tone,when);this.nFilter.Q.value=1.3;ng.setValueAtTime(0,when);[0,.014,.03].forEach(t2=>{ng.setValueAtTime(0,when+t2);ng.linearRampToValueAtTime(vel*.9,when+t2+.002);ng.exponentialRampToValueAtTime(.02,when+t2+.012)});ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='hatC'||type==='hatO'){const open=type==='hatO';const dur=open?.26+.5*decay:.03+.05*decay;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(7200*Math.sqrt(tone),when);ng.setValueAtTime(vel*(open?.4:.5),when);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='tom'){const dur=.22+.35*decay;this.osc.type='sine';this.osc.frequency.setValueAtTime(180*tune,when);this.osc.frequency.exponentialRampToValueAtTime(92*tune,when+dur*.7);og.setValueAtTime(vel*.9,when);og.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='rim'){this.osc.type='square';this.osc.frequency.setValueAtTime(1750*tune,when);og.setValueAtTime(vel*.6,when);og.exponentialRampToValueAtTime(.0001,when+.045)}else if(type==='glitch'){const dur=.08+.14*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1500*tone+800,when);this.nFilter.Q.value=4;ng.setValueAtTime(vel*.7,when);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='shaker'){const dur=.04+.07*decay;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(6000*tone,when);ng.setValueAtTime(vel*.45,when);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='riser'){const dur=1.6;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(300,when);this.nFilter.frequency.exponentialRampToValueAtTime(6000,when+dur);ng.setValueAtTime(.0001,when);ng.exponentialRampToValueAtTime(vel*.6,when+dur);ng.exponentialRampToValueAtTime(.0001,when+dur+.05)}else if(type==='impact'){const dur=1.1*decay+.3;this.osc.type='sine';this.osc.frequency.setValueAtTime(60*tune,when);this.osc.frequency.exponentialRampToValueAtTime(30,when+.5);og.setValueAtTime(vel*1.1,when);og.exponentialRampToValueAtTime(.0001,when+dur)}}
-panic(){try{this.noiseGain.gain.cancelScheduledValues(0);this.noiseGain.gain.setValueAtTime(0,this.ctx.currentTime);this.oscGain.gain.cancelScheduledValues(0);this.oscGain.gain.setValueAtTime(0,this.ctx.currentTime)}catch(e){}}
+/* ── DrumVoice v2 (v0.12.0 P1 — SOUND ENGINE v2) ──
+   Multi-layer synthesis behind the SAME pooled node architecture and the
+   SAME parameter surface (type/tune/decay/tone/punch keep their meaning —
+   the sound behind them is rebuilt):
+
+   KICK  — SUB (sine, exponential pitch env start→f0, punch maps the env
+           depth + click level), BODY (triangle at f0, tone maps body/sub
+           balance, saturated), CLICK (highpassed noise, 5 ms transient);
+           per-voice soft-clip WaveShaper (tanh curve precomputed ONCE per
+           engine, shared by all drum voices — allocation-free).
+   SNARE — TONE (triangle, ~0.4-semitone pitch drop, punch maps tone decay)
+           + NOISE (bandpass, tone maps the band) — dual-band structure.
+   CLAP  — 4 noise bursts (exponential ~11 ms spacing, per-burst spectral
+           decorrelation offsets on the bandpass — deterministic) + tail
+           burst with the long decay. (True L/R stereo decorrelation is a
+           WORKLET-path capability — main-thread voices are mono pre-pan;
+           documented in the limitations list.)
+   HATS  — metallic stack: SIX square oscillators at fixed inharmonic
+           ratios R=[2.0, 3.0, 4.16, 5.43, 6.79, 8.21] on a 40 Hz·tune base
+           (the classic 806-style cymbal recipe — non-integer ratios put
+           the partial lattice off integer multiples → metallic) →
+           bandpass 10 kHz → highpass (tone maps the corner, old law
+           7200·√tone) + a noise touch. Closed/open share the stack with
+           different envelopes; choke stays the existing pool discipline.
+           The stack is created LAZILY on a voice's first hat hit and kept
+           (first-hit lazy init is the documented hot-path exception).
+
+   Determinism: every layer is param automation over seeded buffers — same
+   params → identical PCM (asserted by G39). Duration formulas are
+   UNCHANGED (drumDurEst) → pool discipline and busyUntil windows moved
+   zero. Old presets keep triggering sensibly: unknown/neutral params fall
+   back to the same defaults as v1. */
+const HAT_RATIOS=[2.0,3.0,4.16,5.43,6.79,8.21];
+function mkSatCurve(){const n=1024,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*6-3;c[i]=Math.tanh(1.5*x)*.95}return c}
+class DrumVoice{constructor(ctx,eng){this.ctx=ctx;this.eng=eng;this.bus=null;this.wiredWS=false;this.noise=ctx.createBufferSource();this.noise.buffer=eng.noise;this.noise.loop=true;this.noiseGain=ctx.createGain();this.noiseGain.gain.value=0;this.nFilter=ctx.createBiquadFilter();this.nFilter.type='bandpass';this.noise.connect(this.nFilter);this.nFilter.connect(this.noiseGain);this.osc=ctx.createOscillator();this.osc.type='sine';this.oscGain=ctx.createGain();this.oscGain.gain.value=0;this.osc.connect(this.oscGain);this.out=ctx.createGain();this.noiseGain.connect(this.out);this.oscGain.connect(this.out);
+/* v2 layers: BODY osc (triangle — kick body / snare tone) + shared
+   saturation shaper (kick only — routed out→outWS→bus; every other type
+   routes out→bus directly, so non-kick voices are untouched) */
+this.osc2=ctx.createOscillator();this.osc2.type='triangle';this.osc2Gain=ctx.createGain();this.osc2Gain.gain.value=0;this.osc2.connect(this.osc2Gain);this.osc2Gain.connect(this.out);this.outWS=ctx.createWaveShaper();this.outWS.curve=eng._satC||(eng._satC=mkSatCurve());this.osc2.start();this.noise.start();this.osc.start();this.metal=null;this.fmod=null}
+ensureMetal(){if(this.metal)return;const c=this.ctx;const oscs=HAT_RATIOS.map(()=>{const o=c.createOscillator();o.type='square';o.frequency.value=80;o.start();return o});const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=10000;bp.Q.value=.9;const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=7200;const g=c.createGain();g.gain.value=0;oscs.forEach(o=>o.connect(bp));bp.connect(hp);hp.connect(g);g.connect(this.out);this.metal={oscs,bp,hp,g}}
+ensureFmod(){if(this.fmod)return;const c=this.ctx;const m=c.createOscillator();m.type='sine';m.frequency.value=4900;const mg=c.createGain();mg.gain.value=0;m.connect(mg);mg.connect(this.osc.frequency);m.start();this.fmod={m,mg}}
+connect(bus,useWS){const w=!!useWS;if(this.bus!==bus||this.wiredWS!==w){this.out.disconnect();if(w){this.outWS.disconnect();this.out.connect(this.outWS);this.outWS.connect(bus.input)}else{this.out.disconnect();this.out.connect(bus.input)}if(this.bus!==bus&&this.metal){/* metal stack feeds this.out — already re-routed with out */}this.bus=bus;this.wiredWS=w}}
+hit(tr,when,vel,lock){const p=Object.assign({},tr.sound,lock||{});this.connect(this.eng.chains[tr.idx],(p.type||tr.type||'kick')==='kick');const tune=p.tune||1,decay=p.decay||1,tone=p.tone||1,punch=p.punch||0;const type=p.type||tr.type||'kick';const ng=this.noiseGain.gain,og=this.oscGain.gain,og2=this.osc2Gain.gain;
+/* v0.12.0 P1: zero EVERY layer at the hit anchor first — a voice reused
+   across types never carries a previous layer's tail into the new hit
+   (the pool steal semantics stay exactly the v1 ones: reuse happens at
+   busyUntil, so this cut lands after the estimated duration). */
+ng.cancelScheduledValues(when);og.cancelScheduledValues(when);og2.cancelScheduledValues(when);ng.setValueAtTime(0,when);og.setValueAtTime(0,when);og2.setValueAtTime(0,when);if(this.metal){const mg=this.metal.g.gain;mg.cancelScheduledValues(when);mg.setValueAtTime(0,when)}if(this.fmod){const f=this.fmod.mg.gain;f.cancelScheduledValues(when);f.setValueAtTime(0,when)}
+if(type==='kick'){
+/* SUB — sine, exponential pitch envelope start→f0 (depth = punch) */
+const dur=.12+.5*decay;const f0=Math.max(24,45*tune);const start=f0*(2.2+2.2*Math.min(punch,1));
+this.osc.type='sine';this.osc.frequency.setValueAtTime(start,when);this.osc.frequency.exponentialRampToValueAtTime(f0,when+.032);
+og.setValueAtTime(vel*(.8-.15*Math.min(Math.max(tone,0),1.6)),when);og.exponentialRampToValueAtTime(.0001,when+dur);
+/* BODY — triangle at f0, tone maps body/sub balance */
+this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(f0,when);og2.setValueAtTime(vel*(.28+.24*Math.min(Math.max(tone,0),1.6)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.45);
+/* CLICK — highpassed noise transient, 2–6 ms (punch maps level + corner) */
+this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(3800+1400*Math.min(punch,1),when);this.nFilter.Q.value=.7;ng.setValueAtTime(vel*(.4+.5*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.005);
+}else if(type==='snare'){
+/* TONE — triangle, ~0.4-semitone pitch drop, punch maps tone decay */
+const dur=.1+.16*decay;const f0=195*tune;const td=Math.max(.05,(.10+.10*decay)*(1-.4*Math.min(punch,1)));
+this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(f0,when);this.osc2.frequency.exponentialRampToValueAtTime(f0*Math.pow(2,-.4/12),when+.06);og2.setValueAtTime(vel*(.5+.15*tone),when);og2.exponentialRampToValueAtTime(.0001,when+td);
+/* NOISE — bandpass, tone maps the band (existing law) */
+this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1900*tone,when);this.nFilter.Q.value=.9;ng.setValueAtTime(vel*.85,when);ng.exponentialRampToValueAtTime(.0001,when+dur);
+}else if(type==='clap'){
+const dur=.25+.15*decay;this.nFilter.type='bandpass';this.nFilter.Q.value=1.1;
+/* 4 bursts, exponential ~11 ms spacing + tail burst; per-burst bandpass
+   offsets = deterministic spectral decorrelation (mono-voice reality:
+   true L/R decorrelation is the worklet path — limitations list) */
+const B=[0,.011,.023,.036],DEC=[1,1.07,.94,1.1];B.forEach((t2,i)=>{ng.setValueAtTime(0,when+t2);ng.linearRampToValueAtTime(vel*(.8+.04*i),when+t2+.001);ng.exponentialRampToValueAtTime(.03,when+t2+.011);this.nFilter.frequency.setValueAtTime(1150*tone*DEC[i],when+t2)});
+ng.setValueAtTime(vel*.5,when+.05);ng.exponentialRampToValueAtTime(.0001,when+dur);
+}else if(type==='hatC'||type==='hatO'){
+const open=type==='hatO';const dur=open?.26+.5*decay:.03+.05*decay;
+/* metallic stack: 6 inharmonic squares → BP 10k → HP (tone = brightness) */
+this.ensureMetal();const base=40*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(10000,when);M.hp.frequency.setValueAtTime(7200*Math.sqrt(tone),when);const mg=M.g.gain;mg.setValueAtTime(vel*(open?.46:.42),when);mg.exponentialRampToValueAtTime(.0001,when+dur);
+/* noise touch keeps a little of the old breath */
+this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(8000,when);ng.setValueAtTime(vel*.14,when);ng.exponentialRampToValueAtTime(.0001,when+dur);
+}else if(type==='tom'){
+const dur=.22+.35*decay;this.osc.type='sine';this.osc.frequency.setValueAtTime(180*tune,when);this.osc.frequency.exponentialRampToValueAtTime(92*tune,when+dur*.7);og.setValueAtTime(vel*.9,when);og.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='rim'){
+this.osc.type='square';this.osc.frequency.setValueAtTime(1750*tune,when);og.setValueAtTime(vel*.6,when);og.exponentialRampToValueAtTime(.0001,when+.045)}else if(type==='glitch'){
+const dur=.08+.14*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1500*tone+800,when);this.nFilter.Q.value=4;ng.setValueAtTime(vel*.7,when);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='shaker'){
+const dur=.04+.07*decay;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(6000*tone,when);ng.setValueAtTime(vel*.45,when);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='riser'){
+const dur=1.6;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(300,when);this.nFilter.frequency.exponentialRampToValueAtTime(6000,when+dur);ng.setValueAtTime(.0001,when);ng.exponentialRampToValueAtTime(vel*.6,when+dur);ng.exponentialRampToValueAtTime(.0001,when+dur+.05)}else if(type==='impact'){
+const dur=1.1*decay+.3;this.osc.type='sine';this.osc.frequency.setValueAtTime(60*tune,when);this.osc.frequency.exponentialRampToValueAtTime(30,when+.5);og.setValueAtTime(vel*1.1,when);og.exponentialRampToValueAtTime(.0001,when+dur)}}
+panic(){try{this.noiseGain.gain.cancelScheduledValues(0);this.noiseGain.gain.setValueAtTime(0,this.ctx.currentTime);this.oscGain.gain.cancelScheduledValues(0);this.oscGain.gain.setValueAtTime(0,this.ctx.currentTime);this.osc2Gain.gain.cancelScheduledValues(0);this.osc2Gain.gain.setValueAtTime(0,this.ctx.currentTime);if(this.metal)this.metal.g.gain.cancelScheduledValues(0),this.metal.g.gain.setValueAtTime(0,this.ctx.currentTime);if(this.fmod)this.fmod.mg.gain.cancelScheduledValues(0),this.fmod.mg.gain.setValueAtTime(0,this.ctx.currentTime)}catch(e){}}
 }
 
 export { PooledEngine };
