@@ -60,6 +60,7 @@ export const WORKLET_LIMITATIONS=[
 'master EQ3 + glue comp (v0.8.0) not mapped — the worklet master has its own saturation/limiter',
 'reverb IR is the worklet’s internal noise IR (not the seeded 1.8 s exponential IR)',
 'user SAMPLES unsupported (v0.10.0) — sample-voice tracks play the SYNTH voice in worklet mode',
+'resample / freeze / sample editor / slices / key detection unsupported (v0.11.0) — MAIN engine only',
 'step sequencer timing: MAIN thread schedules, worklet fires sample-accurately'];
 
 /* msgForTrigger — pure model→worklet trigger mapping (shared by the live

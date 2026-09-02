@@ -6,7 +6,8 @@
    the only writer. Hydration pulls referenced samples into the live engine
    cache (missing → synth fallback + one-shot toast, Phase 2). */
 import { $, I, toast, pushHist } from '../state.js';
-import { createSampleStore, makeRecord, guardImport, referencedSampleIds, applySampleHints, SAMPLE_CAPS, deriveSample } from '../samplestore.js';
+import { createSampleStore, makeRecord, guardImport, referencedSampleIds, applySampleHints, SAMPLE_CAPS, deriveSample, ensureVoice } from '../samplestore.js';
+import { detectKey, tuneToRoot } from '../keydetect.js';
 import { armResample, captureStop, captureState } from './capture.js';
 import { resampleGuard } from '../capture.js';
 
@@ -172,6 +173,24 @@ function selectEdit(rec, rows) {
   if (asg) asg.style.display = (rec.derivedOp === 'slice') ? '' : 'none';
 }
 
+/* tuneSelectedToRoot (v0.11.0 P4) — detect the selected sample's key
+ * (deterministic chroma + K-S), compute the minimal semitone shift onto the
+ * project root pitch class, apply it to the SELECTED track's sampleParams.tune. */
+function tuneSelectedToRoot() {
+  const rec = editRows.find(x => x.id === editId);
+  if (!rec) { toast('KEY: select a sample first (ED button)'); return }
+  if (!I.p || I.selTrack == null || !I.p.tracks[I.selTrack]) { toast('KEY: select a target track first'); return }
+  try {
+    const k = detectKey(rec.pcm, rec.sampleRate);
+    const t = I.p.tracks[I.selTrack];
+    const before = ensureVoice(t).sampleParams.tune;
+    const delta = tuneToRoot(k.tonicPc, I.p.root);
+    t.sampleParams.tune = Math.max(-24, Math.min(24, before + delta));
+    I.dirty = true; I.renderDirty = true;
+    toast('KEY ' + k.name + ' (r=' + k.r.toFixed(2) + ') → TUNE ' + (delta >= 0 ? '+' : '') + delta + ' st to project root ' + (['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][((I.p.root % 12) + 12) % 12]) + ' (tune ' + before + ' → ' + t.sampleParams.tune + ')');
+  } catch (e) { toast('KEY DETECT FAILED — ' + (e && e.message || e)) }
+}
+
 /* assignSlicesToSteps (v0.11.0 P3) — the classic breakbeat move: fill the
    SELECTED track's pattern with sequential slice locks (step i → slice
    (i % nSlices) + 1, all steps ON). Locks ride the EXISTING per-step lock
@@ -332,6 +351,8 @@ function wireSamples() {
   if (sl) sl.onclick = () => applyDerive('slice', {});
   const asg = $('smpAssignSlices');
   if (asg) asg.onclick = assignSlicesToSteps;
+  const kb = $('smpKeyB');
+  if (kb) kb.onclick = tuneSelectedToRoot;
   if (drop) {
     drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = 'var(--acc,#4fd6c0)' });
     drop.addEventListener('dragleave', () => { drop.style.borderColor = '' });
