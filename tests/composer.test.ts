@@ -13,6 +13,9 @@
 import { describe, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
 import { compose, COMPOSER_STYLES, SECTION_CHAIN, sectionsFingerprint, variantStepDiff, VARIANT_DIFF_MIN, KICK_VEL_MAX_DELTA } from '../js/composer.js'
+import { songSteps } from '../js/bounce.js'
+import { SCALES } from '../js/model.js'
+import { PROGRESSION_TEMPLATES, pickProgression, chordDegreeAt, chordClasses } from '../foundation/music/progression.mjs'
 import { paramById } from '../js/params.js'
 import { LIMITS } from '../js/limits.js'
 
@@ -221,10 +224,13 @@ describe('section variants (v0.7.0 — no identical repeats)', () => {
     expect(p.arranger.steps.reduce((a, s) => a + s.bars, 0)).toBe(136)
     expect(c.form.totalBars).toBe(108)
     expect(c.form.sections.map(s => s.id)).toEqual(SECTION_CHAIN.map(s => s.id))
-    /* base patterns untouched by the variant ops — the form fingerprint hash
-       is PINNED to the v0.6.0 value (Phase 0 record); any intentional change
-       to fillSection must consciously update this pin (documented) */
-    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('d0c5f32f032f2a88')
+    /* base patterns' form fingerprint hash is PINNED per build (Phase 0
+       record); any intentional change to fillSection must consciously update
+       this pin (documented). v0.9.0 REBUILD VALUE: the chord progression
+       engine (P1) re-tones bass/lead/pad/arp — rhythm tracks are byte-
+       identical to v0.8.0 (pinned below) but the fingerprint covers notes on
+       all tracks, so it moved from the v0.8.0 value d0c5f32f032f2a88. */
+    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('bb16ce280ff48f88')
   })
   test('pairwise step-difference within EVERY family ≥ VARIANT_DIFF_MIN (0.15), base included', () => {
     for (const styleId of Object.keys(COMPOSER_STYLES)) {
@@ -357,18 +363,19 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
     const dPerc = dark.patterns['C3']!.data[3]!.steps.filter(s => s.on).length
     expect(hPerc).toBeGreaterThan(dPerc)          /* glitch density recipe audible */
   })
-  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical to the v0.8.0 Phase-1 hashes', () => {
-    /* any intentional change to the legacy recipes (or to shared code paths
-       they consume) must consciously update these pins — documented contract.
-       v0.8.0 Phase-1 delta: the composer now populates scene.mix snapshots
-       (energy-curve payloads; kick excluded) — patterns/fingerprint are
-       UNCHANGED (form-fp still d0c5f32f032f2a88); the project JSON grows the
-       mix payloads, so the whole-project pins moved (documented in
-       CHANGELOG 0.8.0). Determinism re-proven: same seed → byte-identical. */
+  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical per-build (v0.9.0 rebuild values)', () => {
+    /* any intentional change to the recipes (or shared code paths they
+       consume) must consciously update these pins — documented contract.
+       v0.9.0 REBUILD VALUES: the chord progression engine (P1) re-tones
+       bass/lead/pad/arp per the active progression, so all whole-project
+       hashes moved vs v0.8.0 (v0.8.0 values recorded in CHANGELOG 0.8.0:
+       FULL-ON 338e…/1d9c…/3db8…, DARK-PSY 038f…/6290…/766a…, PROGRESSIVE
+       d8c7…/c73d…/d6bb…). Determinism re-proven: same seed → byte-identical;
+       rhythm tracks byte-identical to v0.8.0 (pinned in the harmony suite). */
     const pins: Record<string, string[]> = {
-      'FULL-ON': ['338e953768eb4d67', '1d9c77e2f3a03446', '3db876a150141b7f'],
-      'DARK-PSY': ['038f8e5b27b46ab2', '62902511bfaabf9e', '766a857696b94ab5'],
-      'PROGRESSIVE': ['d8c7d9acfa7bb40a', 'c73d87559d33e59e', 'd6bb48eeade0560a'],
+      'FULL-ON': ['38651edda8df6cc8', 'fa4d72e80c483cd2', 'd5663948fe1e9727'],
+      'DARK-PSY': ['e9d9e73a3350b54b', '617e80edf1f70b77', '4867687a52d13d02'],
+      'PROGRESSIVE': ['d724150eef4b7e93', '1a61027f125006af', 'd14ce4b11a17e6f3'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {
@@ -378,3 +385,133 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
     }
   })
 })
+
+/* ============ CHORD PROGRESSION ENGINE (v0.9.0 P1 — harmonic coherence) ====
+ * Every composed TONAL note (bass/lead/pad/arp) must be a member of the
+ * active bar's diatonic triad; rhythm tracks are byte-identical to v0.8.0;
+ * progression picks are deterministic and diverse. The chord-tone audit
+ * walks the SHARED songSteps expansion — the same walk the WAV renderer,
+ * the MIDI exporter and the live scheduler bookkeeping use — so the gate
+ * proves the SONG, not just the patterns. */
+describe('chord progression engine (v0.9.0 P1)', () => {
+  const ivOf = (scaleIv: number[], cls: number) => scaleIv[cls % 7] % 12
+
+  function auditProject(styleId: string, minutes: number, seed: number) {
+    const p = JSON.parse(JSON.stringify(compose(styleId, minutes, seed).project))
+    const scaleIv = SCALES[p.scale as keyof typeof SCALES]
+    const h = p.harmony
+    let notes = 0, violations = 0
+    for (const y of songSteps(p)) {
+      const pat = p.patterns[p.scenes[y.scene].pattern]
+      const cls = chordClasses(chordDegreeAt(h, Math.floor(y.phase / 16)))
+      const pcs = cls.map((cv: number) => ivOf(scaleIv, cv))
+      for (const tk of ['4', '5', '6', '7']) {
+        const d = pat.data[tk]
+        const st = d.steps[y.phase % d.len]
+        if (!st.on) continue
+        notes++
+        const pc = ((st.note - p.root) % 12 + 12) % 12
+        if (!pcs.includes(pc)) violations++
+      }
+    }
+    return { notes, violations }
+  }
+
+  test('templates: 12 per family × 5 families, 4/8-bar diatonic loops, unique ids', () => {
+    for (const [fam, list] of Object.entries(PROGRESSION_TEMPLATES)) {
+      expect(Object.keys(COMPOSER_STYLES)).toContain(fam)
+      expect(list.length).toBe(12)
+      expect(new Set(list.map(t => t.id)).size).toBe(12)
+      for (const t of list) {
+        expect([4, 8]).toContain(t.bars)
+        expect(t.degrees.length).toBe(t.bars)
+        for (const d of t.degrees) { expect(d).toBeGreaterThanOrEqual(0); expect(d).toBeLessThanOrEqual(6) }
+      }
+    }
+    expect(Object.keys(PROGRESSION_TEMPLATES).length).toBe(5)
+  })
+
+  test('pick: deterministic, in-family, seed-sensitive (fnv1a(seed+":prog"))', () => {
+    for (const fam of Object.keys(COMPOSER_STYLES)) {
+      const a = pickProgression(fam, 424242)
+      const b = pickProgression(fam, 424242)
+      expect(a.id).toBe(b.id)
+      expect(PROGRESSION_TEMPLATES[fam as keyof typeof PROGRESSION_TEMPLATES]).toContain(a)
+    }
+    /* at least one of 5 seeds lands on a different template (not a constant) */
+    const ids = new Set([1, 2, 3, 4, 5].map(s => pickProgression('FULL-ON', s).id))
+    expect(ids.size).toBeGreaterThan(1)
+  })
+
+  test('HARMONIC INVARIANT: 0 chord-tone violations across ALL styles/lengths via the shared expansion', () => {
+    let total = 0, viol = 0
+    for (const styleId of Object.keys(COMPOSER_STYLES)) {
+      for (const minutes of [3, 5, 8]) {
+        const r = auditProject(styleId, minutes, SEED)
+        total += r.notes
+        viol += r.violations
+        expect(r.violations).toBe(0)
+      }
+    }
+    /* the audit is non-vacuous: it must have actually listened to >20k notes */
+    expect(total).toBeGreaterThan(20000)
+    /* and it generalizes: 3 more seeds × 2 styles */
+    for (const s of [777, 12345, 999999]) for (const styleId of ['FULL-ON', 'FOREST']) {
+      const r = auditProject(styleId, 5, s)
+      expect(r.violations).toBe(0)
+    }
+  })
+
+  test('harmony metadata rides the project (family/progId/degrees) and stats carry the id', () => {
+    const c = compose('FULL-ON', 3, SEED)
+    expect(c.project.harmony.family).toBe('FULL-ON')
+    expect(c.project.harmony.progId).toBe(c.stats.progression)
+    expect(PROGRESSION_TEMPLATES['FULL-ON'].find(t => t.id === c.project.harmony.progId)!.degrees).toEqual(c.project.harmony.degrees)
+    expect(c.project.harmony.degrees.length).toBe(c.project.harmony.progBars)
+  })
+
+  test('DIVERSITY: ≥8 distinct progressions across 20 seeds, every style', () => {
+    const counts: Record<string, number> = {}
+    for (const styleId of Object.keys(COMPOSER_STYLES)) {
+      const set = new Set(Array.from({ length: 20 }, (_, i) => compose(styleId, 3, 1000 + i * 77).stats.progression))
+      counts[styleId] = set.size
+      expect(set.size).toBeGreaterThanOrEqual(8)
+    }
+    expect(Object.keys(counts).length).toBe(5)
+  })
+
+  test('RHYTHM BYTE-IDENTITY: kick/snare/hat/perc/fx digests == the v0.8.0 pre-P1 pins', () => {
+    /* digests computed from the v0.8.0 composer BEFORE the progression engine
+       landed (Run 17 Phase 0 record) — the progression must never touch them */
+    const pins: Record<string, string> = {
+      'FULL-ON/3': 'f8521d29b8ea1bc9', 'FULL-ON/5': 'b84595799b478fae', 'FULL-ON/8': '5fd38f07364c6bf8',
+      'DARK-PSY/3': 'aa09488bfb518051', 'DARK-PSY/5': 'b584b7ac3bb77584', 'DARK-PSY/8': '99ce50d3e6a73896',
+      'PROGRESSIVE/3': '591bec94b770827a', 'PROGRESSIVE/5': '6ec6c6ca94d5ae1d', 'PROGRESSIVE/8': 'dd9f4e0e08e02196',
+      'FOREST/3': '3eaf8951847357f7', 'FOREST/5': '7f27e3a59925b49e', 'FOREST/8': 'c64ad8439123897a',
+      'HI-TECH/3': '6519db783cca9a71', 'HI-TECH/5': '873ae2749bcea630', 'HI-TECH/8': '4c551cad7e670523',
+    }
+    for (const [key, want] of Object.entries(pins)) {
+      const [styleId, mStr] = key.split('/')
+      const c = compose(styleId, parseInt(mStr, 10), SEED)
+      const dig: string[] = []
+      for (const pk of Object.keys(c.project.patterns)) {
+        const pat = c.project.patterns[pk as keyof typeof c.project.patterns]
+        const sub: Record<string, unknown> = {}
+        for (const tk of ['0', '1', '2', '3', '8']) sub[tk] = pat.data[tk]
+        dig.push(pk + ':' + createHash('sha256').update(JSON.stringify(sub)).digest('hex').slice(0, 16))
+      }
+      expect(createHash('sha256').update(dig.join('|')).digest('hex').slice(0, 16)).toBe(want)
+    }
+  })
+
+  test('PROGRESSIONS ARE AUDIBLE: bass notes move with the chord (not a static root pedal)', () => {
+    const p = compose('FULL-ON', 3, SEED).project
+    /* collect distinct bass pitch classes across the DROP pattern — with an
+       8-bar multi-chord progression there must be more than one */
+    const pcs = new Set<number>()
+    const d = p.patterns['C3'].data[4]
+    for (const st of d.steps) if (st.on) pcs.add(((st.note - p.root) % 12 + 12) % 12)
+    expect(pcs.size).toBeGreaterThan(1)
+  })
+})
+

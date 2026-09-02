@@ -18,6 +18,13 @@
      4. LEAD MOTIF — generated on the scale, varied per section through the
         foundation MotifTransformer (drops state it, BREAK inverts, BUILD
         fragments, OUTRO omits) — real variation ops, not re-rolls.
+     4b. HARMONY (v0.9.0) — one chord progression template per project
+        (12 seeded 4/8-bar diatonic loops per style family, picked by
+        fnv1a(seed+':prog')); bass roots, lead motif harmonization and
+        pad/arp voicings derive from the active bar's diatonic triad.
+        Kick/hats/perc/snare/fx NEVER consume the progression (rhythm is
+        byte-identical to v0.8.0 — pinned). Project carries p.harmony
+        metadata so gates/library/evolution can re-derive the chords.
      5. SECTION VARIANTS (v0.7.0) — every section family used more than once
         in the arranger gets n−1 derived variant scenes (naming: base+" 2",
         " 3", …) so NO arranger repeat is ever identical. Variants are the
@@ -35,6 +42,7 @@
 import { rngFor, degreeToSemitone } from '../foundation/foundation.mjs';
 import { arcAt } from '../foundation/composition/form.mjs';
 import { motifFromEvents, MotifTransformer } from '../foundation/music/motif.mjs';
+import { pickProgression, chordDegreeAt, chordClasses, snapDegreeToChord } from '../foundation/music/progression.mjs';
 import { SCALES, mkStep, deep } from './model.js';
 import { initTracks, addTrackToProject, libFind, assignPresetToTrack } from './presets.js';
 import { normalizeSceneMix } from './scenes.js';
@@ -158,18 +166,23 @@ const sectionMotif = (seed, sectionId, base) => {
   return base; /* INTRO: sparse head only (handled in the recipe) */
 };
 
-/* write one section pattern (len = min(bars,8)*16), all tracks equal length */
+/* write one section pattern (len = min(bars,8)*16), all tracks equal length.
+   v0.9.0: ctx.prog — the project's chord progression. Every TONAL note
+   (bass/lead/pad/arp) derives from the active bar's diatonic triad; rhythm
+   tracks (kick/snare/hat/perc/fx) are untouched by it. The pattern's bar j
+   plays chord degrees[j % progBars] — sections restart the loop at index 0
+   (section starts are harmonic anchor points: the psy convention). */
 function fillSection(p, pat, section, bars, energy, ctx) {
   const len = Math.min(bars, 8) * 16;
-  const { style, rng, motif, scaleIv, root } = ctx;
+  const { style, rng, motif, scaleIv, root, prog } = ctx;
   const rc = style.recipe || {}; /* v0.7.0 style recipe — defaults = v0.6.0 constants */
+  const chordRootAt = bar => root + degreeToSemitone(scaleIv, chordDegreeAt(prog, bar)); /* bass register */
   for (const t of Object.keys(pat.data)) {
     const d = pat.data[t];
     d.len = len;
     d.steps = Array.from({ length: len }, () => mkStep(false));
   }
   const sec = section.id;
-  const notes = { bass: root, leadBase: root + 24 };
   const degNote = (deg, oct) => root + 24 + degreeToSemitone(scaleIv, deg) + 12 * (oct || 0);
 
   /* KICK — 4-on-floor when it kicks; silent in BREAK/RISER (breakdown feel) */
@@ -190,18 +203,19 @@ function fillSection(p, pat, section, bars, energy, ctx) {
       for (let s = 0; s < len; s++) {
         if (rng() < 0.14) continue; /* breaths keep it rolling, not static */
         const push = 19 + Math.round(rng() * 6);
-        put(pat, 4, s, 0.78 + rng() * 0.14, rng() < 0.22 ? notes.bass + 12 : notes.bass, push);
+        const bn = chordRootAt(Math.floor(s / 16)); /* v0.9.0: chord root per bar */
+        put(pat, 4, s, 0.78 + rng() * 0.14, rng() < 0.22 ? bn + 12 : bn, push);
       }
     } else {
       for (let s = 1; s < len; s += 2) {
         const push = (sec === 'DROP' || sec === 'DROP2') ? 19 + Math.round(rng() * 6) : null; /* psy-push: +6..8 ticks */
-        put(pat, 4, s, 0.82 + rng() * 0.1, notes.bass, push);
+        put(pat, 4, s, 0.82 + rng() * 0.1, chordRootAt(Math.floor(s / 16)), push);
       }
     }
   } else if (energy >= 0.55) {
-    for (let s = 0; s < len; s += 2) if (rng() < 0.8) put(pat, 4, s, 0.7 + rng() * 0.1, notes.bass)
+    for (let s = 0; s < len; s += 2) if (rng() < 0.8) put(pat, 4, s, 0.7 + rng() * 0.1, chordRootAt(Math.floor(s / 16)))
   } else {
-    for (let b = 0; b < len / 16; b++) { put(pat, 4, b * 16, 0.8, notes.bass); put(pat, 4, b * 16 + 8, 0.75, notes.bass) }
+    for (let b = 0; b < len / 16; b++) { put(pat, 4, b * 16, 0.8, chordRootAt(b)); put(pat, 4, b * 16 + 8, 0.75, chordRootAt(b)) }
   }
   /* HATS — offbeat core, 16th ghosts as energy rises (density per recipe) */
   if (energy >= 0.35) {
@@ -215,29 +229,40 @@ function fillSection(p, pat, section, bars, energy, ctx) {
   /* SNARE — backbeat on full sections, half-time on BREAK */
   if (sec === 'BREAK') { for (let b = 0; b < len / 16; b++) { put(pat, 1, b * 16 + 4, 0.6); put(pat, 1, b * 16 + 12, 0.65) } }
   else if (energy >= 0.8) { for (let b = 0; b < len / 16; b++) { put(pat, 1, b * 16 + 4, 0.55); put(pat, 1, b * 16 + 12, 0.6) } }
-  /* LEAD — the motif, varied per section; INTRO stays headless */
+  /* LEAD — the motif, varied per section; INTRO stays headless. v0.9.0:
+     every motif degree is SNAPPED into the active bar's chord (nearest
+     chord-tone class, deterministic tie-break) — the melody keeps its
+     contour but never leaves the harmony. */
   if (sec !== 'INTRO' && (energy >= 0.55 || sec === 'BREAK')) {
     const evs = motif.events; let cursor = 0;
     const barsN = len / 16;
     for (let b = 0; b < barsN; b++) {
       cursor = b * 16;
+      const cls = chordClasses(chordDegreeAt(prog, b));
       for (const ev of evs) {
         if (!ev.rest && cursor < len) {
-          const n = degNote(ev.deg, ev.oct);
+          const n = degNote(snapDegreeToChord(ev.deg, cls), ev.oct);
           put(pat, 5, cursor, 0.4 + ev.accent * 0.35, n);
         }
         cursor += ev.dur;
       }
     }
   }
-  /* PAD — sustained roots when the mix has room */
+  /* PAD — sustained chord voicings when the mix has room (v0.9.0: root +
+     fifth of the active bar's chord — positions/velocities unchanged) */
   if (energy < 0.6 || sec === 'BREAK') {
-    for (let b = 0; b < len / 16; b++) { put(pat, 6, b * 16, 0.35, root + 12); if (len >= 64) put(pat, 6, b * 16 + 8, 0.3, root + 12 + 7) }
+    for (let b = 0; b < len / 16; b++) {
+      const cd = chordDegreeAt(prog, b);
+      put(pat, 6, b * 16, 0.35, root + 12 + degreeToSemitone(scaleIv, cd));
+      if (len >= 64) put(pat, 6, b * 16 + 8, 0.3, root + 12 + degreeToSemitone(scaleIv, cd + 4));
+    }
   }
-  /* ARP — hypno 16ths only at peak energy */
+  /* ARP — hypno 16ths only at peak energy (v0.9.0: cycles the active bar's
+     chord tones: root/third/fifth/root+8ve) */
   if (energy >= 0.85) {
-    const seq = [0, 2, 4, 6, 4, 2];
-    for (let s = 0; s < len; s++) { if (rng() < 0.85) put(pat, 7, s, 0.28 + rng() * 0.12, root + 24 + degreeToSemitone(scaleIv, seq[s % seq.length])) }
+    const seqT = [0, 1, 2, 3, 2, 1];
+    const arpTone = s => { const cd = chordDegreeAt(prog, Math.floor(s / 16)); return [cd, cd + 2, cd + 4, cd + 7][seqT[s % 6]] };
+    for (let s = 0; s < len; s++) { if (rng() < 0.85) put(pat, 7, s, 0.28 + rng() * 0.12, root + 24 + degreeToSemitone(scaleIv, arpTone(s))) }
   }
   /* FX — riser sweeps through the RISER section, spacing per recipe
      (default one per 2 bars; HI-TECH one per bar — aggressive placement) */
@@ -348,8 +373,9 @@ function deriveVariant(basePat, sec, k, ctx) {
     const barsN = dl.len / 16;
     for (let b = 0; b < barsN; b++) {
       let cursor = b * 16;
+      const cls = chordClasses(chordDegreeAt(ctx.prog, b)); /* v0.9.0: chord-aware variant leads */
       for (const ev of m.events) {
-        if (!ev.rest && cursor < dl.len) put(pat, 5, cursor, 0.4 + ev.accent * 0.35, degNote(ev.deg, ev.oct));
+        if (!ev.rest && cursor < dl.len) put(pat, 5, cursor, 0.4 + ev.accent * 0.35, degNote(snapDegreeToChord(ev.deg, cls), ev.oct));
         cursor += ev.dur;
       }
     }
@@ -357,11 +383,20 @@ function deriveVariant(basePat, sec, k, ctx) {
   /* PERC (track 3) — repositioning: re-seeded sparse density (same recipe). */
   const dp = pat.data[3];
   if (dp) { dp.steps = Array.from({ length: dp.len }, () => mkStep(false)); for (let s = 0; s < dp.len; s += 2) if (rng() < (0.06 + energy * 0.12) * (rc.percMul || 1)) put(pat, 3, s, 0.3 + rng() * 0.4); if (rc.percOdd) { for (let s = 1; s < dp.len; s += 2) if (rng() < (0.03 + energy * 0.07) * (rc.percMul || 1)) put(pat, 3, s, 0.22 + rng() * 0.3) } }
-  /* PAD (track 6) — second-voicing interval swap where a pad exists. */
+  /* PAD (track 6) — second-voicing interval swap where a pad exists
+     (v0.9.0: chord-aware — the active bar's FIFTH voice moves to a picked
+     alternative chord tone: fifth / third / fifth+octave in degree space). */
   const dd = pat.data[6];
   if (dd) {
-    const ivs = [7, 3, 10]; const iv = ivs[Math.floor(rng() * ivs.length)];
-    for (let i = 0; i < dd.len; i++) { const st = dd.steps[i]; if (st.on && st.note === ctx.root + 12 + 7) st.note = ctx.root + 12 + iv; if (st.on) st.vel = Math.min(1, Math.max(0.05, st.vel + (rng() - 0.5) * 0.16)) }
+    const pick = Math.floor(rng() * 3);
+    const alts = [4, 2, 9]; /* degree-space offsets from the chord root */
+    for (let i = 0; i < dd.len; i++) {
+      const st = dd.steps[i];
+      if (!st.on) continue;
+      const cd = chordDegreeAt(ctx.prog, Math.floor(i / 16));
+      if (st.note === ctx.root + 12 + degreeToSemitone(ctx.scaleIv, cd + 4)) st.note = ctx.root + 12 + degreeToSemitone(ctx.scaleIv, cd + alts[pick]);
+      st.vel = Math.min(1, Math.max(0.05, st.vel + (rng() - 0.5) * 0.16))
+    }
   }
   return pat;
 }
@@ -442,12 +477,15 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
     return { ...s, bars: bars[i], energyMid: e };
   });
 
-  /* 2. project shell */
+  /* 2. project shell — v0.9.0: the chord progression is picked FIRST (pure
+     function of styleId+seed) and carried on the project as p.harmony */
+  const prog = pickProgression(styleId, seedInt);
   const p = {
     version: 3, bpm, swing: 0, root: 33, scale: style.scale, recQ: 1, chain: false,
     seed: 'C' + label, groove: 'straight', fx: { delayDiv: '3/16', delayFb: 0.35 }, masterVol: 0.85,
     activeScene: 0, currentPattern: 'C1', selTrack: 4,
     macroVals: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    harmony: { family: styleId, progId: prog.id, progBars: prog.bars, degrees: prog.degrees.slice() },
     tracks: [], patterns: {}, scenes: [], lanes: [],
   };
   initTracks(p);
@@ -477,7 +515,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
     const patName = 'C' + (i + 1);
     const pat = { name: patName, data: {} };
     for (let t = 0; t < p.tracks.length; t++) pat.data[t] = { len: 16, steps: Array.from({ length: 16 }, () => mkStep(false)) };
-    fillSection(p, pat, sec, sec.bars, sec.energyMid, { style, rng, motif, scaleIv, root: p.root });
+    fillSection(p, pat, sec, sec.bars, sec.energyMid, { style, rng, motif, scaleIv, root: p.root, prog });
     p.patterns[patName] = pat;
     p.scenes.push({ name: sec.id, pattern: patName, color: sec.color, bars: Math.min(sec.bars, 8), fill: false });
     sceneMeta.push({ sec, k: 0 });
@@ -491,7 +529,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
      arranger gets n−1 derived variant scenes; the arranger is rewritten so
      occurrence j of a family plays the base (j=0) then " 2", " 3", … Bars
      per step, the form and the total length are unchanged. */
-  const vctx = { seedInt, scaleIv, root: p.root, sectionMotifs: secMotifs, style };
+  const vctx = { seedInt, scaleIv, root: p.root, sectionMotifs: secMotifs, style, prog };
   const usage = new Map();
   for (const st of arrSteps) usage.set(st.scene, (usage.get(st.scene) || 0) + 1);
   const occSeen = new Map();       /* scene → occurrences already assigned */
@@ -570,7 +608,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   return {
     project: p,
     form: { style: styleId, seed: label, bpm, sections: formSections, totalBars: totalSecs, lengthSec: +lengthSec.toFixed(2), targetSec: targetMinutes * 60 },
-    stats: { tracks: p.tracks.length, scenes: p.scenes.length, lanes: p.lanes.length, variants: variantCount, snapshots: snapCount, minVariantDiff: +minFamDiff.toFixed(3), lengthErr: +(((lengthSec - targetMinutes * 60) / (targetMinutes * 60)) * 100).toFixed(3), fingerprint },
+    stats: { tracks: p.tracks.length, scenes: p.scenes.length, lanes: p.lanes.length, variants: variantCount, snapshots: snapCount, progression: prog.id, minVariantDiff: +minFamDiff.toFixed(3), lengthErr: +(((lengthSec - targetMinutes * 60) / (targetMinutes * 60)) * 100).toFixed(3), fingerprint },
   };
 }
 

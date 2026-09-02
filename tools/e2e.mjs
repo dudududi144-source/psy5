@@ -43,7 +43,7 @@ const GATE_TIMEOUT = parseInt(opt('--timeout', '600000'), 10); /* v0.8.0: G28+G2
 
 const EXPECTED = [
   'G1-TECHNO', 'G1-PSYTRANCE', 'G1-TRANCE', 'G1-PROGRESSIVE',
-  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23', 'G24', 'G26', 'G27', 'G28', 'G29', 'G30',
+  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23', 'G24', 'G26', 'G27', 'G28', 'G29', 'G30', 'G31',
 ];
 /* G17 (live capture, v0.4.0) and G25 (record song, v0.6.0) are REALTIME —
    they run on-device (evidence-only) but are explicitly NOT asserted in CI
