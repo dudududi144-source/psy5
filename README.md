@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 371 tests across 32 files — 371 pass / 0 fail (351014 expect() calls)
+bun test             # 420 tests across 36 files — 420 pass / 0 fail (356314 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -74,6 +74,10 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/voice.test.ts` | 10 | v0.10.0 sample voice model: playback math (tune/slice/clamps), ensureVoice canonical + garbage-proof, byte-stable persistence, registry smp* write-through |
 | `tests/inserts.test.ts` | 10 | v0.10.0 insert FX: curve determinism/shape (drive soft-clip, crush staircase), ensureIns canonical + clamps, registry ins* write-through, composer lanes + KICK-SACRED + form-fp unchanged, snapshot/canonical load |
 | `tests/hints.test.ts` | 4 | v0.10.0 composer sample hints: names-only slots {0,3,6}, resolve hit/miss semantics, canonical backfill, no PCM |
+| `tests/freeze.test.ts` | 13 | v0.11.0 freeze/resample math: freezeWindow formula, freezePrep purity + input immutability, 10-min guard, resampleFrames exact trims, 1..32-bar guard |
+| `tests/editor.test.ts` | 16 | v0.11.0 derived samples: canonical params, deterministic ids + idempotence, exact fade/gain math, base immutability, chains, store round-trips |
+| `tests/slices.test.ts` | 11 | v0.11.0 slices: deterministic energy-flux detection (monotonic, capped, ±2-hop accuracy), sliceIdx window math, kind 'sliced' metadata (no PCM duplication), round-trips |
+| `tests/keydetect.test.ts` | 9 | v0.11.0 key detection: DFT chroma selectivity + determinism, K-S triad naming (C major / A minor), tuneToRoot minimal-signed math |
 | `tests/midifile.test.ts` | 9 | v0.7.0 MIDI export: format-1 writer, VLQ multi-byte, stable ordering, dependency-free parse-back, `.mid == WAV schedule` note-for-note identity, byte-identical exports |
 | `tests/follow.test.ts` | 13 | v0.7.0 follow actions: model validation, followBars precedence, all modes' 20-transition simulations, prob=0 fallback, seeded replayability, JSON + share round-trips |
 | `tests/mixsnap.test.ts` | 14 | v0.8.0 scene mix snapshots: canonical validation/clamps, registry application, walk-order launch trace, persistence + share round-trips, composer energy-curve payloads (kick excluded), determinism incl. snapshots, form-fp unchanged |
@@ -104,14 +108,17 @@ Honest subset classification (v0.4.0):
 | `G28` (scene mix snapshots), `G29` (master EQ+glue), `G30` (song stems + section bounce) | v0.8.0 offline+pure set (snapshot RMS ratio + null-mix control / neutral tolerance + crest compression / stem frames + RMS ordering + slice equality) | CI + local |
 | `G31` (chord progression engine), `G32` (per-bar evolution), `G33` (song library) | v0.9.0 offline+pure set (0 chord-tone violations via the shared expansion + determinism + diversity / OFF==pin + ON diff ≥200 + replay + intensity-0 / recipes compose deterministically + save/share round-trips + canonical rebuild) | CI + local |
 | `G34` (sample voice), `G35` (insert FX) | v0.10.0 offline set (engine-path load + mixed render both voices + tune-halves-support + reverse onset-flip + two-render maxDiff + missing→fallback counted / neutral perturb→restore maxDiff<1e-6 + structural zero-node restore + drive crest squash + LP high-band drop) | CI + local |
+| `G36` (freeze track) | v0.11.0: pipeline == independent prep+render+trim (dPipe 0), determinism (dDet 0), frames == freezeWindow formula, sample-track freeze == its plain render (dExact 0), re-freeze RMS within the measured double-master bound (−3.8 dB logged), onset aligned | CI + local |
+| `G37` (sample editor) | v0.11.0: fade onset/sustain RMS 0.289, derivations of base+op+params byte-identical (maxDiff 0), 2-step chain round-trip maxDiff 0 + idempotent, base immutable | CI + local |
+| `G38` (slices) | v0.11.0: detector ≥90% of truths within ±2 hops (measured 100%), sequential slice locks hit every step window in order, per-step lock overrides the track sliceIdx (zero-crossing 43 vs 46) | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.10.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **34 MAIN entries**, of
-which **32 are hard** (offline/pure — CI asserts all 32, including G24 song
+Gate-truth accounting (v0.11.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **38 MAIN entries**, of
+which **36 are hard** (offline/pure — CI asserts 35 ids incl. G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
-voice, G35 insert FX) and
+voice, G35 insert FX, G36 freeze, G37 editor, G38 slices) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
@@ -214,6 +221,43 @@ standard MIDI file export, and seeded follow actions for performance.
   transitionCounter)`) — the same seed + start replays the identical
   sequence (G27 pins it). **PRECEDENCE: PLAY SONG always follows the
   arranger and ignores follow actions.**
+
+## Features (v0.11.0) — RESAMPLE + SLICES + KEY
+
+- **RESAMPLE** (Samples drawer) — record the live master for 1/2/4/8 bars
+  (bar-quantized start, auto-stop, transport untouched) straight into the
+  sample store as `resample-<bpm>bpm-<bars>bar-<hash8>`; optional instant
+  assign to the selected track. Guards: 1..32 bars, worklet refusal,
+  store-quota check. Realtime capture (evidence-class, like live CAPTURE).
+- **FREEZE TRACK** (Sound tab ▸ VOICE row) — render the selected track for
+  one pattern loop into a sample (`freeze-<trackName>-<hash8>`). Tap point
+  **POST-insert PRE-send**: inserts are baked, global sends and sidechain
+  are EXCLUDED (zeroed on the prepped clone) so re-sending a frozen track
+  never doubles sends or ducking; the master section is baked (no pre-master
+  tap exists without a parallel renderer — documented). The 0.05 s schedule
+  lead is trimmed: frame 0 of the frozen sample = the first step of the
+  loop.
+- **SAMPLE EDITOR** (drawer ▸ ED) — waveform canvas (deterministic min/max
+  peaks per pixel bucket) + non-destructive edits: fade-in/fade-out
+  (0..2000 ms), gain, normalize, reverse. Every edit creates a DERIVED
+  sample (deterministic id = base+op+params; idempotent re-derivation;
+  chains allowed); the base import is byte-immutable. Lineage shown
+  (`name · ← base`).
+- **SLICES** — SLICE detects transients with a deterministic energy-flux
+  detector (up to 16 boundaries; stored as pct metadata on a `kind:
+  'sliced'` derived record — no PCM duplication); amber markers on the
+  waveform. Play slices via the `smpSlice` param (0 = full, 1..16) or the
+  per-step lock channel (`lock.smpSlice` — automatable lanes, ARM-AUTO,
+  MIDI-learn by construction). SLICES → STEPS fills the selected track's
+  pattern with sequential slice locks (the classic breakbeat fill).
+- **KEY → ROOT** — deterministic key detection (direct-DFT chroma over the
+  mid section + Krumhansl-Schmuckler correlation); one click tunes the
+  selected track onto the project root pitch class (minimal signed shift,
+  −5..+6 st, logged in the toast).
+- All four features are MAIN-engine only (the WORKLET limitations list says
+  so on-screen). Sample-voice projects without slices/locks render exactly
+  as v0.10.0 (defaults: sliceIdx 0, fades 0 ms — zero behavior change).
+
 
 ## Features (v0.10.0) — SONIC PALETTE
 

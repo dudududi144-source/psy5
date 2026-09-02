@@ -632,3 +632,88 @@ lanes — sacred, pinned. `COMPOSER_SAMPLE_HINTS {0:'kick',3:'perc',6:'atmos'}`
 ride the compose result and the project as names-only provenance; resolved
 once at compose arrival against the store (hit → sample voice baked, miss →
 synth + toast), never re-applied on RESUME.
+
+## 18. Resample + Slices + Key (v0.11.0)
+
+### Resample (realtime) and Freeze (offline)
+
+RESAMPLE reuses the v0.4.0 CaptureTap state machine verbatim: a RESAMPLE
+arm is `armed-start` with an auto-stop counter — the bar hook decrements
+it once capturing and finishes at exactly the Nth boundary (quantized
+start, transport never touched). `resampleFrames(bars, bpm, rate)` is the
+pure trim target (the capture START is bar-quantized, so [0, want) is the
+window; realtime scheduler skew of a few ms is documented — evidence
+class, like G17/G25). The sink hands raw Float32 channels to the SAMPLES
+drawer, which stores them through the ONE programmatic import path
+(`importChannelsAsSample` — count guard → makeRecord → name+hash8 → put →
+engine cache → drawer refresh).
+
+FREEZE renders one pattern loop of one track through the ONE renderer:
+`freezePrep(p, idx)` deep-clones the project and zeroes the track's
+sendA/sendB/scAmount (POST-insert PRE-send tap point: inserts baked,
+sends and sidechain excluded — a frozen track re-sent does not double
+sends or ducking), then `renderBounce(cp, 1, {trackIdx})` — the proven
+STEM path. The 0.05 s schedule lead is trimmed with `pcmFromBuffer` so
+frame 0 of the sample is the loop's first step; sample-voice playback then
+aligns like the original pattern. The MASTER section (EQ3 + glue + comp)
+IS baked — there is no pre-master tap without a parallel renderer
+(forbidden); G36 logs the resulting double-master RMS delta when the
+frozen sample is re-rendered (−3.8 dB on the demo kick loop: the legacy
+comp re-squashes already-mastered material — bounded, measured,
+documented, not hidden). Tails past the loop end truncate exactly as
+stems have always rendered.
+
+### The one-renderer steal-fix (v0.11.0)
+
+The sample-voice cap-8 oldest-stolen `stop()` was no-arg. During an
+OFFLINE schedule walk (all triggers scheduled before `startRendering()`)
+a no-arg stop executes at wall-clock — BEFORE the render — and erases the
+stolen future-scheduled hit entirely (G36 caught it: a frozen 8-bar kick
+loop retriggered per-step lost its whole first cap window). The steal now
+stops the source at the steal moment `when` (time-anchored): live
+semantics unchanged, offline time-correct, and the env is reaped by
+`onended` instead of a synchronous disconnect (same wall-clock hazard).
+
+### Derived samples (non-destructive editing)
+
+Every edit op (fade-in/fade-out/gain/normalize/reverse) bakes a NEW PCM
+copy into a NEW record: id = `fnv(baseId + ':' + op + ':' +
+canonicalParams)` — canonical params are clamped/rounded BEFORE both the
+id and the math, so the id always describes the actual PCM and
+re-derivation is idempotent (same inputs → same id → the put replaces).
+Chains chain from the parent id (the effective base). The base import is
+byte-immutable; derived records own their PCM copies (deleting the base
+orphans only the lineage display). Slice derivations (`kind: 'sliced'`)
+are the exception that proves the rule: they SHARE the base PCM arrays
+(no duplication) and store the detected boundaries as pct metadata; their
+id hashes the detected pcts, so re-detection is idempotent too.
+
+### Slicing + per-step locks
+
+`detectTransients` is a pure energy-flux onset detector (512-frame hop
+RMS → positive flux → 1.5×-mean adaptive threshold → strongest-first
+greedy pick, 35 ms spacing, 16 cap, stable tie-break): same PCM in, same
+boundaries out, forever. Playback resolves `sliceIdx` against a sliced
+record's pcts inside the PURE `samplePlayback` (slice k = [pcts[k−1],
+pcts[k]) — replaces the start/end window; 0 = full sample). Per-step
+selection rides the EXISTING lock channel: `ev.lock.smpSlice` (the
+registry param id) overrides the track's sliceIdx for that hit — so
+lanes, ARM-AUTO recording, MIDI-learn and snapshots work by construction
+with zero new persistence surface. SLICES → STEPS writes the classic
+breakbeat fill (step i → slice (i mod N) + 1, all steps ON) through the
+normal pattern model.
+
+### Key detection
+
+`js/keydetect.js` computes a 12-bin chroma by direct DFT at the pitch-
+class fundamentals (C4 base) over the sample's mid section ([25%, 75%),
+4 s cap) and correlates it against the rotated Krumhansl-Schmuckler
+major/minor profiles (Pearson r; deterministic scan order). The scanned
+register is C4..B4 — a documented honest limitation (fundamentals-only).
+`tuneToRoot` maps the sample's tonic onto the project root pitch class
+with the minimal signed shift ((rootPc − samplePc) mod 12 folded into
+−5..+6 — the same destination as the literal 0..11 reading, smallest
+voice-leading). The KEY → ROOT button applies it to the selected track's
+`sampleParams.tune` and logs key, r, delta and before → after in the
+toast. Composer output is UNCHANGED this run (form-fp + legacy pins
+asserted at Phase 0 and by every battery).

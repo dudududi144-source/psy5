@@ -3,6 +3,125 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.11.0] — Run 19: RESAMPLE + SLICES + KEY (the sonic-palette loop closes)
+
+> The device could import and PLAY user samples, but it could not bounce
+> its own output, edit them, slice them, or tune them. v0.11.0 completes
+> the producer loop: RESAMPLE the live jam, FREEZE a track to audio,
+> non-destructive EDITING with derived versions + a waveform, deterministic
+> SLICING with per-step slice locks (the breakbeat workflow), and musical
+> KEY detection with tune-to-project-root. Zero composer change: the
+> composer output is UNCHANGED this run (form-fp bb16ce280ff48f88 and the
+> legacy pins asserted identical at Phase 0 and re-asserted by G31/G33/G36
+> in every battery). Commands: `bun test` (420 tests / 36 files), `node
+> tools/verify.mjs`, `bun tools/e2e.mjs` (35/35 HARD).
+
+### Added — resample + freeze (`feat: resample and track freeze`)
+
+- RESAMPLE (live, realtime): bars select (1/2/4/8) + button in the Samples
+  drawer — records the master output through the EXISTING CaptureTap for
+  exactly N bars (bar-quantized start, auto-stop at the Nth boundary,
+  transport never touched), trims to `resampleFrames(bars,bpm,rate)`,
+  imports as `resample-<bpm>bpm-<bars>bar-<hash8>` (deterministic content
+  id — identical re-resamples land on ONE row). Guards: 1..32 whole bars,
+  WORKLET refusal, store `estimate()` quota check, 128-row cap. The
+  realtime capture is classified evidence-only (scheduler-skew jitter of a
+  few ms is documented honestly — the same class as G17/G25).
+- FREEZE TRACK (offline, deterministic): FREEZE button in the Sound-tab
+  VOICE row — renders ONE pattern loop of the selected track through the
+  ONE renderer (`freezePrep` clone: sendA/sendB/scAmount zeroed =
+  POST-insert PRE-send tap point; the MASTER section is baked — there is no
+  pre-master tap without a parallel renderer, documented), trims the 0.05 s
+  schedule lead (frame 0 = the first step of the loop), imports as
+  `freeze-<trackName>-<hash8>`. Guards: 10-minute cap, WORKLET refusal.
+- ENGINE FIX found by G36: the sample-voice cap-8 oldest-stolen stop() was
+  no-arg — during the OFFLINE schedule walk it executed at wall-clock and
+  ERASED future-scheduled hits (a frozen 8-bar kick loop replayed per-step
+  lost its entire first cap window). The stop is now TIME-ANCHORED to the
+  steal moment (live semantics unchanged, offline time-correct).
+- Shared `assignSampleToTrack` + `importChannelsAsSample` — one assign
+  path, one programmatic import path (RESAMPLE sink, FREEZE, derivations).
+- **G36** (e2e 33/33 → see below): pipeline == independent prep+render+trim
+  (dPipe=0), determinism (dDet=0), frames == freezeWindow formula
+  (583,945/583,945 on the demo song), sample-track freeze == its plain
+  render (dExact=0), re-freeze RMS within the measured double-master bound
+  (rel 35.58% = −3.8 dB — the master comp re-squashes already-mastered
+  audio; bounded, logged, documented), onset aligned (265→529 f).
+- `tests/freeze.test.ts` (13).
+
+### Added — sample editor (`feat: sample editor (derived versions, waveform)`)
+
+- Derived versions: every edit bakes a NEW PCM copy into a NEW record with
+  a DETERMINISTIC id = fnv(baseId + ':' + op + ':' + canonical params).
+  Idempotent re-derivation (same base+op+params → one id, the put
+  replaces). Derived-of-derived chains chain from the parent id. The BASE
+  import is byte-IMMUTABLE; derived records carry their own PCM (they keep
+  playing even if the base is deleted — lineage display only).
+- Ops: fade-in/fade-out (exact linear ramps, ms 0..2000), gain (0..2,
+  rounded 0.001), normalize (peak → 0.95), reverse. Params canonicalized
+  BEFORE both the id and the math.
+- Drawer UI: ED button → waveform canvas (deterministic min/max peaks per
+  pixel bucket) + edit panel; lineage shown as `name · ← base`.
+- **G37** (e2e 34/34): fade onset/sustain RMS 0.289 (linear-ramp physics),
+  two derivations byte-identical with the same id (maxDiff 0), 2-step
+  chain round-trip maxDiff 0 + re-derivation idempotent, base maxDiff 0.
+- `tests/editor.test.ts` (16).
+
+### Added — slices (`feat: sample slicing (deterministic transients, per-step locks)`)
+
+- `detectTransients` — pure energy-flux onset detector (512-frame hop RMS,
+  positive flux, 1.5×-mean adaptive threshold, strongest-first greedy pick,
+  35 ms min spacing, 16-onset cap, stable tie-break): the same PCM ALWAYS
+  yields the same boundaries.
+- `deriveSample(rec,'slice')` — kind `sliced`, boundaries stored as
+  metadata pct ranges (NO PCM duplication — the record shares the base
+  arrays), id hashes the DETECTED pcts (re-detection idempotent).
+- Playback: `samplePlayback(sp, dur, pcts)` — sliceIdx 1..N selects the
+  k-th boundary window (replaces start/end); 0 = full sample (unchanged);
+  out-of-range clamps to the last slice. Registry param `smpSlice` (0..16,
+  default 0) + Sound-tab slider.
+- Per-step slice locks: `ev.lock.smpSlice` overrides the track sliceIdx for
+  THAT hit — rides the EXISTING per-step lock channel, zero new
+  persistence surface. UI: SLICE button (amber markers on the waveform) +
+  SLICES → STEPS quick action (fills the selected track's pattern with
+  sequential slice locks — the classic breakbeat fill).
+- **G38** (e2e 35/35): detector accuracy 100% (7/7 truth transients within
+  ±2 hops on a synthetic break), the sequential slice fill renders a hit in
+  every step window with monotonically increasing peaks, and the per-step
+  lock PROVABLY overrides the track sliceIdx (step-0 zero-crossing rate 43
+  vs 46 across distinct slice content).
+- `tests/slices.test.ts` (11).
+
+### Added — key detection (`feat: key detection and tune-to-root`)
+
+- `js/keydetect.js` — deterministic chroma (direct DFT at the 12
+  pitch-class fundamentals over the sample's mid section, 4 s cap) +
+  Krumhansl-Schmuckler correlation (12 rotated major/minor profiles) →
+  `{tonicPc, mode, r, name}`. Pure math, no deps, no rng, no time. Honest
+  limitation: fundamentals-only scans C4..B4 (register assumption).
+- `tuneToRoot(tonicPc, projectRootMidi)` — minimal signed semitone shift
+  ((rootPc − samplePc) mod 12, mapped to −5..+6): the same pitch-class
+  destination as the literal 0..11 reading with the smallest
+  voice-leading move (documented resolution).
+- UI: KEY → ROOT button — detects the selected sample's key and applies
+  the shift to the SELECTED track's `sampleParams.tune` (toast logs key,
+  r, delta, before → after). WORKLET limitations list gains the v0.11.0
+  line (no resample/freeze/editor/slices/key — MAIN engine only).
+- `tests/keydetect.test.ts` (9).
+
+### Gates
+
+- Self-Gate inventory: **38 entries = 36 HARD (CI e2e 35/35 asserted ids +
+  G2×… — the canonical list lives in js/ui/tests.js) + 2 evidence-only
+  realtime (G17, G25)**. New HARD gates: G36 (freeze), G37 (editor), G38
+  (slices). G3/G4/G7/G20 never existed — unchanged, never renumbered.
+- Battery at release: `bun test` → **420 pass / 0 fail** across 36 files
+  (356,314 expect() calls). `tools/verify.mjs` GREEN (SW lock
+  psy6-v0.11.0 ↔ this CHANGELOG). Composer re-pin status: UNCHANGED —
+  form-fp bb16ce280ff48f88, demo-song schedule 4,385 events, Phase 0
+  baseline pcmHash 96a82cec2b7435e4 (session-local reference per the
+  v0.10.0 cross-session PCM finding).
+
 ## [0.10.0] — Run 18: SONIC PALETTE (user samples + per-track insert FX)
 
 > The sonic frontier: the device was 100% synthesis with bus sends only.
@@ -710,6 +829,125 @@ bun -e "import('./js/composer.js').then(async m=>{const c=m.compose('FULL-ON',3,
 
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
+
+## [0.11.0] — Run 19: RESAMPLE + SLICES + KEY (the sonic-palette loop closes)
+
+> The device could import and PLAY user samples, but it could not bounce
+> its own output, edit them, slice them, or tune them. v0.11.0 completes
+> the producer loop: RESAMPLE the live jam, FREEZE a track to audio,
+> non-destructive EDITING with derived versions + a waveform, deterministic
+> SLICING with per-step slice locks (the breakbeat workflow), and musical
+> KEY detection with tune-to-project-root. Zero composer change: the
+> composer output is UNCHANGED this run (form-fp bb16ce280ff48f88 and the
+> legacy pins asserted identical at Phase 0 and re-asserted by G31/G33/G36
+> in every battery). Commands: `bun test` (420 tests / 36 files), `node
+> tools/verify.mjs`, `bun tools/e2e.mjs` (35/35 HARD).
+
+### Added — resample + freeze (`feat: resample and track freeze`)
+
+- RESAMPLE (live, realtime): bars select (1/2/4/8) + button in the Samples
+  drawer — records the master output through the EXISTING CaptureTap for
+  exactly N bars (bar-quantized start, auto-stop at the Nth boundary,
+  transport never touched), trims to `resampleFrames(bars,bpm,rate)`,
+  imports as `resample-<bpm>bpm-<bars>bar-<hash8>` (deterministic content
+  id — identical re-resamples land on ONE row). Guards: 1..32 whole bars,
+  WORKLET refusal, store `estimate()` quota check, 128-row cap. The
+  realtime capture is classified evidence-only (scheduler-skew jitter of a
+  few ms is documented honestly — the same class as G17/G25).
+- FREEZE TRACK (offline, deterministic): FREEZE button in the Sound-tab
+  VOICE row — renders ONE pattern loop of the selected track through the
+  ONE renderer (`freezePrep` clone: sendA/sendB/scAmount zeroed =
+  POST-insert PRE-send tap point; the MASTER section is baked — there is no
+  pre-master tap without a parallel renderer, documented), trims the 0.05 s
+  schedule lead (frame 0 = the first step of the loop), imports as
+  `freeze-<trackName>-<hash8>`. Guards: 10-minute cap, WORKLET refusal.
+- ENGINE FIX found by G36: the sample-voice cap-8 oldest-stolen stop() was
+  no-arg — during the OFFLINE schedule walk it executed at wall-clock and
+  ERASED future-scheduled hits (a frozen 8-bar kick loop replayed per-step
+  lost its entire first cap window). The stop is now TIME-ANCHORED to the
+  steal moment (live semantics unchanged, offline time-correct).
+- Shared `assignSampleToTrack` + `importChannelsAsSample` — one assign
+  path, one programmatic import path (RESAMPLE sink, FREEZE, derivations).
+- **G36** (e2e 33/33 → see below): pipeline == independent prep+render+trim
+  (dPipe=0), determinism (dDet=0), frames == freezeWindow formula
+  (583,945/583,945 on the demo song), sample-track freeze == its plain
+  render (dExact=0), re-freeze RMS within the measured double-master bound
+  (rel 35.58% = −3.8 dB — the master comp re-squashes already-mastered
+  audio; bounded, logged, documented), onset aligned (265→529 f).
+- `tests/freeze.test.ts` (13).
+
+### Added — sample editor (`feat: sample editor (derived versions, waveform)`)
+
+- Derived versions: every edit bakes a NEW PCM copy into a NEW record with
+  a DETERMINISTIC id = fnv(baseId + ':' + op + ':' + canonical params).
+  Idempotent re-derivation (same base+op+params → one id, the put
+  replaces). Derived-of-derived chains chain from the parent id. The BASE
+  import is byte-IMMUTABLE; derived records carry their own PCM (they keep
+  playing even if the base is deleted — lineage display only).
+- Ops: fade-in/fade-out (exact linear ramps, ms 0..2000), gain (0..2,
+  rounded 0.001), normalize (peak → 0.95), reverse. Params canonicalized
+  BEFORE both the id and the math.
+- Drawer UI: ED button → waveform canvas (deterministic min/max peaks per
+  pixel bucket) + edit panel; lineage shown as `name · ← base`.
+- **G37** (e2e 34/34): fade onset/sustain RMS 0.289 (linear-ramp physics),
+  two derivations byte-identical with the same id (maxDiff 0), 2-step
+  chain round-trip maxDiff 0 + re-derivation idempotent, base maxDiff 0.
+- `tests/editor.test.ts` (16).
+
+### Added — slices (`feat: sample slicing (deterministic transients, per-step locks)`)
+
+- `detectTransients` — pure energy-flux onset detector (512-frame hop RMS,
+  positive flux, 1.5×-mean adaptive threshold, strongest-first greedy pick,
+  35 ms min spacing, 16-onset cap, stable tie-break): the same PCM ALWAYS
+  yields the same boundaries.
+- `deriveSample(rec,'slice')` — kind `sliced`, boundaries stored as
+  metadata pct ranges (NO PCM duplication — the record shares the base
+  arrays), id hashes the DETECTED pcts (re-detection idempotent).
+- Playback: `samplePlayback(sp, dur, pcts)` — sliceIdx 1..N selects the
+  k-th boundary window (replaces start/end); 0 = full sample (unchanged);
+  out-of-range clamps to the last slice. Registry param `smpSlice` (0..16,
+  default 0) + Sound-tab slider.
+- Per-step slice locks: `ev.lock.smpSlice` overrides the track sliceIdx for
+  THAT hit — rides the EXISTING per-step lock channel, zero new
+  persistence surface. UI: SLICE button (amber markers on the waveform) +
+  SLICES → STEPS quick action (fills the selected track's pattern with
+  sequential slice locks — the classic breakbeat fill).
+- **G38** (e2e 35/35): detector accuracy 100% (7/7 truth transients within
+  ±2 hops on a synthetic break), the sequential slice fill renders a hit in
+  every step window with monotonically increasing peaks, and the per-step
+  lock PROVABLY overrides the track sliceIdx (step-0 zero-crossing rate 43
+  vs 46 across distinct slice content).
+- `tests/slices.test.ts` (11).
+
+### Added — key detection (`feat: key detection and tune-to-root`)
+
+- `js/keydetect.js` — deterministic chroma (direct DFT at the 12
+  pitch-class fundamentals over the sample's mid section, 4 s cap) +
+  Krumhansl-Schmuckler correlation (12 rotated major/minor profiles) →
+  `{tonicPc, mode, r, name}`. Pure math, no deps, no rng, no time. Honest
+  limitation: fundamentals-only scans C4..B4 (register assumption).
+- `tuneToRoot(tonicPc, projectRootMidi)` — minimal signed semitone shift
+  ((rootPc − samplePc) mod 12, mapped to −5..+6): the same pitch-class
+  destination as the literal 0..11 reading with the smallest
+  voice-leading move (documented resolution).
+- UI: KEY → ROOT button — detects the selected sample's key and applies
+  the shift to the SELECTED track's `sampleParams.tune` (toast logs key,
+  r, delta, before → after). WORKLET limitations list gains the v0.11.0
+  line (no resample/freeze/editor/slices/key — MAIN engine only).
+- `tests/keydetect.test.ts` (9).
+
+### Gates
+
+- Self-Gate inventory: **38 entries = 36 HARD (CI e2e 35/35 asserted ids +
+  G2×… — the canonical list lives in js/ui/tests.js) + 2 evidence-only
+  realtime (G17, G25)**. New HARD gates: G36 (freeze), G37 (editor), G38
+  (slices). G3/G4/G7/G20 never existed — unchanged, never renumbered.
+- Battery at release: `bun test` → **420 pass / 0 fail** across 36 files
+  (356,314 expect() calls). `tools/verify.mjs` GREEN (SW lock
+  psy6-v0.11.0 ↔ this CHANGELOG). Composer re-pin status: UNCHANGED —
+  form-fp bb16ce280ff48f88, demo-song schedule 4,385 events, Phase 0
+  baseline pcmHash 96a82cec2b7435e4 (session-local reference per the
+  v0.10.0 cross-session PCM finding).
 
 ## [0.7.0] — Run 10: EVOLUTION + INTEROP
 
