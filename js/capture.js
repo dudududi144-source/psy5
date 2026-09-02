@@ -86,4 +86,22 @@ function stepsToBarBoundary(step) {
   return m === 0 ? 0 : 16 - m;
 }
 
-export { CaptureTap, GrowableChannel, stepsToBarBoundary, SP_BUF };
+/* ── v0.11.0 P1: RESAMPLE math (pure, no Web Audio) ──
+   resampleFrames — the exact trim target for an N-bar master capture:
+   bars·16 steps · stepDur · sampleRate. The live capture starts bar-
+   quantized (tap.start() on a bar hook), so [0, wantFrames) of the assembled
+   stream is the N-bar window (realtime capture carries scheduler-skew
+   jitter of a few ms — classified evidence-only, documented honestly). */
+function resampleFrames(bars, bpm, sampleRate) {
+  const sd = 60 / bpm / 4;
+  return Math.round(bars * 16 * sd * sampleRate);
+}
+
+/* resampleGuard — flow cap: 1..32 bars (tested refusal path). */
+function resampleGuard(bars) {
+  if (!Number.isInteger(bars) || bars < 1) return { ok: false, reason: 'bar count must be a whole number ≥ 1' };
+  if (bars > 32) return { ok: false, reason: 'resample exceeds the 32-bar cap' };
+  return { ok: true };
+}
+
+export { CaptureTap, GrowableChannel, stepsToBarBoundary, SP_BUF, resampleFrames, resampleGuard };

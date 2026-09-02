@@ -397,3 +397,72 @@ eng.syncMix(cp,t0+y.abs*sd);
 const buf=await oc.startRendering();
 return{buf,N:sliceN,startFrame,evs,sections:plan.sections,scheduleHash:evHash(evs),musicSec:plan.totalSteps*sd,totalSec:(plan.totalSteps+SONG_TAIL_STEPS)*sd,sampleFallbacks:eng.sampleFallbacks,sampleSpawns:eng.sampleSpawns,sampleSteals:eng.sampleSteals};
 }
+
+/* ── v0.11.0 P1: FREEZE TRACK — render one track's current pattern loop to a
+ * sample (the "bounce and re-process" move). CONTRACT (documented):
+ *   tap point POST-insert PRE-send — inserts are baked (they are part of the
+ *   track chain: input→drive→crush→filter→duck→pan), global sends are
+ *   EXCLUDED (sendA/sendB zeroed on the prepped clone), so assigning the
+ *   frozen sample to a track and re-adding sends does NOT double them;
+ *   sidechain ducking is EXCLUDED too (scAmount zeroed — the duck is a live
+ *   mix response driven by the kick; freezing it in would double-duck the
+ *   frozen track when replayed next to the kick).
+ *   The MASTER section (EQ3 + glue + comp + master gain) IS baked — there is
+ *   no clean pre-master tap without a parallel renderer (forbidden); the
+ *   freeze is "what the track contributes to the master output". Replaying
+ *   the frozen sample re-applies the master — the mangle workflow wants the
+ *   heard sound anyway (G36 logs the round-trip RMS delta this implies).
+ * MECHANISM: renderBounce (the proven STEM path) — one pattern loop through
+ * the ONE deterministic graph; the 0.05 s schedule lead is trimmed so frame 0
+ * of the sample is exactly the first step of the loop (sample-voice playback
+ * then aligns like the original pattern). READING NOTE: "current pattern
+ * loop" = the LANES-view loop (loopLen steps); renderSong(trackFilter,
+ * bounds) remains the song-section variant and is intentionally NOT used
+ * here — scene snapshots / state lanes would re-write sends mid-render and
+ * break the PRE-send contract (documented in ARCHITECTURE §18).
+ * Tail note (honest): the render ends at the loop boundary — release tails
+ * past the loop end are truncated exactly as the STEM bounce has always
+ * rendered them (same N formula since v0.5.0). */
+const FREEZE_LEAD_FRAMES=Math.ceil(0.05*44100);
+
+/* freezePrep — pure: deep-clone p and zero the frozen track's sends +
+ * sidechain amount. The input project is never mutated (tested). */
+export function freezePrep(p,idx){
+const cp=JSON.parse(JSON.stringify(p));
+const t=cp.tracks[idx];
+if(t){t.mix=t.mix||{};t.mix.sendA=0;t.mix.sendB=0;t.scAmount=0}
+return cp;
+}
+
+/* freezeWindow — pure frame math for one pattern loop (no Web Audio).
+ * frames = the trimmed sample length: ceil((0.05+steps·sd)·44100) − lead. */
+export function freezeWindow(p){
+const L=loopLen(p),sd=60/p.bpm/4;
+const total=Math.ceil((0.05+L*sd)*44100);
+const frames=Math.max(0,total-FREEZE_LEAD_FRAMES);
+return {steps:L,bars:L/16,frames,durationSec:frames/44100,sampleRate:44100};
+}
+
+/* freezeGuard — flow cap: a freeze may not exceed 10 minutes (LOOP_CAP keeps
+ * real loops far below; the guard is the documented refusal path). */
+export function freezeGuard(durationSec){
+if(!(durationSec>0))return {ok:false,reason:'empty render — nothing to freeze'};
+if(durationSec>600)return {ok:false,reason:'freeze exceeds the 10-minute cap'};
+return {ok:true};
+}
+
+/* freezeTrack — async: prepped clone → renderBounce(trackIdx) → trim lead.
+ * Returns {channels,sampleRate,frames,durationSec,scheduleHash} or {error}.
+ * opts.samples: the engine sample cache (Map) — lets a SAMPLE-voiced track
+ * freeze through its buffer playback (re-freeze round-trips work). */
+export async function freezeTrack(p,idx,opts){
+opts=opts||{};
+const win=freezeWindow(p);
+const g=freezeGuard(win.durationSec);
+if(!g.ok)return {error:g.reason};
+if(!p.tracks||!p.tracks[idx])return {error:'no such track'};
+const cp=freezePrep(p,idx);
+const r=await renderBounce(cp,1,{trackIdx:idx,samples:opts.samples});
+const out=pcmFromBuffer(r.buf,FREEZE_LEAD_FRAMES,win.frames);
+return {channels:out.channels,sampleRate:out.sampleRate,frames:out.channels[0].length,durationSec:out.channels[0].length/out.sampleRate,scheduleHash:r.scheduleHash};
+}

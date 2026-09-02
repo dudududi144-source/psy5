@@ -42,8 +42,8 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
-/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 34 entries as of v0.10.0 P3) ──
- * MAIN engine, 34 entries on device — 32 hard (offline/pure, CI-asserted in
+/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 35 entries as of v0.11.0 P1) ──
+ * MAIN engine, 35 entries on device — 33 hard (offline/pure, CI-asserted in
  * tools/e2e.mjs) + 2 evidence-only realtime gates (G17 live capture, G25
  * record song — ScriptProcessor tap on wall-clock; pass on-device, reported
  * as info in CI, never asserted there).
@@ -65,13 +65,14 @@ function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(
  *   G33 song library (offline, v0.9.0)
  *   G34 sample voice (offline, v0.10.0)
  *   G35 per-track insert FX (offline, v0.10.0)
+ *   G36 freeze track (offline, v0.11.0)
  * WORKLET reduced set: 3 entries (G2, G14w, G15w) — offline worklet renders.
  * NUMBERING GAPS (documented, never renumbered — all historical evidence
  * cites these ids): G3, G4, G7 and G20 have NEVER existed in any shipped
  * commit (git log -S across all history); the sequence was assigned
  * topically and the gaps were left reserved-but-unused.
  * The device summary line "N/29" counts entries; the honest hard-pass count
- * cited in README/CI is 27 (29 − G17 − G25). */
+ * cited in README/CI is 33 (35 − G17 − G25). */
 async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;if(I.engine==='worklet'){logLine('info','== PSY6 SELF-GATE — WORKLET engine (reduced but real: G2 + G14w + G15w) ==');await gateWorklet()}else{logLine('info','== PSY6 SELF-GATE — MAIN pooled engine (OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner
@@ -771,6 +772,66 @@ const hp0=hpRms(rH0.buf),hp1=hpRms(rH1.buf);
 const dropDb=20*Math.log10(hp0/Math.max(hp1,1e-9));
 const ok35=maxDiff35<1e-6&&structOk&&(crest0-crest1)>0.5&&dropDb>20;
 gate('G35','insert FX: neutral (perturb→restore renders identical, maxDiff<1e-6; filter node removed, crush back to null-curve), drive squashes saw crest (>0.5 dB, logged), LP 200 Hz drops the hat high band >20 dB',ok35,'maxDiff='+maxDiff35.toExponential(2)+' struct='+structOk+' crest '+crest0.toFixed(2)+'→'+crest1.toFixed(2)+' dB hpDrop='+dropDb.toFixed(1)+' dB')}catch(e){gate('G35','insert FX',false,'ERR '+e.message)}
+/* G36 — FREEZE TRACK (offline — CI-asserted, v0.11.0 P1):
+   (a) PIPELINE: freezeTrack output == an INDEPENDENT freezePrep + renderBounce
+       + lead-trim through the identical path — maxDiff < 1e-6 (expected 0);
+   (b) DETERMINISM: two freezeTrack calls → maxDiff < 1e-6;
+   (c) FORMULA: frames === freezeWindow (exact, logged);
+   (d) ROUND-TRIP: frozen record (normalize OFF) → fresh prepped clone of the
+       same track, pattern COLLAPSED to a single step-0 trigger (a loop
+       sample is played once per loop — re-triggering every kick step would
+       stack 8 cap-truncated copies: musically wrong usage), sample gain
+       compensated 1/vel → ONE full-loop play of the frozen audio:
+       duration EXACTLY equal (frames), non-silent, onset aligned <500
+       frames (proves the 0.05 s lead trim — a missed trim lags 2205 f),
+       RMS within 5% of the freeze RMS (logged actual; residual = the
+       master section re-apply — the freeze bakes the master bus). */
+try{
+const {compose}=await import('/js/composer.js');
+const {freezeTrack,freezeWindow,freezePrep,renderBounce:rb36,pcmFromBuffer:pf36}=await import('/js/bounce.js');
+const {makeRecord,ensureVoice:ev36}=await import('/js/samplestore.js');
+const p36=compose('FULL-ON',3,424242).project;
+const k=p36.tracks.findIndex(t=>t.kind==='drum'&&((t.sound&&t.sound.type)||t.type)==='kick');
+const win=freezeWindow(p36);
+const rms36=ch=>{let s=0,n=0;for(const d of ch)for(let i=0;i<d.length;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0};
+const f1=await freezeTrack(p36,k,{}),f2=await freezeTrack(p36,k,{});
+const cpI=freezePrep(p36,k);const rI=await rb36(cpI,1,{trackIdx:k});
+const outI=pf36(rI.buf,2205,win.frames);
+let dI=0,dD=0;for(let c=0;c<Math.min(2,f1.channels.length);c++){const a=f1.channels[c],b=outI.channels[c],d2=f2.channels[c];for(let i=0;i<Math.min(a.length,b.length);i++){const e1=Math.abs(a[i]-b[i]);if(e1>dI)dI=e1;const e2=Math.abs(a[i]-d2[i]);if(e2>dD)dD=e2}}
+const rmsF=rms36(f1.channels),formulaOk=f1.frames===win.frames;
+const rec=makeRecord('g36freeze',f1.sampleRate,f1.channels,{normalize:false,addedAt:0});
+const p36b=freezePrep(p36,k);const t36=p36b.tracks[k];
+t36.voiceMode='sample';t36.sampleId=rec.id;t36.sampleMeta={name:rec.name,durationSec:rec.durationSec,peak:rec.peak};ev36(t36);
+const pat36=p36b.patterns[p36b.currentPattern],dk36=pat36&&pat36.data[k];
+if(!dk36)throw new Error('no pattern data for track '+k);
+/* extend the track pattern to the FULL loop (its own len is shorter — LCM
+   phase would repeat it) and keep a single step-0 trigger */
+const v36=dk36.steps[0]&&dk36.steps[0].vel||0.85;
+dk36.len=win.steps;
+dk36.steps=Array.from({length:win.steps},(_,i)=>({on:i===0?1:0,vel:v36,prob:1,micro:0,note:48,lock:{}}));
+t36.sampleParams.gain=Math.min(2,1/Math.max(v36,0.1)); /* compensate step velocity so amp == 1.0 */
+const eng0=new PooledEngine(new OfflineAudioContext(1,128,44100));eng0.loadSampleBuffer(rec);
+/* (d1) EXACT: freezeTrack of the SAMPLE-voiced track (single step-0 trigger,
+   gain-compensated) == the plain renderBounce of the same track — identical
+   path, identical schedule — maxDiff < 1e-6. The one-renderer proof for
+   sample tracks: the freeze adds nothing but the lead trim. */
+const fB=await freezeTrack(p36b,k,{samples:eng0.sampleCache});
+const rR=await rb36(p36b,1,{trackIdx:k,samples:eng0.sampleCache});
+const outR=pf36(rR.buf,2205,win.frames);
+let dX=0;for(let c=0;c<Math.min(2,fB.channels.length);c++){const a=fB.channels[c],b=outR.channels[c];for(let i2=0;i2<Math.min(a.length,b.length);i2++){const e3=Math.abs(a[i2]-b[i2]);if(e3>dX)dX=e3}}
+/* (d2) MEASURED: freezing the sample track re-applies the MASTER section
+   (EQ3+glue+comp) to already-mastered audio — the double-master delta is
+   real physics (measured ~ -3.8 dB RMS on the demo kick loop; the legacy
+   comp threshold -8/ratio 6 re-squashes loud material). Bound: re-frozen
+   RMS stays within -7.5 dB of the original freeze (catches silent or
+   truncated playback) and the onset stays aligned. */
+const rmsB=rms36(fB.channels);
+const onset36=ch=>{let pk=0;for(const d of ch)for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>pk)pk=a}const th=pk*0.02;for(let i=0;i<ch[0].length;i++)if(Math.abs(ch[0][i])>th)return i;return -1};
+const oF=onset36(f1.channels),oR=onset36(fB.channels);
+const framesOk=fB.frames===win.frames&&fB.frames===outR.channels[0].length;
+const relDiff=Math.abs(rmsB-rmsF)/Math.max(rmsF,1e-9);
+const ok36=formulaOk&&dI<1e-6&&dD<1e-6&&rmsF>0.005&&framesOk&&dX<1e-6&&relDiff<0.45&&rmsB>0.42*rmsF&&oR>=0&&Math.abs(oR-oF)<500;
+gate('G36','freeze track: pipeline == independent prep+render+trim (maxDiff<1e-6), determinism (maxDiff<1e-6), frames == freezeWindow formula, sample-track freeze == its plain render (maxDiff<1e-6), re-freeze RMS within the measured double-master bound (-7.5 dB), onset aligned <500f, non-silent',ok36,'frames='+f1.frames+'/'+win.frames+' dPipe='+dI.toExponential(2)+' dDet='+dD.toExponential(2)+' dExact='+dX.toExponential(2)+' rmsF='+rmsF.toFixed(4)+' rmsB='+rmsB.toFixed(4)+' rel='+(relDiff*100).toFixed(2)+'% onset '+oF+'\u2192'+oR+' nonSilent='+(rmsF>0.005))}catch(e){gate('G36','freeze track',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

@@ -5,8 +5,10 @@
    references the sample). PCM never touches the project JSON; the drawer is
    the only writer. Hydration pulls referenced samples into the live engine
    cache (missing → synth fallback + one-shot toast, Phase 2). */
-import { $, I, toast } from '../state.js';
+import { $, I, toast, pushHist } from '../state.js';
 import { createSampleStore, makeRecord, guardImport, referencedSampleIds, applySampleHints, SAMPLE_CAPS } from '../samplestore.js';
+import { armResample, captureStop, captureState } from './capture.js';
+import { resampleGuard } from '../capture.js';
 
 function ensureStore() {
   if (!I.sampleStore) I.sampleStore = createSampleStore();
@@ -61,6 +63,57 @@ async function importFiles(files) {
   }
   if (ok) { I.dirty = false; /* store is global — not project state */ }
   renderSamples();
+}
+
+/* assignSampleToTrack (v0.11.0) — the ONE assign path (Sound-tab VOICE select,
+ * RESAMPLE quick action, FREEZE) — extracted from the sound.js handler so no
+ * flow duplicates the canonical write sequence. */
+export function assignSampleToTrack(rec, idx) {
+  if (!rec || !I.p || !I.p.tracks || !I.p.tracks[idx]) return false;
+  const t = I.p.tracks[idx];
+  pushHist();
+  t.sampleId = rec.id;
+  t.sampleMeta = { name: rec.name, durationSec: rec.durationSec, peak: rec.peak };
+  t.voiceMode = 'sample'; /* assigning a sample means wanting to hear it */
+  if (I.eng && !I.eng.hasSampleBuffer(rec.id)) I.eng.loadSampleBuffer(rec);
+  if (I.missingSampleIds) I.missingSampleIds.length = 0;
+  I.dirty = true; I.renderDirty = true;
+  toast('SAMPLE → ' + (t.name || ('track-' + idx)) + ' ✓ ' + rec.name + ' — voice switched to SAMPLE');
+  return true;
+}
+
+/* importChannelsAsSample (v0.11.0) — the ONE programmatic import path
+ * (RESAMPLE sink, FREEZE, editor derivations): count guard → makeRecord →
+ * name appended with the content hash8 → put → engine cache → drawer
+ * refresh. normalize is caller's choice; derivations pass false (they bake
+ * their own math) and so do freeze/resample (what you heard is what you
+ * get). Returns the stored record or null (refusals toast). */
+export async function importChannelsAsSample(baseName, channels, sampleRate, normalize) {
+  const store = ensureStore();
+  const rows = await store.list();
+  if (rows.length >= SAMPLE_CAPS.maxCount) { toast('SAMPLE STORE FULL — ' + SAMPLE_CAPS.maxCount + ' rows cap; delete some first'); return null }
+  const rec = makeRecord(String(baseName).slice(0, 24), sampleRate, channels, { normalize: !!normalize, addedAt: Date.now() });
+  rec.name = (rec.name + '-' + rec.id.slice(1, 9)).slice(0, 32);
+  await store.put(rec);
+  cacheSample(rec);
+  I.dirty = false; /* store is global — not project state */
+  renderSamples();
+  return rec;
+}
+
+/* resampleToStore (v0.11.0) — the RESAMPLE sink: raw captured channels →
+ * store record. Name = 'resample-<bpm>bpm-<bars>bar-<hash8>' where hash8 is
+ * the content id (id computed from the base name + PCM, so identical
+ * re-resamples land on the SAME id — idempotent — and the name appends the
+ * same hash8 again). */
+async function resampleToStore(channels, meta) {
+  try {
+    const rec = await importChannelsAsSample('resample-' + meta.bpm + 'bpm-' + meta.bars + 'bar', channels, meta.sampleRate, false);
+    if (!rec) return;
+    toast('RESAMPLE ✓ ' + rec.name + ' · ' + rec.durationSec.toFixed(2) + 's');
+    const t = I.p && I.p.tracks && I.p.tracks[I.selTrack] ? I.p.tracks[I.selTrack] : null;
+    if (t) assignSampleToTrack(rec, I.selTrack);
+  } catch (e) { toast('RESAMPLE IMPORT FAILED — ' + (e && e.message || e)) }
 }
 
 function audition(rec) {
@@ -155,6 +208,17 @@ function wireSamples() {
   const bImp = $('bSmpImport'), f = $('smpF');
   if (bImp && f) bImp.onclick = () => f.click();
   if (f) f.onchange = () => { importFiles(f.files); f.value = '' };
+  /* v0.11.0 RESAMPLE — record N bars of the live master into the store */
+  const rb = $('bResample');
+  if (rb) rb.onclick = async () => {
+    if (!captureState() || captureState().state !== 'idle') { captureStop(); return }
+    const bars = $('rsBars') ? ($('rsBars').value | 0) : 2;
+    const g = resampleGuard(bars);
+    if (!g.ok) { toast('RESAMPLE REFUSED — ' + g.reason); return }
+    if (I.engine === 'worklet') { toast('RESAMPLE: unsupported on the WORKLET engine (reduced feature set)'); return }
+    try { const est = await ensureStore().estimate(); if (est && est.quota && est.usage / est.quota > 0.9) { toast('RESAMPLE REFUSED — store quota nearly exhausted (' + (est.usage / 1048576 | 0) + ' MB used)'); return } } catch (e) { /* estimate is advisory */ }
+    armResample(bars, resampleToStore);
+  };
   const drop = $('smpDrop');
   if (drop) {
     drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = 'var(--acc,#4fd6c0)' });
