@@ -98,6 +98,10 @@ export const PARAMS = [
   P('compAttack',  'Comp attack',   1, 100, 10,  'project', (p, v) => { ensureMaster(p).compAttack = v }),
   P('compRelease', 'Comp release', 20, 1000, 150,'project', (p, v) => { ensureMaster(p).compRelease = v }),
   P('compMakeup',  'Comp makeup',   0, 24,   0,  'project', (p, v) => { ensureMaster(p).compMakeup = v }),
+  /* v0.12.0 P3: master stereo width 0..200% (1 = neutral = network OUT of
+     the chain; bass < 300 Hz forced mono via the side highpass). Registered
+     like every master param — automatable/recordable/snapshot-able. */
+  P('widthMaster', 'Width',         0,  2,   1,  'project', (p, v) => { ensureMaster(p).widthMaster = v }),
   P('macro.0', 'Macro ENERGY',    0, 1, 0.5, 'project', (p, v) => { p.macroVals[0] = v }),
   P('macro.1', 'Macro DRIVE',     0, 1, 0.5, 'project', (p, v) => { p.macroVals[1] = v }),
   P('macro.2', 'Macro SPACE',     0, 1, 0.5, 'project', (p, v) => { p.macroVals[2] = v }),
@@ -106,10 +110,10 @@ export const PARAMS = [
 
 const BY_ID = new Map(PARAMS.map(p => [p.id, p]));
 const SOUND_IDS = new Set(['cutoff', 'res', 'atk', 'dec', 'sus', 'rel', 'gate', 'detune', 'lfoRate', 'lfoDepth']);
-const MASTER_IDS = new Set(['eqLow', 'eqMid', 'eqHigh', 'compOn', 'compThresh', 'compRatio', 'compAttack', 'compRelease', 'compMakeup']);
+const MASTER_IDS = new Set(['eqLow', 'eqMid', 'eqHigh', 'compOn', 'compThresh', 'compRatio', 'compAttack', 'compRelease', 'compMakeup', 'widthMaster']);
 /* canonical master defaults + clamps (single source for ensureMaster/engine/UI) */
-const MASTER_DEFAULTS = { eqLow: 0, eqMid: 0, eqHigh: 0, compOn: 0, compThresh: -20, compRatio: 2, compAttack: 10, compRelease: 150, compMakeup: 0 };
-const MASTER_RANGES = { eqLow: [-12, 12], eqMid: [-12, 12], eqHigh: [-12, 12], compOn: [0, 1], compThresh: [-40, 0], compRatio: [1, 20], compAttack: [1, 100], compRelease: [20, 1000], compMakeup: [0, 24] };
+const MASTER_DEFAULTS = { eqLow: 0, eqMid: 0, eqHigh: 0, compOn: 0, compThresh: -20, compRatio: 2, compAttack: 10, compRelease: 150, compMakeup: 0, widthMaster: 1 };
+const MASTER_RANGES = { eqLow: [-12, 12], eqMid: [-12, 12], eqHigh: [-12, 12], compOn: [0, 1], compThresh: [-40, 0], compRatio: [1, 20], compAttack: [1, 100], compRelease: [20, 1000], compMakeup: [0, 24], widthMaster: [0, 2] };
 
 /* ensureMaster — backfill + clamp the project master section (v0.8.0).
    Legacy projects (pre-master) get the NEUTRAL defaults; existing values

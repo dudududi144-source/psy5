@@ -53,6 +53,39 @@ export function irChannel(len, seed, decay) {
   return out;
 }
 
+/* ── v0.12.0 P3: reverb variants ──
+   Three deterministic IRs selectable per project (fx.irKind; undefined →
+   classic = the exact v0.11.0 IR, so legacy renders are unchanged):
+     short  ~1.2 s bright  (faster decay envelope, no damping)
+     classic ~1.8 s        (the original — byte-identical when selected)
+     long   ~3.2 s dark    (slower decay + a deterministic one-pole lowpass
+                            at 2600 Hz over the noise — the "dark" tilt)
+   irChannelShaped(len, seed, decay, lp) == irChannel(len, seed, decay) when
+   lp is 0 — the classic variant never changes shape. */
+export const IR_VARIANTS = {
+  classic: { key: 'classic', len: 1.8, decay: 3.0, seeds: [99, 133], lp: 0 },
+  short: { key: 'short', len: 1.2, decay: 3.4, seeds: [211, 229], lp: 0 },
+  long: { key: 'long', len: 3.2, decay: 2.2, seeds: [313, 347], lp: 2600 },
+};
+
+export function irVariantFor(kind) {
+  return IR_VARIANTS[kind] || IR_VARIANTS.classic;
+}
+
+export function irChannelShaped(len, seed, decay, lpHz) {
+  const out = irChannel(len, seed, decay);
+  if (!lpHz) return out;
+  /* deterministic one-pole lowpass (bilinear-free — the plain exponential
+     smoother from the worklet OnePoleLP family), applied in place */
+  const a = (1 / 44100) * 2 * Math.PI * lpHz;
+  let v = 0;
+  for (let i = 0; i < out.length; i++) {
+    v += a * (out[i] - v) / (1 + a);
+    out[i] = v;
+  }
+  return out;
+}
+
 /* IR_SEEDS — the two per-channel seeds (stereo decorrelation by seed). */
 export const IR_SEEDS = [99, 133];
 

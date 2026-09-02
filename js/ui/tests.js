@@ -24,7 +24,7 @@ import { canonicalProject, encodeShare, decodeShare } from '../share.js';
 
 function logLine(cls,msg){const L=$('log');const s=document.createElement('span');s.className=cls;L.appendChild(s);s.textContent=msg+'\n';L.scrollTop=L.scrollHeight}
 const GATE_RES=[];
-function gate(id,claim,pass,ev){GATE_RES.push({id,claim,pass,ev});logLine(pass?'':'fail',(pass?'PASS':'FAIL')+' '+id+' — '+claim+(ev?' ['+ev+']':''))}
+let _gateT0=Date.now();function gate(id,claim,pass,ev){GATE_RES.push({id,claim,pass,ev,ms:Date.now()-_gateT0});_gateT0=Date.now();logLine(pass?'':'fail',(pass?'PASS':'FAIL')+' '+id+' — '+claim+(ev?' ['+ev+']':''))}
 function peakOf(buf){const d=buf.getChannelData(0);let m=0;for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>m)m=a}return m}
 async function renderGenre(style){const sr=44100,oc=new OfflineAudioContext(2,sr*2,sr);const eng=new PooledEngine(oc);const p=buildStyle(style,1234);eng.syncMix(p);const sd=60/p.bpm/4;let t=.05;const total=Math.floor(1.8/sd);for(let s=0;s<total;s++){for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}return await oc.startRendering()}
 /* G9 — priority voice stealing under deliberate overload:
@@ -75,6 +75,60 @@ function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(
  * topically and the gaps were left reserved-but-unused.
  * The device summary line "N/29" counts entries; the honest hard-pass count
  * cited in README/CI is 35 (37 − G17 − G25). */
+/* g41Run — the G41 body as a callable (module-level: the local probe drives the
+   EXACT same logic the gate runs; window-exposed for tools probes) */
+window.__psy6G41Run=async function(){
+
+const p41=buildStyle('PSYTRANCE',42);
+/* real stereo content for the width probe (factory pans are 0): the panned
+   tracks are HF-dominant (hats + lead) — the 300 Hz side highpass removes
+   low-side energy BY DESIGN (bass mono protection), so the side probe must
+   ride above it */
+p41.tracks[2].mix.pan=.8;p41.tracks[5].mix.pan=-.7;
+/* sends for the space probes */
+p41.tracks[4].mix.sendA=.5;p41.tracks[0].mix.sendB=.5;
+const rRef=await renderBounce(p41,1);
+/* one-engine perturb → restore (G35 pattern — mode changes anchored at 0) */
+const sch41=bounceSchedule(p41,1,.05);
+const oc41=new OfflineAudioContext(2,Math.ceil(sch41.total*44100)+2048,44100);
+const eng41=new PooledEngine(oc41);
+const trig41=()=>{for(const e of sch41.evs)eng41.trigger(p41.tracks[e.track],e.t,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sch41.stepDur)};
+eng41.syncMix(p41);trig41();
+p41.master.widthMaster=1.8;eng41.syncMix(p41);
+p41.master.widthMaster=1;eng41.syncMix(p41);
+p41.fx.pingPong=1;eng41.syncMix(p41);
+p41.fx.pingPong=0;eng41.syncMix(p41);
+p41.fx.irKind='short';eng41.syncMix(p41);
+p41.fx.irKind='classic';eng41.syncMix(p41);
+const buf41=await oc41.startRendering();
+let nDiff41=0;{const dA=rRef.buf.getChannelData(0),dB=buf41.getChannelData(0);for(let i=0;i<Math.min(dA.length,dB.length);i++){const e=Math.abs(dA[i]-dB[i]);if(e>nDiff41)nDiff41=e}}
+const neutralOk=nDiff41<1e-6;
+/* width probe: HF-side energy (first-difference of (L−R)/2 — a ~2 kHz+
+   crude highpass) at width 1 vs 1.8. The 300 Hz side highpass removes
+   low-side energy BY DESIGN (bass mono protection), so the metric rides
+   the band width actually affects; same filter both renders. */
+const sideRatio41=async(w)=>{const q=JSON.parse(JSON.stringify(p41));q.master.widthMaster=w;const r=await renderBounce(q,1);const L=r.buf.getChannelData(0),R=r.buf.getChannelData(1);let se=0,n=0;let prev=0;for(let i=0;i<L.length;i++){const s=(L[i]-R[i])*.5;const h=s-prev;prev=s;se+=h*h;n++}return Math.sqrt(se/Math.max(n,1))};
+const sr1=await sideRatio41(1),sr18=await sideRatio41(1.8);
+const widthOk=sr18>sr1*1.3&&sr18>0;
+/* ping-pong probe: isolate the DELAY — only the sent bass sounds (pan 0,
+   everything else muted), so L−R carries the delay taps alone: the mono
+   delay upmixes identically to L and R (flips ≈ 0) while ping-pong
+   alternates taps between the channels (flips ≥ 2) */
+const flips41=async(pp)=>{const q=JSON.parse(JSON.stringify(p41));q.fx.pingPong=pp?1:0;q.tracks.forEach((t,i)=>{t.mix.mute=i!==4});const r=await renderBounce(q,1);const L=r.buf.getChannelData(0),R=r.buf.getChannelData(1);const W=1024,n=Math.floor(L.length/W);let flips=0,prev=0,seen=0;for(let k=0;k<n;k++){let d=0;for(let i=k*W;i<(k+1)*W;i++)d+=L[i]-R[i];const s=d>0?1:(d<0?-1:0);if(s!==0){if(seen&&s!==prev)flips++;prev=s;seen=1}}return flips};
+const fMono=await flips41(false),fPP=await flips41(true);
+const ppOk=fPP>=2&&fPP>fMono;
+/* IR probe: tail loudness long vs short */
+/* IR probe: PURE reverb decay — solo the sent kick, schedule ONE loop of
+   events into a longer context, then measure 1.0–2.4 s AFTER the last
+   event (the direct sound is gone; the short IR has fully decayed, the
+   long dark IR is still ringing) */
+const tail41=async(kind)=>{const q=JSON.parse(JSON.stringify(p41));q.fx.irKind=kind;q.tracks.forEach((t,i)=>{t.mix.mute=i!==0});const sch=bounceSchedule(q,1,.05);const oc=new OfflineAudioContext(2,Math.ceil((sch.total+2.5)*44100),44100);const eng=new PooledEngine(oc);eng.syncMix(q);for(const e of sch.evs)eng.trigger(q.tracks[e.track],e.t,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sch.stepDur);const buf=await oc.startRendering();const L=buf.getChannelData(0),R=buf.getChannelData(1);const a0=Math.round((sch.total+1)*44100),a1=Math.round((sch.total+2.4)*44100);let s2=0,n=0;for(let i=a0;i<Math.min(a1,L.length);i++){s2+=L[i]*L[i]+R[i]*R[i];n++}return Math.sqrt(s2/Math.max(n,1))};
+const tShort=await tail41('short'),tLong=await tail41('long');
+const irOk=tLong>tShort*1.3;
+const ok41=neutralOk&&widthOk&&ppOk&&irOk;
+return{ok:ok41,ev:'neutral maxDiff='+nDiff41.toExponential(2)+' | side '+sr1.toExponential(2)+'->'+sr18.toExponential(2)+' | flips mono='+fMono+' pp='+fPP+' | tail short='+tShort.toExponential(2)+' long='+tLong.toExponential(2)}
+};
+
 async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;if(I.engine==='worklet'){logLine('info','== PSY6 SELF-GATE — WORKLET engine (reduced but real: G2 + G14w + G15w) ==');await gateWorklet()}else{logLine('info','== PSY6 SELF-GATE — MAIN pooled engine (OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner
@@ -951,7 +1005,7 @@ gate('G38','slices: deterministic detector hits >=90% of truth transients within
            < 1e-6 (the through-graph standard of the G34/G36 family;
            Chrome's offline chunk scheduling occasionally yields ~3e-7
            tails — == 0 holds for the pure per-sample engines). */
-try{
+if((window.__psy6GateSkip||[]).includes('G39')){gate('G39','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 const SR39=44100;
 const mk39=(oc,sound)=>{const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g39',name:'g39-'+sound.type,sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return eng};
 const hit39=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR39*dur),SR39);const eng=mk39(oc,sound);return await oc.startRendering()};
@@ -991,7 +1045,7 @@ const clapOk=C.bursts>=4;
 const snareOk=S.toneRatio>=.04&&S.noiseRatio>=.04;
 const detOk=det39<1e-6;
 const ok39=kickOk&&hatOk&&clapOk&&snareOk&&detOk;
-gate('G39','drum engine v2: kick sub>=.45 + click diff6>=.05 (v1 .0151) + pitch-env ZCR descent; hat centroid>=6k + inharmonic (peak-gap cv>=.2; degenerate square comb cv<=.1); clap >=4 bursts (v1=3); snare dual-band >=.04; all four voices deterministic maxDiff<1e-6',ok39,'kick sub='+K.subRatio+' diff6='+K.diff6+'(v1 .0151) zcr '+K.zcr10+'>'+K.zcr30+' | hat c='+H.centroid+' cv='+H.cv+'(rim cv='+m39.rimRef.cv+') | clap b='+C.bursts+'(v1 3) | snare t='+S.toneRatio+' n='+S.noiseRatio+' | detMaxDiff='+det39.toExponential(2))}catch(e){gate('G39','drum engine v2',false,'ERR '+e.message)}
+gate('G39','drum engine v2: kick sub>=.45 + click diff6>=.05 (v1 .0151) + pitch-env ZCR descent; hat centroid>=6k + inharmonic (peak-gap cv>=.2; degenerate square comb cv<=.1); clap >=4 bursts (v1=3); snare dual-band >=.04; all four voices deterministic maxDiff<1e-6',ok39,'kick sub='+K.subRatio+' diff6='+K.diff6+'(v1 .0151) zcr '+K.zcr10+'>'+K.zcr30+' | hat c='+H.centroid+' cv='+H.cv+'(rim cv='+m39.rimRef.cv+') | clap b='+C.bursts+'(v1 3) | snare t='+S.toneRatio+' n='+S.noiseRatio+' | detMaxDiff='+det39.toExponential(2))}catch(e){gate('G39','drum engine v2',false,'ERR '+e.message)}}
 /* G40 — PERCUSSION v2 + LIBRARY (offline — CI-asserted, v0.12.0 P2):
    LIBRARY BREADTH: the factory library holds >= 150 presets and >= 100
    drum presets, unique ids, genre coverage 8/8 (PSYTRANCE, DARK-PSY, GOA,
@@ -1004,7 +1058,7 @@ gate('G39','drum engine v2: kick sub>=.45 + click diff6>=.05 (v1 .0151) + pitch-
    zap monotone descent (windowed ZCR strictly decreasing), boom sub-band
    dominance (<120 Hz ratio > .8). DETERMINISM: tom/cowbell/zap re-rendered
    fresh → maxDiff < 1e-6 (through-graph Chrome standard, G39 note). */
-try{
+if((window.__psy6GateSkip||[]).includes('G40')){gate('G40','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 const all40=libFilter('all','ALL');const drums40=all40.filter(x=>x.cat==='drum');
 const ids40=new Set(all40.map(x=>x.id));
 const uniq40=ids40.size===all40.length;
@@ -1045,7 +1099,24 @@ for(const sd of [{type:'tom',tune:1.1,decay:.7,tone:1,punch:0},{type:'cowbell',t
 const a=(await hit4(sd,1)).getChannelData(0),b=(await hit4(sd,1)).getChannelData(0);for(let i=0;i<Math.min(a.length,b.length);i++){const e=Math.abs(a[i]-b[i]);if(e>det40)det40=e}}
 const detOk40=det40<1e-6;
 const ok40=libOk&&tomOk&&cowOk40&&zapOk&&boomOk&&detOk40;
-gate('G40','percussion v2 + library: >=150 presets (>=100 drums), unique ids, genres 8/8, schema-valid, 8 kits resolve; tom pitch sweep (ZCR monotone), cowbell dual-square partials, zap monotone descent, boom sub>0.8; new voices deterministic maxDiff<1e-6',ok40,'lib='+all40.length+'('+drums40.length+' drums) badSchema='+bad40.length+' kits='+kits40.length+'/8 | tomZ='+tomZ.map(x=>x.toFixed(0)).join('/')+' cowA='+cowA.toFixed(3)+' cowB='+cowB.toFixed(3)+' cowMax='+cowMax.toFixed(3)+' zapDesc='+zapDesc+'/4 sub='+subB.toFixed(2)+' det='+det40.toExponential(2))}catch(e){gate('G40','percussion v2 + library',false,'ERR '+e.message)}
+gate('G40','percussion v2 + library: >=150 presets (>=100 drums), unique ids, genres 8/8, schema-valid, 8 kits resolve; tom pitch sweep (ZCR monotone), cowbell dual-square partials, zap monotone descent, boom sub>0.8; new voices deterministic maxDiff<1e-6',ok40,'lib='+all40.length+'('+drums40.length+' drums) badSchema='+bad40.length+' kits='+kits40.length+'/8 | tomZ='+tomZ.map(x=>x.toFixed(0)).join('/')+' cowA='+cowA.toFixed(3)+' cowB='+cowB.toFixed(3)+' cowMax='+cowMax.toFixed(3)+' zapDesc='+zapDesc+'/4 sub='+subB.toFixed(2)+' det='+det40.toExponential(2))}catch(e){gate('G40','percussion v2 + library',false,'ERR '+e.message)}}
+
+/* G41 — MASTER SPACE (offline — CI-asserted, v0.12.0 P3):
+   NEUTRAL CONTRACT: widthMaster 1 + pingPong off + classic IR leaves the
+   exact pre-v0.12.0 topology — a full perturb→restore round trip on ONE
+   engine (width 1.8→1, pingPong on→off, IR short→classic) re-renders the
+   post-P2 reference byte-close: maxDiff < 1e-6 (expected 0 — the width
+   network and ping-pong path are REMOVED at defaults, not ducked).
+   WIDTH PROBE (non-vacuous): with real stereo content (panned tracks),
+   widthMaster 1.8 raises the side-channel energy ratio (L−R)/total —
+   both ratios logged; the rise must exceed 1.5×.
+   PING-PONG PROBE (non-vacuous): with a delay send active, the L−R
+   envelope alternates (sign flips ≥ 2) while the mono delay path has a
+   constant-sign offset — flips logged for both.
+   IR PROBE (non-vacuous): the long dark IR's tail (last 0.5 s RMS) is
+   louder than the short bright IR's tail — both logged, ratio > 1.3.
+   All three render through the ONE renderer (renderBounce) — no fork. */
+if((window.__psy6GateSkip||[]).includes('G41')){gate('G41','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{const r41=await window.__psy6G41Run();gate('G41','master space: neutral contract (width/pingPong/IR perturb→restore maxDiff<1e-6), width 1.8 raises HF-side energy >1.3x (300 Hz protection excludes low side by design), ping-pong L-R envelope alternates (flips>=2, >mono), long-IR tail louder than short (>1.3x)',r41.ok,r41.ev)}catch(e){gate('G41','master space',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 

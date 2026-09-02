@@ -39,11 +39,15 @@ const opt = (name, dflt) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : dflt;
 };
 const OUT = opt('--out', null);
-const GATE_TIMEOUT = parseInt(opt('--timeout', '600000'), 10); /* v0.8.0: G28+G29+G30 add ~8 heavy offline renders — 600 s headroom */
+/* --skip G39,G40,G41 — subset runs: the named gates report as skipped
+   (pass=true, ev='subset-skipped') in-page and are REMOVED from EXPECTED;
+   the verdict asserts the remaining gates. The FULL CI run never skips. */
+const SKIP = (opt('--skip', null) || '').split(',').map(x => x.trim()).filter(Boolean);
+const GATE_TIMEOUT = parseInt(opt('--timeout', '1800000'), 10); /* v0.12.0: the suite grew again (G39-G41 heavy offline renders) — 1800 s headroom; the CI gates job carries an explicit timeout-minutes */
 
 const EXPECTED = [
   'G1-TECHNO', 'G1-PSYTRANCE', 'G1-TRANCE', 'G1-PROGRESSIVE',
-  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23', 'G24', 'G26', 'G27', 'G28', 'G29', 'G30', 'G31', 'G32', 'G33', 'G34', 'G35', 'G36', 'G37', 'G38', 'G39', 'G40',
+  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23', 'G24', 'G26', 'G27', 'G28', 'G29', 'G30', 'G31', 'G32', 'G33', 'G34', 'G35', 'G36', 'G37', 'G38', 'G39', 'G40', 'G41',
 ];
 /* G17 (live capture, v0.4.0) and G25 (record song, v0.6.0) are REALTIME —
    they run on-device (evidence-only) but are explicitly NOT asserted in CI
@@ -221,22 +225,31 @@ async function main() {
     await waitFor(cdp, `window.__psy6&&window.__psy6.ctx&&window.__psy6.ctx.state!=='suspended'&&window.__psy6.engine==='main'`, 30000, 250, 'MAIN boot');
     const boot = await cdp.eval(`JSON.stringify({engine:window.__psy6.engine,ctx:window.__psy6.ctx.state})`);
 
+    if (SKIP.length) await cdp.eval(`window.__psy6GateSkip=${JSON.stringify(SKIP)}; true`);
     // switch to the tests tab and press RUN SELF-GATE
     await cdp.eval(`(()=>{const btn=Array.from(document.querySelectorAll('nav button')).find(x=>x.dataset.t==='tests');btn.click();return true})()`);
     await cdp.eval(`document.querySelector('#bGate').click(); true`);
-    await waitFor(cdp, `document.querySelector('#log').textContent.includes('SELF-GATE:')`, GATE_TIMEOUT, 1000, 'Self-Gate verdict line');
+    let timedOut = false;
+    try {
+      await waitFor(cdp, `document.querySelector('#log').textContent.includes('SELF-GATE:')`, GATE_TIMEOUT, 1000, 'Self-Gate verdict line');
+    } catch (e) {
+      timedOut = true; /* v0.12.0: still collect the gates that DID run (partial evidence) */
+    }
 
-    const gates = await cdp.eval(`window.__psy6Gates?window.__psy6Gates.map(g=>({id:g.id,claim:g.claim,pass:g.pass,ev:g.ev||''})):[]`);
+    const gates = await cdp.eval(`window.__psy6Gates?window.__psy6Gates.map(g=>({id:g.id,claim:g.claim,pass:g.pass,ev:g.ev||'',ms:g.ms||0})):[]`);
+    const verdictLine0 = await cdp.eval(`(document.querySelector('#log').textContent.match(/SELF-GATE: \\d+\\/\\d+ passed/)||[''])[0]`);
     const verdictLine = await cdp.eval(`(document.querySelector('#log').textContent.match(/SELF-GATE: \\d+\\/\\d+ passed/)||[''])[0]`);
 
     const byId = new Map(gates.map((g) => [g.id, g]));
-    const missing = EXPECTED.filter((id) => !byId.has(id));
-    const failed = gates.filter((g) => g.pass !== true && !EXCLUDED.has(g.id));
+    const expected = EXPECTED.filter((id) => !SKIP.includes(id));
+    const missing = expected.filter((id) => !byId.has(id));
+    const failed = gates.filter((g) => g.pass !== true && !EXCLUDED.has(g.id) && !SKIP.includes(g.id));
     const excludedInfo = gates.filter((g) => EXCLUDED.has(g.id)).map((g) => ({ id: g.id, pass: g.pass, ev: g.ev }));
-    const ok = missing.length === 0 && failed.length === 0 && gates.length > 0;
+    const ok = !timedOut && missing.length === 0 && failed.length === 0 && gates.length > 0;
 
     verdict = {
       ok,
+      timedOut,
       subset: {
         asserted: EXPECTED.map((id) => ({ id, class: PURE.has(id) ? 'pure-computation' : 'offline-render' })),
         notRunInCI: [
@@ -248,7 +261,7 @@ async function main() {
       },
       boot,
       verdictLine,
-      summary: { total: EXPECTED.length, passed: EXPECTED.filter((id) => byId.get(id) && byId.get(id).pass).length, failed: failed.length, missing, excludedInfo },
+      summary: { total: expected.length, passed: expected.filter((id) => byId.get(id) && byId.get(id).pass).length, failed: failed.length, missing, skipped: SKIP.slice(), excludedInfo },
       gates: gates.map((g) => ({ ...g, class: PURE.has(g.id) ? 'pure-computation' : 'offline-render' })),
     };
   } catch (e) {

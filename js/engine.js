@@ -3,7 +3,7 @@ import { ensureVoice, samplePlayback } from './samplestore.js';
 import { ensureIns } from './params.js';
 import { driveCurve, crushCurve, driveTrim } from '../foundation/dsp/inserts.mjs';
 import { planDuck, nextState, duckParams } from '../foundation/dsp/sidechain.mjs';
-import { delaySecondsFor, delayFbClamp, delayDivClamp, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../foundation/dsp/sends.mjs';
+import { delaySecondsFor, delayFbClamp, delayDivClamp, irChannel, irChannelShaped, irVariantFor, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../foundation/dsp/sends.mjs';
 
 /* ============ POOLED audio engine ============ */
 /* Priority tiers for voice stealing (PSY6):
@@ -21,7 +21,22 @@ class PooledEngine{constructor(ctx,opts){opts=opts||{};this.poolSizes={synthVoic
    guaranteed neutral). opts.masterFlat skips the section entirely (the
    exact pre-v0.8.0 topology — used by the G29 neutral-tolerance evidence
    and the offline A/B tests). */
-this.masterFlat=!!opts.masterFlat;if(!this.masterFlat){const eqL=this.eqLow=ctx.createBiquadFilter();eqL.type='lowshelf';eqL.frequency.value=100;const eqM=this.eqMid=ctx.createBiquadFilter();eqM.type='peaking';eqM.frequency.value=1000;eqM.Q.value=.8;const eqH=this.eqHigh=ctx.createBiquadFilter();eqH.type='highshelf';eqH.frequency.value=8000;const gc=this.glue=ctx.createDynamicsCompressor();gc.threshold.value=-20;gc.knee.value=6;gc.ratio.value=2;gc.attack.value=.01;gc.release.value=.15;const gm=this.glueMake=ctx.createGain();gm.gain.value=1;this.glueOn=false;this.master.connect(eqL);eqL.connect(eqM);eqM.connect(eqH);eqH.connect(comp);/* compOn 0: glue OUT of the chain */gc.connect(gm);gm.connect(comp)}const dIn=this.dIn=ctx.createGain();const del=this.delay=ctx.createDelay(2);del.delayTime.value=.3;/* feedback loop with a lowpass inside — dark, analog-style repeats */const dLp=this.dLp=ctx.createBiquadFilter();dLp.type='lowpass';dLp.frequency.value=4500;const fb=this.fb=ctx.createGain();fb.gain.value=.35;const dOut=this.dOut=ctx.createGain();dOut.gain.value=.8;dIn.connect(del);del.connect(dLp);dLp.connect(fb);fb.connect(del);del.connect(dOut);dOut.connect(this.master);const rIn=this.rIn=ctx.createGain();const conv=this.conv=ctx.createConvolver();conv.buffer=this.mkIR();const rOut=this.rOut=ctx.createGain();rOut.gain.value=.8;rIn.connect(conv);conv.connect(rOut);rOut.connect(this.master);if(this.masterFlat){this.master.connect(comp)}comp.connect(an);an.connect(ctx.destination);this.noise=this.mkNoise();this.chains=[];this.scCache=[];this.duckState=[];this.duckEvents=0;this._plan={};for(let t=0;t<MAX_TRACKS;t++){const input=ctx.createGain();/* sidechain duck: ONE persistent GainNode per bus, created at init —
+this.masterFlat=!!opts.masterFlat;if(!this.masterFlat){const eqL=this.eqLow=ctx.createBiquadFilter();eqL.type='lowshelf';eqL.frequency.value=100;const eqM=this.eqMid=ctx.createBiquadFilter();eqM.type='peaking';eqM.frequency.value=1000;eqM.Q.value=.8;const eqH=this.eqHigh=ctx.createBiquadFilter();eqH.type='highshelf';eqH.frequency.value=8000;const gc=this.glue=ctx.createDynamicsCompressor();gc.threshold.value=-20;gc.knee.value=6;gc.ratio.value=2;gc.attack.value=.01;gc.release.value=.15;const gm=this.glueMake=ctx.createGain();gm.gain.value=1;this.glueOn=false;this.master.connect(eqL);eqL.connect(eqM);eqM.connect(eqH);eqH.connect(comp);/* compOn 0: glue OUT of the chain */gc.connect(gm);gm.connect(comp)}const dIn=this.dIn=ctx.createGain();const del=this.delay=ctx.createDelay(2);del.delayTime.value=.3;/* feedback loop with a lowpass inside — dark, analog-style repeats */const dLp=this.dLp=ctx.createBiquadFilter();dLp.type='lowpass';dLp.frequency.value=4500;const fb=this.fb=ctx.createGain();fb.gain.value=.35;const dOut=this.dOut=ctx.createGain();dOut.gain.value=.8;dIn.connect(del);del.connect(dLp);dLp.connect(fb);fb.connect(del);del.connect(dOut);dOut.connect(this.master);const rIn=this.rIn=ctx.createGain();const conv=this.conv=ctx.createConvolver();conv.buffer=this.mkIR();const rOut=this.rOut=ctx.createGain();rOut.gain.value=.8;rIn.connect(conv);conv.connect(rOut);rOut.connect(this.master);
+/* ── v0.12.0 P3 master space: stereo width + ping-pong delay + IR variants ──
+   WIDTH: mid/side network (lazy build) with a 300 Hz side highpass (bass
+   mono protection, documented). widthMaster 1 = the network is OUT of the
+   chain entirely (mode-switch rewiring like the glue comp) — the default
+   topology is EXACTLY the pre-v0.12.0 graph, so legacy renders are
+   unchanged (neutral contract, G41).
+   PING-PONG: fx.pingPong 1 rewires the delay to two cross-fed taps with
+   hard L/R outputs (lazy build, same feedback discipline: one lowpass per
+   leg, feedback clamped by delayFbClamp). 0/undefined = the exact mono
+   delay topology.
+   IR VARIANTS: fx.irKind 'classic'|'short'|'long' swaps the convolver
+   buffer (deterministic seeded IRs — sends.mjs IR_VARIANTS); classic is
+   byte-identical to the v0.11.0 IR. Buffer swaps are mode changes
+   (documented click risk, like crush curve swaps). */
+this.widthNet=null;this.widthOn=false;this.pp=null;this.ppOn=false;this._irKind='classic';if(this.masterFlat){this.master.connect(comp)}comp.connect(an);an.connect(ctx.destination);this.noise=this.mkNoise();this.chains=[];this.scCache=[];this.duckState=[];this.duckEvents=0;this._plan={};for(let t=0;t<MAX_TRACKS;t++){const input=ctx.createGain();/* sidechain duck: ONE persistent GainNode per bus, created at init —
 kick events automate it (no per-hit nodes). Idle gain = 1 → zero
 effect until a track's scAmount > 0. */const duck=ctx.createGain();duck.gain.value=1;const pan=ctx.createStereoPanner?ctx.createStereoPanner():ctx.createGain();const sA=ctx.createGain(),sB=ctx.createGain();sA.gain.value=0;sB.gain.value=0;/* v0.10.0 INSERT chain: input → [drive: dTrim→dWS→dWet ‖ dDry] → cIn → cWS → [filt?] → duck → pan.
 EXACT-BYPASS defaults: drive 0 = dry path only (dTrim 1, dWet 0, dDry 1 —
@@ -34,13 +49,32 @@ renders stay time-correct (foundation/dsp/inserts.mjs header). */const dTrim=ctx
 per-track active-voice registry (cap 8, oldest-stolen — pool discipline),
 honest counters for gates/evidence. opts.samples seeds the cache (offline
 renders get the live cache injected through bounce.js — zero render-fork). */this.sampleCache=new Map();this.sampleVoices=Array.from({length:MAX_TRACKS},()=>[]);this.sampleSteals=0;this.sampleFallbacks=0;this.sampleSpawns=0;this.SAMPLE_CAP_VOICES=8;if(opts.samples)for(const[id,v]of(opts.samples instanceof Map?opts.samples.entries():Object.entries(opts.samples)))this.sampleCache.set(id,v)}
+mkIRv(v){/* deterministic variant IR (v0.12.0 P3) — seeds/decay/lp from sends.mjs IR_VARIANTS */const c=this.ctx,len=Math.round(c.sampleRate*v.len),b=c.createBuffer(2,len,c.sampleRate);b.getChannelData(0).set(irChannelShaped(len,v.seeds[0],v.decay,v.lp));b.getChannelData(1).set(irChannelShaped(len,v.seeds[1],v.decay,v.lp));return b}
+buildWidthNet(){const c=this.ctx;const spl=c.createChannelSplitter(2),mer=c.createChannelMerger(2);const gL=c.createGain(),gR=c.createGain(),gLs=c.createGain(),gRi=c.createGain();gL.gain.value=.5;gR.gain.value=.5;gLs.gain.value=.5;gRi.gain.value=-.5;const mid=c.createGain();const sideHP=c.createBiquadFilter();sideHP.type='highpass';sideHP.frequency.value=300;const sideW=c.createGain();const sideL=c.createGain(),sideR=c.createGain();sideR.gain.value=-1;spl.connect(gL,0);spl.connect(gR,1);spl.connect(gLs,0);spl.connect(gRi,1);gL.connect(mid);gR.connect(mid);gLs.connect(sideHP);gRi.connect(sideHP);sideHP.connect(sideW);sideW.connect(sideL);sideW.connect(sideR);sideL.connect(mer,0,0);sideR.connect(mer,0,1);mid.connect(mer,0,0);mid.connect(mer,0,1);this.widthNet={spl,mer,sideW,sideHP}}
+buildPingPong(){const c=this.ctx;const delB=c.createDelay(2);const dLpB=c.createBiquadFilter();dLpB.type='lowpass';dLpB.frequency.value=4500;const fbB=c.createGain();const dOutB=c.createGain();dOutB.gain.value=.8;const mer=c.createChannelMerger(2);this.pp={delB,dLpB,fbB,dOutB,mer}}
 mkNoise(){const c=this.ctx,len=c.sampleRate,b=c.createBuffer(1,len,c.sampleRate),d=b.getChannelData(0),r=mulberry32(7);for(let i=0;i<len;i++)d[i]=r()*2-1;return b}
 mkIR(){/* deterministic synthetic stereo IR (PSY6): seeded decorrelated noise
 (canonical mulberry32, one seed per channel), exponential decay over ~1.8s.
 Generated at init — no external files, no Math.random. Same seeds →
 byte-identical IR on every machine. */const c=this.ctx,len=Math.round(c.sampleRate*IR_LEN_S),b=c.createBuffer(2,len,c.sampleRate);b.getChannelData(0).set(irChannel(len,IR_SEEDS[0],IR_DECAY));b.getChannelData(1).set(irChannel(len,IR_SEEDS[1],IR_DECAY));return b}
 syncMix(p,when){const at=(when==null)?this.ctx.currentTime:when;this.applyMaster(p,at);const anySolo=p.tracks.some(t=>t.mix.solo);p.tracks.forEach((t,i)=>{const ch=this.chains[i];if(!ch)return;const m=t.mix,aud=!m.mute&&(!anySolo||m.solo);const g=aud?m.vol*m.vol:0;ch.input.gain.setTargetAtTime(g,at,.02);if(ch.pan.pan)ch.pan.pan.setTargetAtTime(clamp(m.pan,-1,1),at,.02);/* sendA/sendB are POST-FADER taps (taken after the strip fader+pan) —
-the two shared send buses feed the master chain input */ch.sA.gain.setTargetAtTime(m.sendA,at,.02);ch.sB.gain.setTargetAtTime(m.sendB,at,.02);this.scCache[i]=duckParams(t);this.applyIns(i,t,at)});/* BPM-synced delay: division 1/8|3/16|1/4 (default 3/16) + feedback 0..80% */const fx=p.fx||{};this.delay.delayTime.setTargetAtTime(delaySecondsFor(delayDivClamp(fx.delayDiv),p.bpm),at,.08);this.fb.gain.setTargetAtTime(delayFbClamp(fx.delayFb),at,.08)}
+the two shared send buses feed the master chain input */ch.sA.gain.setTargetAtTime(m.sendA,at,.02);ch.sB.gain.setTargetAtTime(m.sendB,at,.02);this.scCache[i]=duckParams(t);this.applyIns(i,t,at)});/* BPM-synced delay: division 1/8|3/16|1/4 (default 3/16) + feedback 0..80% */
+const fx=p.fx||{};this.delay.delayTime.setTargetAtTime(delaySecondsFor(delayDivClamp(fx.delayDiv),p.bpm),at,.08);this.fb.gain.setTargetAtTime(delayFbClamp(fx.delayFb),at,.08);
+/* ── v0.12.0 P3: ping-pong delay (fx.pingPong 1) + reverb IR variants
+   (fx.irKind) — mode changes rewire/swap immediately (documented click
+   risk); defaults leave the exact pre-v0.12.0 topology. ── */
+const ppOn=fx&&fx.pingPong===1;
+if(ppOn!==this.ppOn){this.ppOn=ppOn;
+if(ppOn){if(!this.pp)this.buildPingPong();const P=this.pp;
+try{this.dIn.disconnect()}catch(e){}try{this.delay.disconnect()}catch(e){}try{this.dLp.disconnect()}catch(e){}try{this.fb.disconnect()}catch(e){}try{this.dOut.disconnect()}catch(e){}
+this.dIn.connect(this.delay);this.delay.connect(this.dLp);this.dLp.connect(this.fb);this.fb.connect(P.delB);P.delB.connect(P.dLpB);P.dLpB.connect(P.fbB);P.fbB.connect(this.delay);
+this.delay.connect(this.dOut);this.dOut.connect(P.mer,0,0);P.delB.connect(P.dOutB);P.dOutB.connect(P.mer,0,1);P.mer.connect(this.master);
+P.delB.delayTime.value=this.delay.delayTime.value;P.fbB.gain.value=this.fb.gain.value;P.dLpB.frequency.value=4500}
+else{try{this.dIn.disconnect()}catch(e){}try{this.delay.disconnect()}catch(e){}try{this.dLp.disconnect()}catch(e){}try{this.fb.disconnect()}catch(e){}try{this.dOut.disconnect()}catch(e){}if(this.pp){try{this.pp.mer.disconnect()}catch(e){}try{this.pp.dOutB.disconnect()}catch(e){}}
+this.dIn.connect(this.delay);this.delay.connect(this.dLp);this.dLp.connect(this.fb);this.fb.connect(this.delay);this.delay.connect(this.dOut);this.dOut.connect(this.master)}}
+if(this.ppOn&&this.pp){this.pp.delB.delayTime.setTargetAtTime(delaySecondsFor(delayDivClamp(fx.delayDiv),p.bpm),at,.08);this.pp.fbB.gain.setTargetAtTime(delayFbClamp(fx.delayFb),at,.08)}
+const iv=irVariantFor(fx&&fx.irKind);
+if(iv.key!==this._irKind){this._irKind=iv.key;this.conv.buffer=this.mkIRv(iv)}}
 /* ── per-track INSERT FX apply (v0.10.0 P3) ──
 Called from syncMix with the SAME time anchor as the mix glides (live:
 currentTime/launch anchor; offline render: the step's exact time — filter
@@ -67,6 +101,13 @@ same time anchor as the mix glides; the offline render anchors it at step
 times exactly like the live scheduler). compOn toggling REWIRES the chain
 (bypass = node removed). masterFlat engines are permanently neutral. */
 applyMaster(p,when){if(this.masterFlat)return;const m=(p&&p.master)||null;const at=(when==null)?this.ctx.currentTime:when;const on=!!(m&&(m.compOn===1||m.compOn===true));if(on!==this.glueOn){this.glueOn=on;try{this.eqHigh.disconnect()}catch(e){}if(on)this.eqHigh.connect(this.glue);else this.eqHigh.connect(this.comp)}
+/* ── width network (v0.12.0 P3): widthMaster 1 = OUT (exact neutral);
+   any other value = mid/side in-chain with the 300 Hz side highpass.
+   Mode-switch rewiring mirrors the glue-comp toggle. ── */
+const cl2w=(v,a,b)=>v<a?a:(v>b?b:v);
+const wv=(m&&m.widthMaster!=null&&isFinite(+m.widthMaster))?cl2w(+m.widthMaster,0,2):1;const wantNet=Math.abs(wv-1)>1e-9;
+if(wantNet!==this.widthOn){this.widthOn=wantNet;if(wantNet){if(!this.widthNet)this.buildWidthNet();try{this.master.disconnect()}catch(e){}this.master.connect(this.widthNet.spl);this.widthNet.mer.connect(this.eqLow)}else{try{this.master.disconnect()}catch(e){}if(this.widthNet){try{this.widthNet.mer.disconnect()}catch(e){}try{this.widthNet.spl.disconnect()}catch(e){}}this.master.connect(this.eqLow)}}
+if(this.widthNet&&this.widthOn)this.widthNet.sideW.gain.setTargetAtTime(wv,at,.03);
 if(!m)return;const cl2=(v,a,b)=>v<a?a:(v>b?b:v);const g=(x,d)=>(x==null||!isFinite(x))?d:x;
 this.eqLow.gain.setTargetAtTime(cl2(g(m.eqLow,0),-12,12),at,.03);this.eqMid.gain.setTargetAtTime(cl2(g(m.eqMid,0),-12,12),at,.03);this.eqHigh.gain.setTargetAtTime(cl2(g(m.eqHigh,0),-12,12),at,.03);
 if(on){this.glue.threshold.setTargetAtTime(cl2(g(m.compThresh,-20),-40,0),at,.03);this.glue.ratio.setTargetAtTime(cl2(g(m.compRatio,2),1,20),at,.03);this.glue.attack.setTargetAtTime(cl2(g(m.compAttack,10),1,100)/1000,at,.03);this.glue.release.setTargetAtTime(cl2(g(m.compRelease,150),20,1000)/1000,at,.03);this.glueMake.gain.setTargetAtTime(Math.pow(10,cl2(g(m.compMakeup,0),0,24)/20),at,.03)}}
