@@ -1,4 +1,4 @@
-import { $, I, PERF, saveProject, loadStored, resolveMidiParam } from '../state.js';
+import { $, I, PERF, saveProject, loadStored, loadProjectObj, resolveMidiParam, K_MAIN } from '../state.js';
 import { sceneSetFollow, resolveFollow, sceneSetMix, applySceneMix } from '../scenes.js';
 import { songMidi } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
@@ -9,7 +9,8 @@ import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval
 import { recordPoint, quantStep, applyLanes } from '../autorec.js';
 import { compose, minVariantDiff, VARIANT_DIFF_MIN, COMPOSER_STYLES } from '../composer.js';
 import { chordDegreeAt, chordClasses } from '../../foundation/music/progression.mjs';
-import { evolutionState } from '../evolution.js';
+import { evolutionState, evolutionStats } from '../evolution.js';
+import { libraryValid } from '../library.js';
 import { paramApply } from '../params.js';
 import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../foundation/dsp/sends.mjs';
 import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, evHash, songSteps, SONG_LEAD, songStemTracks, sectionFrames, songFrames } from '../bounce.js';
@@ -631,6 +632,42 @@ const z32=songSchedule(JSON.parse(JSON.stringify(p32z)),0.05);
 const d32=diff32(off32.evs,on32.evs);
 const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='3feaf9cb45503864';
 gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4385) diff='+d32+'/4385 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='3feaf9cb45503864')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
+/* G33 — song library (offline — CI-asserted, v0.9.0 P3): recipes are
+   RECIPES — 3 stored (style,seed,len) recipes compose twice → identical
+   JSON + non-empty scenes + length within ±5%. Persistence: the library
+   rides a REAL saveProject→loadStored round-trip deep-equal, survives
+   encodeShare→decodeShare, and loadProjectObj canonicalizes it (invalid
+   songs dropped, active pointer fixed, absent → null). Legacy: a
+   library-less project loads to library null and libraryValid stays true.
+   The drawer DOM (libBody/bLibAdd/bLibNew) must be wired. */
+try{
+const recs=[{name:'A',style:'FULL-ON',seed:424242,len:3},{name:'B',style:'DARK-PSY',seed:777,len:5},{name:'C',style:'FOREST',seed:31337,len:3}];
+let detOk33=true,lenOk33=true,scenesOk33=true;
+for(const r of recs){const a=compose(r.style,r.len,r.seed),b=compose(r.style,r.len,r.seed);
+if(JSON.stringify(a.project)!==JSON.stringify(b.project))detOk33=false;
+if(Math.abs(a.form.lengthSec-r.len*60)/(r.len*60)>0.05)lenOk33=false;
+if(!a.project.scenes.length||!a.project.arranger.steps.length)scenesOk33=false}
+const p33=compose('FULL-ON',3,424242).project;
+p33.library={songs:recs.map((r,i)=>({id:'LG'+i,name:r.name,style:r.style,seed:r.seed,len:r.len,composerMeta:{bpm:145,progression:null}})),activeSongId:'LG0'};
+const saved33=libraryValid(p33);
+/* real localStorage round-trip (restore the previous state afterwards) */
+const K33=K_MAIN,prev33=localStorage.getItem(K33);
+I.p=p33;const sp33=saveProject();const ls33=loadStored();
+const rtOk=sp33.ok&&ls33&&JSON.stringify(ls33.library)===JSON.stringify(p33.library);
+localStorage.setItem(K33,prev33==null?'':prev33);if(prev33==null)localStorage.removeItem(K33);
+/* share round-trip (async) */
+const canon33=v=>JSON.stringify(v,(_,x)=>(x&&typeof x==='object'&&!Array.isArray(x))?Object.keys(x).sort().reduce((o,k)=>(o[k]=x[k],o),{}):x);
+const sh33=await encodeShare(p33);const dec33=sh33.ok?await decodeShare(sh33.token):null;
+const shareOk=!!(dec33&&dec33.project&&canon33(dec33.project.library)===canon33(p33.library));
+/* canonical rebuild: drop invalid songs, fix the pointer, absent → null */
+const dirty33=JSON.parse(JSON.stringify(p33));dirty33.library.songs.push({id:'BAD',name:'x',style:'GHOST',seed:1,len:3,composerMeta:{}});
+const reb33=loadProjectObj(dirty33);
+const rebOk=reb33.library.songs.length===3&&reb33.library.activeSongId==='LG0';
+const bare33=loadProjectObj(compose('FULL-ON',3,424242).project);
+const legacyOk=bare33.library===null&&libraryValid(bare33);
+const domOk=!!($('libBody')&&$('bLibAdd')&&$('bLibNew'));
+const ok33=detOk33&&lenOk33&&scenesOk33&&saved33&&rtOk&&shareOk&&rebOk&&legacyOk&&domOk;
+gate('G33','song library: 3 recipes compose deterministically (±5% length, non-empty scenes), save/load + share round-trips carry the album deep-equal, loadProjectObj canonicalizes (invalid dropped, absent→null), drawer wired',ok33,'det='+detOk33+' len='+lenOk33+' scenes='+scenesOk33+' save='+rtOk+' share='+shareOk+' rebuild='+rebOk+(reb33.library.songs.length!==3?'(songs='+reb33.library.songs.length+')':'')+' legacy='+legacyOk+' dom='+domOk)}catch(e){gate('G33','song library',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

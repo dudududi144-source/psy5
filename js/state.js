@@ -1,4 +1,5 @@
 import { clamp, mulberry32, loopLen, M_ENERGY, M_SPACE } from './model.js';
+import { COMPOSER_STYLES } from './composer.js';
 import { laneModeBackfill, paramApply, paramById, paramDenorm, ensureMaster } from './params.js';
 import { recordPoint, quantStep } from './autorec.js';
 import { normalizeSceneMix, applySceneMix } from './scenes.js';
@@ -53,7 +54,13 @@ function loadProjectObj(p){if(p.seed==null)p.seed='PSY6';if(!p.groove)p.groove='
    the save was produced. */
 if(p.scenes)p.scenes=p.scenes.map(sc=>{const o={name:sc.name,pattern:sc.pattern==null?null:sc.pattern,color:sc.color==null?null:sc.color,bars:sc.bars==null?null:sc.bars,fill:sc.fill===true};/* v0.7.0 follow backfill: a valid non-none config is preserved in canonical form; absent/invalid/none → absent (legacy scenes behave identically) */if(sc.follow&&sc.follow.mode&&sc.follow.mode!=='none'){o.follow={mode:String(sc.follow.mode),target:(sc.follow.target==null?null:Math.max(0,sc.follow.target|0)),prob:(typeof sc.follow.prob==='number'&&isFinite(sc.follow.prob))?Math.max(0,Math.min(100,Math.round(sc.follow.prob))):100,afterBars:(sc.follow.afterBars==null?null:Math.max(1,Math.min(64,sc.follow.afterBars|0)))}}/* v0.8.0 mix-snapshot backfill: a valid payload is preserved in CANONICAL form (sorted track keys, registry field order — the load→save byte-stability contract); absent/invalid/empty → absent (legacy scenes byte-identical) */const mixN=normalizeSceneMix(sc.mix,(p.tracks||[]).length);if(mixN)o.mix=mixN;return o});/* lane backfill (v0.5.0): legacy lanes get mode 'lock' (sound params — the only thing
    that ever had a lane) or 'state' (anything else), preserving exact legacy behavior */
-if(p.lanes)for(const ln of p.lanes)ln.mode=laneModeBackfill(ln.param,ln.mode);I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;I.autoArm=new Set();I.selLane=-1;if(I.eng)I.eng.syncMix(p);I.renderDirty=true;if(I.copilotReload)I.copilotReload()}
+if(p.lanes)for(const ln of p.lanes)ln.mode=laneModeBackfill(ln.param,ln.mode);/* v0.9.0 song-library backfill: a present library is rebuilt CANONICALLY
+(fixed record shape {id,name,style,seed,len,composerMeta} — load→save byte
+stability); absent/empty/invalid → null (legacy projects stay library-less;
+the empty-album state only exists in-memory via libraryEnsure). Songs are
+RECIPES (style/seed/len — the compose() inputs), never snapshots; this is
+the known silent-drop pitfall fixed in place (Run 15 51ce434 contract). */
+if(p.library&&Array.isArray(p.library.songs)&&p.library.songs.length){const CL=[3,5,8];const seen=new Set();p.library={songs:p.library.songs.filter(s0=>s0&&typeof s0.id==='string'&&s0.id&&!seen.has(s0.id)&&seen.add(s0.id)).map(s=>{const st=(s.style&&COMPOSER_STYLES[s.style])?s.style:null;const ln=CL.includes(s.len)?s.len:null;const sd=(typeof s.seed==='number'&&isFinite(s.seed))?s.seed:String(s.seed==null?'':s.seed).slice(0,24);const cm=(s.composerMeta&&typeof s.composerMeta==='object'&&!Array.isArray(s.composerMeta))?{bpm:Number(s.composerMeta.bpm)||null,progression:s.composerMeta.progression!=null?String(s.composerMeta.progression).slice(0,40):null}:{bpm:null,progression:null};return{id:s.id,name:String(s.name==null||s.name===''?'UNTITLED':s.name).slice(0,32),style:st,seed:sd,len:ln,composerMeta:cm}}),activeSongId:null};p.library.songs=p.library.songs.filter(s=>s.style&&s.len);const act=p.library.songs.some(s=>s.id===p.library.activeSongId)?p.library.activeSongId:(p.library.songs.length?p.library.songs[0].id:null);p.library.activeSongId=act}else p.library=null;I.p=p;I.hist=[];I.redo=[];I.dirty=false;I.pending=null;I.autoArm=new Set();I.selLane=-1;if(I.eng)I.eng.syncMix(p);I.renderDirty=true;if(I.copilotReload)I.copilotReload();return p}
 /* MIDI param paths (v0.4.0; v0.8.0 adds the master section): macro.<0-7> |
    master.vol | master.eqLow|eqMid|eqHigh|compOn|compThresh|compRatio|
    compAttack|compRelease|compMakeup (CC 0–1 → registry range via paramDenorm)

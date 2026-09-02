@@ -47,6 +47,11 @@ import { SCALES, mkStep, deep } from './model.js';
 import { initTracks, addTrackToProject, libFind, assignPresetToTrack } from './presets.js';
 import { normalizeSceneMix } from './scenes.js';
 
+/* composer length menu (minutes) — v0.9.0 P4 adds 12 and 20 (documented
+ * tiers); P3 ships 3/5/8. The library's ADD CURRENT recovery snaps to the
+ * nearest of these. */
+export const COMPOSER_LENGTHS = [3, 5, 8];
+
 /* ── style templates ──
    v0.7.0: every style is a FULL RECIPE in this dict — section chain
    (weights + energy arcs, same 7 canonical ids), per-track preset map,

@@ -57,7 +57,15 @@ export function wireCompose() {
     if (hasNotes(I.p) && !confirm('COMPOSE replaces the current in-memory project:\n• all scenes, patterns and lanes\n• the arranger chain\n• project bpm/scale/root\nYour current project is NOT saved. Continue?')) return;
     const r = compose(styleId, minutes, seed);
     const m = $('composeModal'); if (m) m.style.display = 'none';
+    /* v0.9.0 library-target COMPOSE NEW (51ce434 contract): when opened from
+       the SONG LIBRARY drawer (bLibNew), the album is STASHED before the
+       load and RESTORED after — recipes survive compose-new. The plain
+       header COMPOSE leaves I.libComposeTarget unset and starts FRESH
+       (documented behavior: no album there). */
+    const libTarget = I.libComposeTarget === true;
+    const stash = libTarget && I.p ? I.p.library : undefined;
     loadProjectObj(r.project);
+    if (libTarget) { I.p.library = stash || null; I.libComposeTarget = false; }
     I.renderDirty = true;
     landOnPerform(r.form);
   };
