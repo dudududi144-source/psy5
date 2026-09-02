@@ -44,7 +44,7 @@ import { arcAt } from '../foundation/composition/form.mjs';
 import { motifFromEvents, MotifTransformer } from '../foundation/music/motif.mjs';
 import { pickProgression, chordDegreeAt, chordClasses, snapDegreeToChord } from '../foundation/music/progression.mjs';
 import { SCALES, mkStep, deep } from './model.js';
-import { initTracks, addTrackToProject, libFind, assignPresetToTrack } from './presets.js';
+import { initTracks, addTrackToProject, libFind, assignPresetToTrack, KITS } from './presets.js';
 import { normalizeSceneMix } from './scenes.js';
 
 /* composer length menu (minutes) — v0.9.0 P4 adds 12 and 20 (documented
@@ -76,19 +76,19 @@ export const COMPOSER_SAMPLE_HINTS = { 0: 'kick', 3: 'perc', 6: 'atmos' };
 export const COMPOSER_STYLES = {
   'FULL-ON': {
     label: 'FULL-ON', bpm: 145, scale: 'phrygian',
-    presets: { kick: 'PS-KICK-TIGHT', snare: 'PS-KICK-DEEP', hat: 'PS-HAT', perc: 'PS-PERC', bass: 'PS-BASS-ROLL', lead: 'PS-LEAD-SQUELCH', pad: 'PS-PAD-PSYCH', arp: 'PS-ARP-ACID', fx: 'FX-PS-RISE' },
+    presets: Object.assign({}, KITS['FULL-ON'], { kick: 'PS-KICK-TIGHT' }), /* v0.12.0 kit swap — kick sacred-consistent */
   },
   'DARK-PSY': {
     label: 'DARK-PSY', bpm: 148, scale: 'phrygian',
-    presets: { kick: 'PS-KICK-DEEP', snare: 'PS-GLITCH', hat: 'PS-HAT', perc: 'PS-PERC', bass: 'PS-BASS-AGGRO', lead: 'PS-LEAD-FMTEX', pad: 'PS-PAD-PSYCH', arp: 'PS-ARP-ACID', fx: 'FX-PS-RISE' },
+    presets: Object.assign({}, KITS['DARK-PSY'], { kick: 'PS-KICK-DEEP' }), /* v0.12.0 kit swap — kick sacred-consistent */
   },
   'PROGRESSIVE': {
     label: 'PROGRESSIVE', bpm: 138, scale: 'minor',
-    presets: { kick: 'PR-KICK', snare: 'TR-CLAP', hat: 'PR-HAT', perc: 'PR-PERC', bass: 'PR-BASS-WARM', lead: 'PR-LEAD-MELODIC', pad: 'PR-PAD-EVOLVE', arp: 'PR-ARP-MELODIC', fx: 'FX-TE-RISE' },
+    presets: Object.assign({}, KITS['PROGRESSIVE'], { kick: 'PR-KICK' }), /* v0.12.0 kit swap — kick sacred-consistent */
   },
   'FOREST': {
     label: 'FOREST', bpm: 150, scale: 'harmonicMinor', /* darker scale bias */
-    presets: { kick: 'PS-KICK-DEEP', snare: 'PS-GLITCH', hat: 'PS-HAT', perc: 'PS-PERC', bass: 'PS-BASS-AGGRO', lead: 'PS-LEAD-FMTEX', pad: 'PS-PAD-PSYCH', arp: 'PS-ARP-ACID', fx: 'FX-PS-RISE' },
+    presets: Object.assign({}, KITS['DARK-PSY'], { kick: 'PS-KICK-DEEP' }), /* v0.12.0 kit swap (FOREST rides the DARK-PSY kit) — kick sacred-consistent */
     /* longer builds, more BREAK weight (weights sum to 1) */
     chain: [
       { id: 'INTRO', w: 0.11, energy: [0.20, 0.35], color: 3 },
@@ -103,7 +103,7 @@ export const COMPOSER_STYLES = {
   },
   'HI-TECH': {
     label: 'HI-TECH', bpm: 155, scale: 'phrygian',
-    presets: { kick: 'PS-KICK-TIGHT', snare: 'PS-GLITCH', hat: 'PS-HAT', perc: 'PS-PERC', bass: 'PS-BASS-ROLL', lead: 'PS-LEAD-SQUELCH', pad: 'PS-PAD-PSYCH', arp: 'PS-ARP-ACID', fx: 'FX-PS-RISE' },
+    presets: Object.assign({}, KITS['HI-TECH'], { kick: 'PS-KICK-TIGHT' }), /* v0.12.0 kit swap — kick sacred-consistent */
     /* faster section turnover, aggressive riser placement */
     chain: [
       { id: 'INTRO', w: 0.09, energy: [0.25, 0.42], color: 3 },

@@ -363,7 +363,7 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
     const dPerc = dark.patterns['C3']!.data[3]!.steps.filter(s => s.on).length
     expect(hPerc).toBeGreaterThan(dPerc)          /* glitch density recipe audible */
   })
-  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical per-build (v0.9.0 rebuild values)', () => {
+  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical per-build (v0.12.0 kit-swap values)', () => {
     /* any intentional change to the recipes (or shared code paths they
        consume) must consciously update these pins — documented contract.
        v0.9.0 REBUILD VALUES: the chord progression engine (P1) re-tones
@@ -375,9 +375,13 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
        CHANGELOG 0.10.0). Determinism re-proven: same seed → byte-identical;
        rhythm tracks byte-identical to v0.8.0 (pinned in the harmony suite). */
     const pins: Record<string, string[]> = {
-      'FULL-ON': ['ffb3e7c9350ccfb6', 'bcb04a99c5b8c883', '2fc28523aae7aa1c'],
-      'DARK-PSY': ['4d40a1820bc5c99f', '913650f484f5eee5', '2ab09cc2e6407cdd'],
-      'PROGRESSIVE': ['0e306937f6cca52c', '661848d2df4f0126', '5bddafec47419910'],
+      /* v0.12.0 RE-PIN: the composer rides the v0.12.0 layered kits (kick
+         sacred-consistent per style) — whole-project hashes moved; the
+         v0.11.0 values are recorded in CHANGELOG 0.12.0. PATTERN-level
+         form-fp (bb16ce280ff48f88) is UNCHANGED — asserted above. */
+      'FULL-ON': ['a89f76062f5cc2d5', 'a6f74ab733dbb180', 'eca3f96245253bd6'],
+      'DARK-PSY': ['d5a0dd3bc576a0bc', '88ced66a2cdd127f', '1823f63e7b25542c'],
+      'PROGRESSIVE': ['c36e3f979c764693', '39ff990601dc3717', '12e3fb8b026384cb'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {

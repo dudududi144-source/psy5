@@ -118,17 +118,58 @@ SynthVoice:
   osc1 -> filter -> vca -> trackBus -> master
   osc2 -> filter
 
-DrumVoice:
-  noise -> bandpass -> gain -> out -> master
-  osc -> gain -> out
+DrumVoice (v0.12.0 — multi-layer; every layer zeroed at the hit anchor,
+  pool discipline unchanged — drumDurEst formulas untouched):
+  KICK   osc   (sine, SUB)   pitch env f0*startMult -> f0 (punch -> depth)
+         osc2  (triangle BODY, tone -> body/sub balance)
+         noise -> HP(3800+1400*punch) -> gain  (CLICK, 5 ms)
+         out -> soft-clip WaveShaper (tanh, engine-shared curve) -> trackBus
+         (non-kick types route out -> trackBus DIRECTLY — the shaper is
+          kick-only, everything else keeps the exact dry path)
+  HAT    6x square osc, inharmonic ratios [2, 3, 4.16, 5.43, 6.79, 8.21]
+         *40 Hz*tune (806-style recipe; lazy first-hit init)
+         -> BP 10k -> HP(7200*sqrt(tone)) -> gain  + noise touch (HP 8k)
+  CLAP   noise -> BP(1150*tone, per-burst offsets [1, 1.07, .94, 1.1])
+         4 bursts (~11 ms spacing) + tail burst (long decay)
+  SNARE  osc2 (triangle TONE, 0.4-semitone drop, punch -> decay)
+         + noise -> BP(1900*tone)  (dual-band)
+  TOM    osc (sine sweep 180->92*tune) + strike noise (BP 1800, 8 ms)
+  RIM    osc (sine) + FM: modulator 2.76x, depth 1.4x -> osc.frequency
+  SHAKER noise -> BP(5500*tone) dual-envelope micro-structure
+  CONGA/BONGO  sine + pitch bend + noise touch (membrane model)
+  COWBELL  osc square 560*tune + osc2 square 845*tune (documented 1.509)
+  CLAVE  osc sine 2500*tune + osc2 sine 3750*tune (wood modes 1 : 1.5)
+  ZAP    osc glide 1600*tune -> 70*tune + BP chirp 4000 -> 200
+  BOOM   osc sub drop 70*tune -> 28 + LP 400 touch (reverb-ready tail)
+  IMPACT osc sub 60->30 + osc2 triangle body 120->55
 
-Master chain:
-  master -> compressor -> limiter -> analyser -> destination
+Master chain (v0.12.0 P3):
+  master -> [width network] -> EQ3 -> [glue comp -> makeup] -> comp -> analyser -> destination
+  width network (ONLY when widthMaster != 1 — at 1 the network is OUT,
+  the exact pre-v0.12.0 graph):
+    master -> splitter -> mid=(L+R)/2, side=(L-R)/2
+    side -> HP 300 Hz (bass mono protection, documented) -> width gain
+    merger: L' = mid + w*side, R' = mid - w*side -> eqLow
+  delay (mono default | fx.pingPong 1 = two cross-fed taps, hard L/R outs,
+  one lowpass per leg, delayFbClamp feedback)
+  reverb: convolver, fx.irKind 'classic'(1.8 s, byte-identical to v0.11.0)
+    | 'short'(1.2 s bright) | 'long'(3.2 s dark, one-pole LP 2600) —
+    seeded deterministic IRs (sends.mjs IR_VARIANTS)
 
 ## 7. Preset System
 
-Genres: TECHNO, PSYTRANCE, TRANCE, PROGRESSIVE
+Genres: TECHNO, PSYTRANCE, TRANCE, PROGRESSIVE, DARK-PSY, GOA, FULL-ON,
+HI-TECH (+ ANY) — 8 musical genres as of v0.12.0
 Categories: drum, bass, lead, pad, pluck, arp, fx
+Library: 178 presets (133 drums), unique ids, schema-validated (G40 +
+tests/v2-library.test.ts). KITS: 8 layered per-genre kits mapping the 9
+composer roles {kick, snare, hat, perc, bass, lead, pad, arp, fx} to
+preset ids; COMPOSER_STYLES ride the kits (kick sacred-consistent per
+style — pattern data untouched, form-fp asserted). Drum preset schema:
+{id, name, genre, cat:'drum', engine:'DRUM', type, tune, decay, tone,
+punch} — the SAME v1 parameter surface drives the v2 voices (neutral
+defaults; new capability ships as NEW presets/types, not new required
+fields).
 
 ## 8. MIDI Integration
 

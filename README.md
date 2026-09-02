@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 420 tests across 36 files — 420 pass / 0 fail (356314 expect() calls)
+bun test             # 424 tests across 37 files — 424 pass / 0 fail (357966 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -111,14 +111,18 @@ Honest subset classification (v0.4.0):
 | `G36` (freeze track) | v0.11.0: pipeline == independent prep+render+trim (dPipe 0), determinism (dDet 0), frames == freezeWindow formula, sample-track freeze == its plain render (dExact 0), re-freeze RMS within the measured double-master bound (−3.8 dB logged), onset aligned | CI + local |
 | `G37` (sample editor) | v0.11.0: fade onset/sustain RMS 0.289, derivations of base+op+params byte-identical (maxDiff 0), 2-step chain round-trip maxDiff 0 + idempotent, base immutable | CI + local |
 | `G38` (slices) | v0.11.0: detector ≥90% of truths within ±2 hops (measured 100%), sequential slice locks hit every step window in order, per-step lock overrides the track sliceIdx (zero-crossing 43 vs 46) | CI + local |
+| `G39` (drum engine v2) | v0.12.0: kick sub ≥.45 (0.997) + click diff6 ≥.05 (v1 0.0151 → 0.1028) + ZCR pitch descent; hat centroid ≥6 k (12249) + inharmonic gap-cv ≥.2 (0.584 vs degenerate comb 0.009); clap ≥4 bursts (v1 3 → 8); snare dual-band (0.756/0.188); 4 voices deterministic <1e-6 | CI + local |
+| `G40` (percussion v2 + library) | v0.12.0: 178 presets (133 drums) ≥150/≥100, schema 0 bad, genres 8/8, kits 8/8 resolve; tom ZCR monotone descent, cowbell dual-square partials (DFT 560/845 Hz), zap monotone 4/4, boom sub 0.95; determinism 0 | CI + local |
+| `G41` (master space) | v0.12.0: neutral perturb→restore maxDiff 2.46e-7; width 1.8 HF-side ×1.77 (300 Hz protection by design); ping-pong L−R flips 2→46; long-IR decay 48.7× short | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.11.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **37 MAIN entries**, of
-which **35 are hard** (offline/pure — CI asserts all 35 ids incl. G24 song
+Gate-truth accounting (v0.12.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **40 MAIN entries**, of
+which **38 are hard** (offline/pure — CI asserts all 38 ids incl. G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
-voice, G35 insert FX, G36 freeze, G37 editor, G38 slices) and
+voice, G35 insert FX, G36 freeze, G37 editor, G38 slices, G39 drum engine
+v2, G40 percussion + library, G41 master space) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
@@ -221,6 +225,42 @@ standard MIDI file export, and seeded follow actions for performance.
   transitionCounter)`) — the same seed + start replays the identical
   sequence (G27 pins it). **PRECEDENCE: PLAY SONG always follows the
   arranger and ignores follow actions.**
+
+## Features (v0.12.0) — SOUND ENGINE v2
+
+The synthesis layer was rebuilt (this run DELIBERATELY changes the rendered
+sound of drums/percussion — that is its purpose; the A/B table in
+CHANGELOG 0.12.0 is the measured proof):
+
+- **Drum engine v2** — the four core voices are multi-layer: KICK = sub
+  (sine, exponential pitch envelope, punch→depth) + body (triangle,
+  tone→balance) + click (highpassed noise transient) + shared tanh
+  soft-clip; HAT = six inharmonic square oscillators (806-style ratios
+  [2, 3, 4.16, 5.43, 6.79, 8.21]·40 Hz) → bandpass 10 k → tone-mapped
+  highpass + noise touch; CLAP = four bursts (~11 ms exponential spacing)
+  + tail; SNARE = tone (triangle, 0.4-semitone drop) + noise band. Same
+  parameter surface (type/tune/decay/tone/punch) — old presets sound
+  upgraded, not broken.
+- **Percussion v2 + new types** — tom (sweep + strike noise), rim (FM
+  metallic), shaker (bandpass + dual-envelope micro-structure), impact
+  (sub + body); NEW: conga, bongo, cowbell (560+845 Hz squares), clave,
+  zap, boom.
+- **Library 178 presets / 8 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
+  TECHNO, TRANCE, PROGRESSIVE, HI-TECH) with layered per-genre kits
+  (KITS export) — all AUDITION-able in the Sound tab.
+- **Master space** — stereo width `widthMaster` (0–200 %, mid/side with
+  300 Hz bass-mono protection; 1 = exact-neutral bypass), ping-pong delay
+  (`fx.pingPong`), 3 reverb variants (`fx.irKind`: short bright 1.2 s /
+  classic 1.8 s / long dark 3.2 s — seeded, deterministic).
+- **Composer kits** — the composer rides the per-style kits (kick stays
+  sacred-consistent per style); pattern data unchanged (form-fp asserted).
+- Honest DSP notes: main-thread voices are mono pre-pan (true L/R
+  decorrelation is the worklet path); the hat metallic stack initializes
+  lazily on a voice's first hat hit (documented hot-path exception); the
+  worklet engine keeps its reduced feature set (no width/ping-pong/IR
+  variants, no tone-mapped hat, no snare voice — documented limitations);
+  through-graph determinism is < 1e-6 (Chrome offline chunk variance
+  ~3e-7 documented), pure engines are bit-exact.
 
 ## Features (v0.11.0) — RESAMPLE + SLICES + KEY
 

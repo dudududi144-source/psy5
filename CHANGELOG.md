@@ -3,6 +3,166 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.12.0] — Run 20: SOUND ENGINE v2 (professional multi-layer drums + space)
+
+> The drum voices were toy models: kick = one sine with an envelope, hats =
+> filtered noise, clap = one noise burst. v0.12.0 rebuilds the synthesis
+> layer (multi-layer kick, metallic inharmonic hats, 4-burst clap, dual-band
+> snare), upgrades the percussion row (tom/rim/shaker/impact) and adds six
+> new types (conga, bongo, cowbell, clave, zap, boom), expands the factory
+> library 55 → 178 presets across 8 genres with layered kits, and upgrades
+> the master space (stereo width with bass mono protection, ping-pong delay,
+> 3 reverb variants). Every claim below is a MEASUREMENT (the Phase-0
+> acoustic baseline vs the same analyzer on v2 — same pipeline, same
+> metrics). Commands: `bun test` (424 tests / 37 files), `node
+> tools/verify.mjs`, `bun tools/e2e.mjs` (38/38 HARD).
+
+### Pin doctrine (HONEST BEHAVIOR-CHANGE — this run deliberately changes the drums' sound)
+
+- PATTERN-level pins UNCHANGED (asserted): form-fp `bb16ce280ff48f88`
+  (composer.test.ts:233 + mixsnap.test.ts:223), evolution OFF pin
+  `b35b75f6a82e48ae` (event-level, 4385 events), rhythm-track pins.
+- PROJECT-level pins RE-PINNED as **v0.12.0 values** (the composer rides
+  the new kits; kick sacred-consistent per style):
+  FULL-ON `a89f76062f5cc2d5 / a6f74ab733dbb180 / eca3f96245253bd6`
+  (3/5/8 min), DARK-PSY `d5a0dd3bc576a0bc / 88ced66a2cdd127f /
+  1823f63e7b25542c`, PROGRESSIVE `c36e3f979c764693 / 39ff990601dc3717 /
+  12e3fb8b026384cb`. The v0.11.0 values (`ffb3e7c9… / bcb04a99… /
+  2fc28523…`, `4d40a182… / 913650f4… / 2ab09cc2…`, `0e306937… / 661848d2… /
+  5bddafec…`) are recorded here and in tests/composer.test.ts history.
+- PCM-level: the gate suite contains NO absolute PCM hashes (G24/G34/G36/
+  G37/G38 are relational: thresholds, counts, determinism) — they survived
+  the voice change with re-measured values; the A/B table below IS the
+  re-pin record for the rendered sound.
+
+### THE A/B TABLE (Phase 0 baseline vs v2 — identical analyzer, solo hits through the full engine, vel .9, 44.1 kHz)
+
+| voice | metric | v0.11.0 before | v0.12.0 after | meaning |
+|---|---|---|---|---|
+| kick | peak | 0.4378 | 0.4554 | level consistent |
+| kick | crest dB | 12.82 | 9.64 | denser, saturated |
+| kick | spectral centroid Hz | 130 | 349 | more mid/body |
+| kick | sub <150 Hz ratio | 0.9888 | 0.9973 | sub preserved (≥.45 gate) |
+| kick | diff6ms (first-6ms transient RMS) | **0.0151** | **0.1028** | ×6.8 click layer |
+| kick | ZCR 10ms → 30 ms | 600 → 367 | 1000 → 433 | stronger pitch env |
+| snare | peak | 0.2888 | 0.3436 | louder, dual-band |
+| snare | tone band (150–1500) / noise band (2–8 k) ratio | — | 0.756 / 0.188 | both layers present (G39) |
+| hatC | crest dB | 18.24 | 24.84 | metallic stack density |
+| hatC | centroid Hz | 13103 | 12249 | still bright (≥6 k gate) |
+| hatC | peak-gap cv (inharmonicity) | noise (n/a) | 0.584 | vs raw square comb 0.009 |
+| hatO | crest dB | 16.99 | 27.60 | metallic open hat |
+| clap | envelope bursts (8 ms refractory) | **3** | **8** | 4-burst + tail structure |
+| clap | mid band (2–6 k) ratio | 0.2161 | 0.3074 | brighter body |
+| tom | windowed ZCR | flat (pure sine) | 14/14/13/12 | pitch sweep present (G40) |
+| cowbell | DFT at 560 / 845 Hz | — (type absent) | 0.016 / 0.013 ≥ .5·max | dual-square partials (G40) |
+| zap | windowed ZCR descent | — (type absent) | 4/4 monotone | laser sweep (G40) |
+| boom | sub <120 Hz ratio | — (type absent) | 0.95 | sub drop (G40) |
+| determinism | kick re-render maxDiff | 0 | 3.6e-7 (<1e-6 gate) | Chrome offline chunk variance (documented; pure engines == 0) |
+
+Baseline artifacts: r20/baseline-v1-acoustic.json (before) and
+r20/baseline-v2-acoustic.json (after) — produced by the same probe
+(solo hit → PooledEngine in an OfflineAudioContext → FFT/analysis).
+
+### Added — drum engine v2 (`feat: drum engine v2 …`)
+
+- KICK v2: SUB (sine, exponential pitch envelope start→f0 — punch maps the
+  envelope depth AND the click level), BODY (triangle at f0, tone maps the
+  body/sub balance), CLICK (highpassed noise, 2–6 ms transient), shared
+  per-engine tanh soft-clip WaveShaper (kick-only routing — non-kick voices
+  keep the exact dry path).
+- HAT v2: metallic stack — SIX square oscillators at fixed inharmonic
+  ratios R=[2.0, 3.0, 4.16, 5.43, 6.79, 8.21] on a 40 Hz·tune base (the
+  classic 806-style cymbal recipe — non-integer ratios put the partial
+  lattice off integer multiples), bandpass 10 kHz → highpass (tone maps
+  the corner, old 7200·√tone law) + a noise touch. Closed/open share the
+  stack; choke stays the pool discipline; lazy first-hit init (documented
+  hot-path exception).
+- CLAP v2: four noise bursts (exponential ~11 ms spacing) + a tail burst
+  with the long decay; per-burst bandpass offsets = deterministic spectral
+  decorrelation (true L/R decorrelation is a worklet-path capability —
+  main-thread voices are mono pre-pan, documented).
+- SNARE v2: TONE layer (triangle, ~0.4-semitone pitch drop, punch maps the
+  tone decay) + NOISE layer (bandpass, tone maps the band).
+- Every voice zeroes ALL layers at the hit anchor (a pooled voice reused
+  across types never carries a previous layer's tail); drumDurEst formulas
+  UNCHANGED → pool discipline and busyUntil windows moved zero; parameter
+  surface (type/tune/decay/tone/punch) unchanged — old presets trigger
+  sensibly behind the new engine.
+- Worklet parity: the HatVoice metallic stack ported per-sample (same
+  ratios); the worklet kick was ALREADY multi-layer (sub+mid+click+sat —
+  the quality source this run ported FROM); worklet clap already 4-burst.
+  Worklet limitations (honest): no tone param on the worklet hat (world
+  params carry no hat-tone), no dedicated worklet snare voice (perc covers
+  it), width/ping-pong/IR variants are MAIN-engine features.
+
+### Added — percussion v2 + library (`feat: percussion v2 and 150+ preset library`)
+
+- Tom v2 (sweep + strike noise), Rim v2 (FM metallic via a lazy modulator
+  pair), Shaker v2 (bandpass + dual-envelope micro-structure), Impact v2
+  (sub drop + triangle body).
+- NEW types: conga/bongo (membrane model: sine + pitch bend + noise touch),
+  cowbell (two squares, documented 560/845 Hz ≈ 1.509), clave (two-mode
+  wood: 1 : 1.5), zap (downward sweep + synced bandpass chirp), boom (sub
+  drop, clean reverb-ready tail). drumDurEst entries for all — pool
+  discipline preserved.
+- LIBRARY: 55 → **178 presets (133 drums)**, genre coverage **8/8**
+  (PSYTRANCE, DARK-PSY, GOA, FULL-ON, TECHNO, TRANCE, PROGRESSIVE,
+  HI-TECH) + ANY, unique ids, full schema (id/name/genre/cat/engine/type/
+  numeric ranges — validated by G40 AND tests/v2-library.test.ts).
+- KITS: 8 layered per-genre kits (9 roles each: kick/snare/hat/perc/bass/
+  lead/pad/arp/fx) exported from js/presets.js; the Sound tab genre filter
+  gains the four new genres; every preset AUDITION-able via the existing
+  Sound tab path.
+- G40: breadth (178 ≥ 150, 133 ≥ 100), schema 0 bad, kits 8/8 resolve;
+  tom ZCR monotone, cowbell dual-square partials (exact DFT at 560/845 vs
+  a 200–2000 Hz scan), zap monotone descent 4/4, boom sub 0.95; new
+  voices deterministic (measured maxDiff 0).
+
+### Added — master space (`feat: master width, ping-pong delay, reverb variants`)
+
+- Stereo width `widthMaster` (0..200 %, default 1 = NEUTRAL): mid/side
+  network with a 300 Hz side highpass (bass mono protection, documented).
+  At 1 the network is OUT of the chain entirely (mode-switch rewiring —
+  the default topology is EXACTLY the pre-v0.12.0 graph). Registered in
+  js/params.js — automatable/recordable/snapshot-able.
+- Ping-pong delay `fx.pingPong` (per-project flag, default off): two
+  cross-fed taps, hard L/R outputs, same feedback discipline (one lowpass
+  per leg, delayFbClamp). Off = the exact mono topology.
+- Reverb variants `fx.irKind` (default classic): short bright ~1.2 s /
+  classic ~1.8 s (byte-identical to v0.11.0: irChannelShaped(lp=0) ===
+  irChannel) / long dark ~3.2 s (deterministic one-pole LP 2600 Hz over
+  the seeded noise). Seeded, byte-identical per selection.
+- G41: neutral contract — width 1.8→1 + pingPong on→off + IR short→classic
+  perturb→restore round trip re-renders the reference at maxDiff
+  **2.46e-7 < 1e-6**; width 1.8 raises HF-side energy **1.77×** (3.84e-3 →
+  6.78e-3 — the 300 Hz protection excludes low side BY DESIGN, so the
+  probe measures the band width affects); ping-pong L−R envelope flips
+  **2 → 46** (mono delay upmixes identically to L/R); long-IR post-event
+  decay **2.00e-2 vs 4.11e-4 (48.7×)**.
+
+### Changed — composer kits (`docs: v0.12.0` + the kit swap)
+
+- COMPOSER_STYLES ride the v0.12.0 layered kits: FULL-ON → KITS['FULL-ON'],
+  DARK-PSY/FOREST → KITS['DARK-PSY'], PROGRESSIVE → KITS['PROGRESSIVE'],
+  HI-TECH → KITS['HI-TECH']. PATTERN data UNCHANGED (form-fp asserted);
+  the KICK per style stays the v0.11.0 assignment (sacred-consistent);
+  every other role (snare/hat/perc/bass/lead/pad/arp/fx) moved to the new
+  presets. Whole-project hashes re-pinned (values above).
+
+### Engineering notes
+
+- e2e: `--skip` subset mechanism (local verification splits; the full CI
+  run never skips), verdict wait 600→1800 s + explicit CI
+  `timeout-minutes: 60`, partial gate evidence emitted on timeout,
+  per-gate ms timing recorded in the evidence JSON.
+- G39's degenerate harmonic reference is a RAW 525 Hz square (rendered
+  outside the engine — voices may evolve, a pure comb never does): peak-gap
+  cv 0.584 (v2 hat) vs 0.009 (comb) — the inharmonicity test bites.
+- Chrome finding (documented): OfflineAudioContext renders occasionally
+  differ by ~3e-7 in decay tails between fresh runs (chunk scheduling) —
+  the through-graph determinism standard stays < 1e-6 (G34/G36 family);
+  pure per-sample engines assert exact equality (G40 measured 0).
+
 ## [0.11.0] — Run 19: RESAMPLE + SLICES + KEY (the sonic-palette loop closes)
 
 > The device could import and PLAY user samples, but it could not bounce
