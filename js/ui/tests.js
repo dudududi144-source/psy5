@@ -789,9 +789,9 @@ gate('G35','insert FX: neutral (perturb→restore renders identical, maxDiff<1e-
        RMS within 5% of the freeze RMS (logged actual; residual = the
        master section re-apply — the freeze bakes the master bus). */
 try{
-const {compose}=await import('/js/composer.js');
-const {freezeTrack,freezeWindow,freezePrep,renderBounce:rb36,pcmFromBuffer:pf36}=await import('/js/bounce.js');
-const {makeRecord,ensureVoice:ev36}=await import('/js/samplestore.js');
+const {compose}=await import('../composer.js'); /* import.meta-relative — works at repo root AND under the GitHub Pages /psy5/ prefix */
+const {freezeTrack,freezeWindow,freezePrep,renderBounce:rb36,pcmFromBuffer:pf36}=await import('../bounce.js');
+const {makeRecord,ensureVoice:ev36}=await import('../samplestore.js');
 const p36=compose('FULL-ON',3,424242).project;
 const k=p36.tracks.findIndex(t=>t.kind==='drum'&&((t.sound&&t.sound.type)||t.type)==='kick');
 const win=freezeWindow(p36);
@@ -846,7 +846,7 @@ gate('G36','freeze track: pipeline == independent prep+render+trim (maxDiff<1e-6
    (d) BASE IMMUTABILITY: the base record's PCM is byte-identical after
        every op. */
 try{
-const S37=await import('/js/samplestore.js');
+const S37=await import('../samplestore.js');
 const ch37=new Float32Array(22050);
 for(let i=0;i<ch37.length;i++)ch37[i]=Math.sin(2*Math.PI*440*i/44100)*0.5;
 const rec37=S37.makeRecord('g37tone',44100,[ch37],{normalize:false,addedAt:0});
@@ -890,7 +890,7 @@ gate('G37','sample editor: fade-in derivation drops onset-region RMS below 60% o
        zero-crossing delta proves the per-step lock and the track param
        resolve DIFFERENT slice content. */
 try{
-const S38=await import('/js/samplestore.js');
+const S38=await import('../samplestore.js');
 const SR=44100,LEN=SR*2;
 const truths=[0,0.25,0.5,0.75,1.0,1.25,1.5,1.75].map(s=>Math.round(s*SR));
 const d38=new Float32Array(LEN);
