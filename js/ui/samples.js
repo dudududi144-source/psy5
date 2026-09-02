@@ -5,7 +5,7 @@
    references the sample). PCM never touches the project JSON; the drawer is
    the only writer. Hydration pulls referenced samples into the live engine
    cache (missing → synth fallback + one-shot toast, Phase 2). */
-import { $, I, toast, pushHist } from '../state.js';
+import { $, I, toast, pushHist, after } from '../state.js';
 import { createSampleStore, makeRecord, guardImport, referencedSampleIds, applySampleHints, SAMPLE_CAPS, deriveSample, ensureVoice } from '../samplestore.js';
 import { detectKey, tuneToRoot } from '../keydetect.js';
 import { armResample, captureStop, captureState } from './capture.js';
