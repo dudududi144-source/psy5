@@ -14,6 +14,7 @@
      Legacy lanes backfill to 'lock' for sound params, 'state' otherwise
      (sound params had lock support; nothing else ever had a lane). */
 const cl = (v, a, b) => v < a ? a : (v > b ? b : v);
+import { ensureVoice } from './samplestore.js';
 
 function P(id, label, min, max, def, target, apply) {
   return { id, label, min, max, def, target, apply: (t, v) => apply(t, cl(v, min, max)) };
@@ -41,6 +42,16 @@ export const PARAMS = [
   P('scAttackMs', 'SC attack', 1, 200, 12,  'track', (t, v) => { t.scAttackMs = Math.round(v) }),
   P('scHoldMs',   'SC hold',   0, 400, 0,   'track', (t, v) => { t.scHoldMs = Math.round(v) }),
   P('scReleaseMs','SC release', 5, 1000, 140, 'track', (t, v) => { t.scReleaseMs = Math.round(v) }),
+  /* ── sample voice (v0.10.0 P2): registry-driven → automatable lanes,
+     ARM-AUTO recordable, snapshot-able by construction. Writes through
+     ensureVoice (canonical clamp) to track.sampleParams. ── */
+  P('smpGain', 'SMP gain',     0, 2,   1,   'track', (t, v) => { ensureVoice(t).sampleParams.gain = v }),
+  P('smpTune', 'SMP tune',   -24, 24,  0,   'track', (t, v) => { ensureVoice(t).sampleParams.tune = v }),
+  P('smpStart','SMP start %',  0, 100, 0,   'track', (t, v) => { ensureVoice(t).sampleParams.startPct = v }),
+  P('smpEnd',  'SMP end %',    0, 100, 100, 'track', (t, v) => { ensureVoice(t).sampleParams.endPct = v }),
+  P('smpRev',  'SMP reverse',  0, 1,   0,   'track', (t, v) => { ensureVoice(t).sampleParams.reverse = v >= 0.5 ? 1 : 0 }),
+  P('smpAtk',  'SMP attack',   0, 100, 0,   'track', (t, v) => { ensureVoice(t).sampleParams.attackMs = Math.round(v) }),
+  P('smpRel',  'SMP release',  0, 500, 20,  'track', (t, v) => { ensureVoice(t).sampleParams.releaseMs = Math.round(v) }),
   /* ── project-level (lane.track = -1) ── */
   P('masterVol', 'Master',    0, 1, 0.85, 'project', (p, v) => { p.masterVol = v }),
   /* ── master section (v0.8.0): EQ3 + glue comp — NEUTRAL defaults (EQ 0 dB,

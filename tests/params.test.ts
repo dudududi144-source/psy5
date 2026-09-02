@@ -45,6 +45,11 @@ describe('param registry', () => {
       } else if (pd.id.startsWith('sc')) {
         const key = pd.id === 'scAmount' ? 'scAmount' : pd.id === 'scAttackMs' ? 'scAttackMs' : pd.id === 'scHoldMs' ? 'scHoldMs' : 'scReleaseMs'
         expect(t[key]).toBe(pd.id === 'scAmount' || pd.id === 'scAttackMs' || pd.id === 'scHoldMs' ? Math.round(pd.min) : Math.max(pd.min, Math.round(pd.min)))
+      } else if (pd.id.startsWith('smp')) {
+        /* v0.10.0 sample-voice params → track.sampleParams (ensureVoice path) */
+        const map: any = { smpGain: 'gain', smpTune: 'tune', smpStart: 'startPct', smpEnd: 'endPct', smpRev: 'reverse', smpAtk: 'attackMs', smpRel: 'releaseMs' }
+        const want = pd.id === 'smpRev' ? (pd.min >= 0.5 ? 1 : 0) : (pd.id === 'smpAtk' || pd.id === 'smpRel') ? Math.round(pd.min) : pd.min
+        expect((t as any).sampleParams[map[pd.id]]).toBe(want)
       } else {
         expect(t.sound[pd.id]).toBe(pd.min)
       }

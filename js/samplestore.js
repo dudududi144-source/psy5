@@ -222,3 +222,45 @@ export function referencedSampleIds(p) {
   for (const t of (p && p.tracks) || []) if (t && t.sampleId && !seen.has(t.sampleId)) { seen.add(t.sampleId); out.push(t.sampleId) }
   return out;
 }
+
+/* ── sample VOICE model (v0.10.0 P2) ──
+   track.voiceMode 'synth' (default) | 'sample'; track.sampleId;
+   track.sampleParams = { gain 0..2 (1), tune −24..+24 st (0),
+     startPct 0..100 (0), endPct 0..100 (100), reverse 0/1 (0),
+     attackMs 0..100 (0), releaseMs 0..500 (20) }.
+   ensureVoice backfills + clamps IN PLACE (canonical key order on creation
+   → load→save byte stability, the loadProjectObj pattern). */
+export const SAMPLE_PARAM_DEFAULTS = { gain: 1, tune: 0, startPct: 0, endPct: 100, reverse: 0, attackMs: 0, releaseMs: 20 };
+export const SAMPLE_PARAM_RANGES = { gain: [0, 2], tune: [-24, 24], startPct: [0, 100], endPct: [0, 100], reverse: [0, 1], attackMs: [0, 100], releaseMs: [0, 500] };
+
+export function ensureVoice(t) {
+  if (!t || typeof t !== 'object') return t;
+  if (t.voiceMode !== 'sample') t.voiceMode = 'synth';
+  if (t.sampleId != null && typeof t.sampleId !== 'string') t.sampleId = null;
+  if (t.sampleMeta != null && (typeof t.sampleMeta !== 'object' || Array.isArray(t.sampleMeta))) t.sampleMeta = null;
+  if (!t.sampleParams || typeof t.sampleParams !== 'object' || Array.isArray(t.sampleParams)) t.sampleParams = {};
+  const sp = t.sampleParams;
+  for (const k of Object.keys(SAMPLE_PARAM_DEFAULTS)) {
+    const [lo, hi] = SAMPLE_PARAM_RANGES[k];
+    let v = sp[k];
+    if (v == null || !isFinite(v)) v = SAMPLE_PARAM_DEFAULTS[k];
+    v = Math.min(hi, Math.max(lo, v));
+    if (k === 'reverse') v = v >= 0.5 ? 1 : 0;
+    else if (k === 'attackMs' || k === 'releaseMs') v = Math.round(v);
+    else v = Math.round(v * 1000) / 1000;
+    sp[k] = v;
+  }
+  return t;
+}
+
+/* samplePlayback — PURE playback math: tune semitones → rate, pct slice →
+ * buffer-time window. tune +12 → the wall-clock support HALVES (rate 2).
+ * endPct ≤ startPct is clamped to a full slice (never a zero-length hit). */
+export function samplePlayback(sp, durationSec) {
+  const tune = Math.min(24, Math.max(-24, (sp && sp.tune) || 0));
+  let s0 = Math.min(100, Math.max(0, (sp && sp.startPct) || 0));
+  let s1 = Math.min(100, Math.max(0, (sp && sp.endPct) != null ? sp.endPct : 100));
+  if (s1 <= s0) { s0 = 0; s1 = 100 }
+  const rate = Math.pow(2, tune / 12);
+  return { rate, offsetSec: s0 / 100 * durationSec, durSec: (s1 - s0) / 100 * durationSec / rate };
+}

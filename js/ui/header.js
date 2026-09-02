@@ -33,7 +33,7 @@ if($('bMidi'))$('bMidi').onclick=()=>{if(!I.p)return;const sm=songMidi(I.p);if(!
 $('bounceCancel').onclick=()=>{if(songCtl){songCtl.cancel();return}$('bounceModal').style.display='none';$('bounceGo').disabled=false;$('bounceGo').textContent='RENDER WAV';if($('songProg'))$('songProg').style.display='none'};
 $('bounceGo').onclick=async()=>{const b=$('bounceGo');b.disabled=true;b.textContent='RENDERING…';try{const loops=+$('bounceLoops').value;const mode=$('bounceMode')?$('bounceMode').value:'mix';
 if(mode==='stems'){const {tracks}=stemTracks(I.p,loops);if(!tracks.length){toast('STEMS: no notes in this pattern');b.disabled=false;b.textContent='RENDER WAV';return}
-let done=0;for(const ti of tracks){const {buf,N}=await renderBounce(I.p,loops,{trackIdx:ti});const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);const nm=(I.p.tracks[ti].name||('track-'+ti)).replace(/\s+/g,'-').toLowerCase();dlWav(ab,'psy6-stem-'+nm+'.wav');done++;await new Promise(r=>setTimeout(r,350))/* sequential downloads — browsers throttle rapid clicks */}
+let done=0;for(const ti of tracks){const {buf,N}=await renderBounce(I.p,loops,{trackIdx:ti,samples:I.eng?I.eng.sampleCache:null});const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);const nm=(I.p.tracks[ti].name||('track-'+ti)).replace(/\s+/g,'-').toLowerCase();dlWav(ab,'psy6-stem-'+nm+'.wav');done++;await new Promise(r=>setTimeout(r,350))/* sequential downloads — browsers throttle rapid clicks */}
 toast('STEMS ✓ '+done+' file'+(done===1?'':'s')+' · '+N+' samples each');$('bounceModal').style.display='none'}
 else if(mode==='song'){const steps=songSteps(I.p);
 if(!steps.length){toast('SONG: arranger is empty — build [scene,bars] sections first');b.disabled=false;b.textContent='RENDER WAV';return}
@@ -58,7 +58,7 @@ const ctl=songRenderController();songCtl=ctl;
 b.textContent='STEM '+(done+1)+'/'+tracks.length+'…';
 const nm=((I.p.tracks[ti]&&I.p.tracks[ti].name)||('track-'+ti)).replace(/\s+/g,'-').toLowerCase();
 $('songProg').style.display='';$('songProgLabel').textContent='RENDERING STEM '+(done+1)+'/'+tracks.length+' — '+nm;
-const r=await renderSong(I.p,{ctrl:ctl,trackFilter:ti});
+const r=await renderSong(I.p,{ctrl:ctl,trackFilter:ti,samples:I.eng?I.eng.sampleCache:null});
 songCtl=null;
 if(!r||r.cancelled){break}
 const pcm=pcmFromBuffer(r.buf,r.startFrame||0,r.N);
@@ -75,14 +75,14 @@ const ctl=songRenderController();songCtl=ctl;
 ctl.onProgress=(i,n,sceneIdx)=>{const pr=$('songProg');if(!pr)return;pr.style.display='';$('songProgBar').style.width=Math.round(100*i/n)+'%';const nm=(I.p.scenes[sceneIdx]&&I.p.scenes[sceneIdx].name)||('SCENE '+(sceneIdx+1));$('songProgLabel').textContent='RENDERING SONG — section '+(i+1)+'/'+n+' · '+nm+' · '+Math.round(100*i/n)+'%'};
 ctl._onCancelled=()=>{songCtl=null;b.disabled=false;b.textContent='RENDER WAV';if($('songProg'))$('songProg').style.display='none';toast('SONG render cancelled — clean abort, live engine untouched')};
 $('songProg').style.display='';$('songProgLabel').textContent='RENDERING SONG…';
-const r=await renderSong(I.p,{ctrl:ctl});
+const r=await renderSong(I.p,{ctrl:ctl,samples:I.eng?I.eng.sampleCache:null});
 songCtl=null;
 if(r.cancelled){return}
 const pcm=pcmFromBuffer(r.buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);
 dlWav(ab,'psy6-song-'+I.p.bpm+'bpm.wav');
 $('songProg').style.display='none';$('bounceModal').style.display='none';
 toast('SONG ✓ music '+r.musicSec.toFixed(1)+'s · with tail '+r.totalSec.toFixed(1)+'s · '+r.N+' samples · '+(ab.byteLength/1024|0)+' KB')}}
-else{const {buf,N}=await renderBounce(I.p,loops);const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);dlWav(ab,'psy6-bounce-'+I.p.bpm+'bpm.wav');toast('BOUNCED ✓ '+N+' samples · '+(ab.byteLength/1024|0)+' KB');$('bounceModal').style.display='none'}}catch(err){toast('BOUNCE FAILED — '+err.message)}songCtl=null;b.disabled=false;b.textContent='RENDER WAV'};
+else{const {buf,N}=await renderBounce(I.p,loops,{samples:I.eng?I.eng.sampleCache:null});const pcm=pcmFromBuffer(buf);const ab=wavEncode(pcm.channels,pcm.sampleRate);dlWav(ab,'psy6-bounce-'+I.p.bpm+'bpm.wav');toast('BOUNCED ✓ '+N+' samples · '+(ab.byteLength/1024|0)+' KB');$('bounceModal').style.display='none'}}catch(err){toast('BOUNCE FAILED — '+err.message)}songCtl=null;b.disabled=false;b.textContent='RENDER WAV'};
 /* keyboard dispatcher — bindings come from js/shortcuts.js (single source of
    truth, collision-tested; ? renders the help overlay from the same table) */
 window.addEventListener('keydown',e=>{

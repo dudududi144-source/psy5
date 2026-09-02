@@ -82,7 +82,7 @@ let sch=bounceSchedule(p,loops,t0);
 if(opts.trackIdx!=null)sch=Object.assign({},sch,{evs:sch.evs.filter(e=>e.track===opts.trackIdx)});
 const N=Math.ceil(sch.total*sr);
 const oc=new OfflineAudioContext(2,N,sr);
-const eng=new PooledEngine(oc,opts.engineOpts||{});
+const eng=new PooledEngine(oc,Object.assign({samples:opts.samples},opts.engineOpts||{}));
 eng.syncMix(p);
 for(const e of sch.evs)eng.trigger(p.tracks[e.track],e.t,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sch.stepDur);
 const buf=await oc.startRendering();
@@ -365,7 +365,7 @@ const startFrame=bounds?Math.max(0,Math.round(sr*((t0+bounds[0]*16*sd)-SONG_LEAD
 if(bounds){const bars=cp.arranger.steps.reduce((a,s)=>a+(s.bars|0),0);if(bounds[1]>bars)return null}
 const sliceN=bounds?sectionFrames(cp,bounds[0],bounds[1]):N;
 const oc=new OfflineAudioContext(2,N,sr);
-const eng=new PooledEngine(oc);
+const eng=new PooledEngine(oc,{samples:opts.samples});
 eng.syncMix(cp);
 /* progress: suspend at section boundaries (thinned to ≤64 marks so very
    long chains stay cheap). Chrome quantizes suspend times to the render
@@ -395,5 +395,5 @@ eng.syncMix(cp,t0+y.abs*sd);
 }
 }
 const buf=await oc.startRendering();
-return{buf,N:sliceN,startFrame,evs,sections:plan.sections,scheduleHash:evHash(evs),musicSec:plan.totalSteps*sd,totalSec:(plan.totalSteps+SONG_TAIL_STEPS)*sd};
+return{buf,N:sliceN,startFrame,evs,sections:plan.sections,scheduleHash:evHash(evs),musicSec:plan.totalSteps*sd,totalSec:(plan.totalSteps+SONG_TAIL_STEPS)*sd,sampleFallbacks:eng.sampleFallbacks,sampleSpawns:eng.sampleSpawns,sampleSteals:eng.sampleSteals};
 }

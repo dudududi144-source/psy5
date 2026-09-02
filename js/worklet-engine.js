@@ -59,6 +59,7 @@ export const WORKLET_LIMITATIONS=[
 'synth editor params (wave/cutoff/res/ADSR) → worklet world params + macros only',
 'master EQ3 + glue comp (v0.8.0) not mapped — the worklet master has its own saturation/limiter',
 'reverb IR is the worklet’s internal noise IR (not the seeded 1.8 s exponential IR)',
+'user SAMPLES unsupported (v0.10.0) — sample-voice tracks play the SYNTH voice in worklet mode',
 'step sequencer timing: MAIN thread schedules, worklet fires sample-accurately'];
 
 /* msgForTrigger — pure model→worklet trigger mapping (shared by the live

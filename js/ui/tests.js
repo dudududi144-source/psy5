@@ -1,4 +1,5 @@
 import { $, I, PERF, saveProject, loadStored, loadProjectObj, resolveMidiParam, K_MAIN } from '../state.js';
+import { ensureVoice } from '../samplestore.js';
 import { sceneSetFollow, resolveFollow, sceneSetMix, applySceneMix } from '../scenes.js';
 import { songMidi } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
@@ -41,8 +42,8 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
-/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 29 entries as of v0.9.0) ──
- * MAIN engine, 29 entries on device — 27 hard (offline/pure, CI-asserted in
+/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 33 entries as of v0.10.0 P2) ──
+ * MAIN engine, 33 entries on device — 31 hard (offline/pure, CI-asserted in
  * tools/e2e.mjs) + 2 evidence-only realtime gates (G17 live capture, G25
  * record song — ScriptProcessor tap on wall-clock; pass on-device, reported
  * as info in CI, never asserted there).
@@ -61,6 +62,8 @@ function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(
  *   G30 song stems + section bounce (offline, v0.8.0)
  *   G31 chord progression engine (offline, v0.9.0)
  *   G32 per-bar evolution (offline, v0.9.0)
+ *   G33 song library (offline, v0.9.0)
+ *   G34 sample voice (offline, v0.10.0)
  * WORKLET reduced set: 3 entries (G2, G14w, G15w) — offline worklet renders.
  * NUMBERING GAPS (documented, never renumbered — all historical evidence
  * cites these ids): G3, G4, G7 and G20 have NEVER existed in any shipped
@@ -668,6 +671,59 @@ const legacyOk=bare33.library===null&&libraryValid(bare33);
 const domOk=!!($('libBody')&&$('bLibAdd')&&$('bLibNew'));
 const ok33=detOk33&&lenOk33&&scenesOk33&&saved33&&rtOk&&shareOk&&rebOk&&legacyOk&&domOk;
 gate('G33','song library: 3 recipes compose deterministically (±5% length, non-empty scenes), save/load + share round-trips carry the album deep-equal, loadProjectObj canonicalizes (invalid dropped, absent→null), drawer wired',ok33,'det='+detOk33+' len='+lenOk33+' scenes='+scenesOk33+' save='+rtOk+' share='+shareOk+' rebuild='+rebOk+(reb33.library.songs.length!==3?'(songs='+reb33.library.songs.length+')':'')+' legacy='+legacyOk+' dom='+domOk)}catch(e){gate('G33','song library',false,'ERR '+e.message)}
+/* G34 — SAMPLE VOICE (offline — CI-asserted, v0.10.0 P2): a deterministic
+   seeded PCM (noise floor + loud impulse @10% + quiet impulse @60% of 0.25 s)
+   enters through the ENGINE path (loadSampleBuffer on a throwaway engine —
+   the memory-backed engine contract, no IndexedDB in CI). A mixed render of
+   the composed demo song with the KICK track on the sample voice:
+   (a) sample kick stem RMS > 0 AND synth bass stem RMS > 0 (both voices live);
+   (b) tune +12 → the audible support HALVES (0.4 < ratio < 0.65, release
+       tail accounted);
+   (c) reverse → the loud impulse's global-argmax position moves LATER in the
+       first hit window (onset order flips, shift > 0.05 s);
+   (d) two identical renders maxDiff < 1e-6 (offline determinism);
+   (e) MISSING sample → honest synth fallback: stem still audible and
+       renderSong reports sampleFallbacks > 0. */
+try{
+const SR34=44100,N34=Math.round(SR34*0.25),pcm34=new Float32Array(N34);
+{const r34=mulberry32(20260902);for(let i=0;i<N34;i++)pcm34[i]=(r34()*2-1)*0.01;
+const a34=Math.round(N34*0.10),b34=Math.round(N34*0.60),L34=882;
+for(let k=0;k<L34;k++){pcm34[a34+k]=(1-k/L34)*0.9*(k%2?1:-1);pcm34[b34+k]=(1-k/L34)*0.35*(k%2?-1:1)}}
+const rev34=new Float32Array(N34);for(let i=0;i<N34;i++)rev34[i]=pcm34[N34-1-i];
+let pk34=0;for(let i=0;i<N34;i++)if(Math.abs(pcm34[i])>pk34)pk34=Math.abs(pcm34[i]);
+const rec34={id:'SG34test01',name:'g34-impulse',sampleRate:SR34,channels:1,length:N34,durationSec:N34/SR34,peak:pk34,pcm:[pcm34],pcmReversed:[rev34],addedAt:null};
+const eng0=new PooledEngine(new OfflineAudioContext(1,128,44100));
+const loadOk=eng0.loadSampleBuffer(rec34);
+const cache34=eng0.sampleCache;
+const p34=JSON.parse(JSON.stringify(compose('FULL-ON',3,424242).project));
+ensureVoice(p34.tracks[0]);
+p34.tracks[0].voiceMode='sample';p34.tracks[0].sampleId='SG34test01';
+p34.tracks[0].sampleMeta={name:'g34-impulse',durationSec:N34/SR34,peak:pk34};
+const rK=await renderSong(p34,{trackFilter:0,samples:cache34});
+const rB=await renderSong(p34,{trackFilter:4,samples:cache34});
+const rms34=buf=>{let s=0,n=0;for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=0;i<d.length;i++){s+=d[i]*d[i];n++}}return Math.sqrt(s/n)};
+const rmsK=rms34(rK.buf),rmsB=rms34(rB.buf);
+/* support length above a small threshold (music window only — skip 0.05 s pre-roll) */
+const sup=buf=>{const d=buf.getChannelData(0);const f0=Math.round(44100*0.05);let n=0;for(let i=f0;i<d.length;i++)if(Math.abs(d[i])>1e-4)n++;return n};
+const sup0=sup(rK.buf);
+p34.tracks[0].sampleParams.tune=12;
+const rK12=await renderSong(p34,{trackFilter:0,samples:cache34});
+const ratio=sup(rK12.buf)/sup0;
+p34.tracks[0].sampleParams.tune=0;p34.tracks[0].sampleParams.reverse=1;
+const rRev=await renderSong(p34,{trackFilter:0,samples:cache34});
+const argmax=buf=>{const d=buf.getChannelData(0);let m=0,mi=0;for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>m){m=a;mi=i}}return mi};
+const shiftF=argmax(rK.buf),shiftR=argmax(rRev.buf);
+const revShift=shiftR-shiftF;
+/* determinism: re-render the forward config → identical samples */
+p34.tracks[0].sampleParams.reverse=0;
+const rK2=await renderSong(p34,{trackFilter:0,samples:cache34});
+let maxDiff34=0;{const dA=rK.buf.getChannelData(0),dB=rK2.buf.getChannelData(0);const n=Math.min(dA.length,dB.length);for(let i=0;i<n;i++){const d=Math.abs(dA[i]-dB[i]);if(d>maxDiff34)maxDiff34=d}}
+/* missing sample → synth fallback, still audible, honestly counted */
+const p34m=JSON.parse(JSON.stringify(p34));p34m.tracks[0].sampleId='Smissing34';
+const rM=await renderSong(p34m,{trackFilter:0,samples:cache34});
+const fbOk=(rM.sampleFallbacks|0)>0&&rms34(rM.buf)>0.01;
+const ok34=loadOk&&rmsK>0.01&&rmsB>0.01&&ratio>0.4&&ratio<0.65&&revShift>Math.round(44100*0.05)&&maxDiff34<1e-6&&fbOk;
+gate('G34','sample voice: engine-path load, mixed render (sample kick + synth bass both audible), tune+12 halves the support, reverse flips the onset order, two renders maxDiff<1e-6, missing→synth fallback counted',ok34,'rmsK='+rmsK.toFixed(4)+' rmsB='+rmsB.toFixed(4)+' half='+ratio.toFixed(3)+' revShift='+revShift+'f maxDiff='+maxDiff34.toExponential(2)+' fb='+fbOk+' spawns='+rK.sampleSpawns+' steals='+rK.sampleSteals)}catch(e){gate('G34','sample voice',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

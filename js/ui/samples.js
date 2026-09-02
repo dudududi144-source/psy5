@@ -145,6 +145,11 @@ function wireSamples() {
     drop.addEventListener('dragleave', () => { drop.style.borderColor = '' });
     drop.addEventListener('drop', e => { e.preventDefault(); drop.style.borderColor = ''; importFiles(e.dataTransfer.files) });
   }
+  /* one-shot honest toast when the ENGINE falls back to synth at trigger time
+     (sample deleted after load / never imported in this browser) */
+  if (!I._smpFbTimer) I._smpFbTimer = setInterval(() => {
+    try { if (I.eng && I.eng.sampleFallbacks > 0 && !I._smpFbToasted) { I._smpFbToasted = true; toast('SAMPLES MISSING AT TRIGGER — synth fallback active (re-import in Sound ▸ Samples)') } } catch (e) { }
+  }, 1000);
   renderSamples();
 }
 
