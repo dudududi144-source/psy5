@@ -9,6 +9,7 @@
 import { $, I, toast, loadProjectObj } from '../state.js';
 import { compose, COMPOSER_STYLES } from '../composer.js';
 import { arrToggle } from '../arranger.js';
+import { applyComposerSampleHints } from './samples.js';
 
 function hasNotes(p) {
   if (!p) return false;
@@ -41,6 +42,8 @@ export function wireCompose() {
   if (pb) pb.onclick = () => {
     const { styleId, minutes, seed } = readForm($('compStyle'), $('compLen'), $('compSeed'));
     const r = compose(styleId, minutes, seed);
+    r.project.sampleHints = JSON.parse(JSON.stringify(r.sampleHints)); /* v0.10.0 hints ride the project */
+    I.pendingHints = true;
     I.pendingCompose = r.project;
     I.composedLoad = r.form;
     const styleBtn = document.querySelector('#stylePicker button'); /* any style boots; powerOn prefers pendingCompose */
@@ -67,6 +70,7 @@ export function wireCompose() {
     loadProjectObj(r.project);
     if (libTarget) { I.p.library = stash || null; I.libComposeTarget = false; }
     I.renderDirty = true;
+    applyComposerSampleHints(r); /* v0.10.0: resolve the composer's sample slots (async, honest toasts) */
     landOnPerform(r.form);
   };
   for (const id of ['cmpStyle', 'cmpLen', 'cmpSeed']) { const el = $(id); if (el) el.onchange = updateInfo }

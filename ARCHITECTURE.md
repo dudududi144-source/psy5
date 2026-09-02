@@ -560,3 +560,75 @@ progress/cancel modal; stems and SECTION bounce keep the 10-min
 `SONG_MAX_SEC` cap via `songStemsGuard`. Long-form project JSON exceeds the
 ~5 MB localStorage quota (12-min ≈ 3.8 MB, 20-min ≈ 6.4 MB) — SAVE fails by
 design there; EXPORT/SHARE unaffected (documented in README + CHANGELOG).
+
+## 17. Sonic Palette (v0.10.0)
+
+### Sample pipeline (import → store → cache → trigger)
+
+```
+file (≤20s, ≤50MB, ≤128 rows)
+  → decodeAudioData → Float32Array[] (per channel)
+  → makeRecord: id = 'S'+fnv1a(name:length:sampleRate:first-4096-samples)
+     (id computed BEFORE normalize → re-import idempotent)
+  → optional normalize (peak → 0.95, f32-measured metadata) + reversedCopy
+  → IndexedDB 'psy6-samples'/'samples' (injectable backend: memory in Bun)
+  → engine cache: PooledEngine.loadSampleBuffer → AudioBuffer pair
+    (normal + pre-reversed) — context-independent, shared live/offline
+  → trigger(): voiceMode==='sample' && cache hit
+     → per-hit AudioBufferSourceNode + env GainNode → chain input
+     playbackRate = 2^(tune/12); slice = [startPct,endPct)% (pre-reversed
+     PCM for reverse); release extends past the slice end
+     → per-track active-voice cap 8, TIME-AWARE oldest-stolen stop()
+       (only voices competing at `when` count — the offline walk schedules
+       the whole song upfront; a time-blind stealer would stop() future
+       sources and silently drop hits — caught by G34's own numbers)
+  → missing sample → synth fallback (counted: renderSong.sampleFallbacks,
+     one-shot UI toast)
+```
+
+Persistence split (THE contract): project JSON carries `sampleId` +
+`sampleMeta {name,durationSec,peak}` + `sampleParams` + `sampleHints`
+(names only) — NEVER PCM. localStorage/save/share are metadata-only by
+construction; file EXPORT may bundle base64 PCM behind an explicit confirm
+with a 30 MB base64 hard guard; IMPORT rehydrates into IndexedDB. The
+injectable-backend interface (`createSampleStore(backend)`) keeps the whole
+store Bun-testable (memory backend) — the MockMIDI pattern.
+
+### Insert chain (per track, pre-send)
+
+```
+input ─→ dTrim ─→ dWS ─→ dWet ─┐
+   └───→ dDry ─────────────────┴─→ cIn ─→ cWS ─→ [filt] ─→ duck ─→ pan
+                                                     (filt REMOVED when off)
+                                                        ↑ sends tap after pan
+```
+
+- Defaults are EXACT bypass: drive 0 → dTrim 1 / dWet 0 / dDry 1 (the wet
+  branch contributes exact zeros; ±0 sign flips are the only theoretical
+  artifact), crush 16 → null-curve WaveShaper passthrough, filter node
+  REMOVED. G35 proves the neutral contract in-session (perturb→restore
+  maxDiff 8.94e-8 < 1e-6) + structurally (zero nodes restored) + at the
+  schedule layer (all pure-JS pins).
+- WHY drive is trim+fixed-curve (not a per-amount curve grid): WaveShaper
+  `.curve` swaps and node reconnects are NOT time-anchorable — offline
+  bounces walk the whole song before rendering, so curve swaps would apply
+  the FINAL curve to the entire render. The composer's ins lanes (BUILD
+  filt sweeps, RISER filt+drive rise) must be time-correct offline; the
+  trim/wet/dry path is pure AudioParam automation and is. Known honest
+  limitation: user-drawn insCrush lanes render with the final bits offline
+  (composer never emits them).
+- Chrome OfflineAudioContext renders are NOT bit-identical across sessions
+  (observed: 3 sessions → 3 PCM hashes at an identical scheduleHash);
+  within a session identical graphs ARE bit-identical (G34 maxDiff 0.0).
+  All cross-machine pins are therefore pure-JS (schedules/JSON); PCM
+  comparisons are in-session only, with the documented tolerance doctrine.
+
+### Composer integration
+
+BUILD opens `insFiltFreq` lanes on lead (5) + pad (6); RISER opens the perc
+(3) filter + rises its drive. Base states `filtOn:1` on those tracks
+(mode-static offline). The kick (track 0) NEVER receives inserts or insert
+lanes — sacred, pinned. `COMPOSER_SAMPLE_HINTS {0:'kick',3:'perc',6:'atmos'}`
+ride the compose result and the project as names-only provenance; resolved
+once at compose arrival against the store (hit → sample voice baked, miss →
+synth + toast), never re-applied on RESUME.

@@ -253,6 +253,36 @@ export function ensureVoice(t) {
   return t;
 }
 
+/* applySampleHints — resolve the composer's sample hints ({trackIdx →
+ * name}) against the store: a hit applies the SAMPLE voice (voiceMode +
+ * sampleId + sampleMeta) to that track; a miss is reported honestly (the
+ * caller toasts; the synth voice keeps playing). NEVER throws; never
+ * touches tracks without hints. Idempotent per (name→id) resolution. */
+export async function applySampleHints(p, store) {
+  const out = { applied: 0, appliedNames: [], missing: [] };
+  const hints = p && p.sampleHints;
+  if (!hints || typeof hints !== 'object' || Array.isArray(hints)) return out;
+  let rows = null;
+  for (const k of Object.keys(hints)) {
+    const idx = +k;
+    const name = String(hints[k] || '').trim();
+    const t = p.tracks[idx];
+    if (!t || !name) continue;
+    if (!rows) rows = await store.list();
+    const rec = rows.find(r => r.name === name);
+    ensureVoice(t);
+    if (rec) {
+      t.voiceMode = 'sample';
+      t.sampleId = rec.id;
+      t.sampleMeta = { name: rec.name, durationSec: rec.durationSec, peak: rec.peak };
+      out.applied++; out.appliedNames.push(name);
+    } else {
+      out.missing.push(name + ' (track ' + idx + ')');
+    }
+  }
+  return out;
+}
+
 /* samplePlayback — PURE playback math: tune semitones → rate, pct slice →
  * buffer-time window. tune +12 → the wall-clock support HALVES (rate 2).
  * endPct ≤ startPct is clamped to a full slice (never a zero-length hit). */

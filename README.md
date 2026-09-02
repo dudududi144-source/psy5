@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 336 tests across 28 files — 336 pass / 0 fail (326537 expect() calls)
+bun test             # 371 tests across 32 files — 371 pass / 0 fail (351014 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -70,6 +70,10 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/composer.test.ts` | 41 | composer determinism, 7-section structure, length ±5%, step invariants, 20-seed project-wide uniqueness, output integrity + v0.7.0 section variants (pairwise ≥ 0.15, KICK-SACRED bound, pinned form fingerprint, pinned legacy hashes) + FOREST/HI-TECH recipes + v0.9.0 chord-progressions (harmonic invariant via the shared expansion, diversity, rhythm byte-identity) + 12/20-min growth (extended chain, allocateBars regression, SONG_HARD_MAX_SEC refusal) |
 | `tests/evolution.test.ts` | 15 | v0.9.0 per-bar evolution: OFF byte-identity contract (pinned post-P1 schedule), ON diff ≥200, replay determinism, intensity-0 == OFF, op hygiene (chord-root rolls, lane precedence, clamps), live absBar mapping |
 | `tests/library.test.ts` | 7 | v0.9.0 song library: recipe round-trip (compose → recipeFromProject → composeRecipe byte-identical), CRUD + deterministic ids, JSON/save/loadProjectObj/share persistence, legacy null, G33 support |
+| `tests/samplestore.test.ts` | 11 | v0.10.0 sample store: id identity + idempotent re-import, canonical record order, f32-accurate normalize/reverse, 20s/50MB guards, memory-backend round-trip, metadata-only persistence, EXPORT bundle base64 round-trip + 30MB guard |
+| `tests/voice.test.ts` | 10 | v0.10.0 sample voice model: playback math (tune/slice/clamps), ensureVoice canonical + garbage-proof, byte-stable persistence, registry smp* write-through |
+| `tests/inserts.test.ts` | 10 | v0.10.0 insert FX: curve determinism/shape (drive soft-clip, crush staircase), ensureIns canonical + clamps, registry ins* write-through, composer lanes + KICK-SACRED + form-fp unchanged, snapshot/canonical load |
+| `tests/hints.test.ts` | 4 | v0.10.0 composer sample hints: names-only slots {0,3,6}, resolve hit/miss semantics, canonical backfill, no PCM |
 | `tests/midifile.test.ts` | 9 | v0.7.0 MIDI export: format-1 writer, VLQ multi-byte, stable ordering, dependency-free parse-back, `.mid == WAV schedule` note-for-note identity, byte-identical exports |
 | `tests/follow.test.ts` | 13 | v0.7.0 follow actions: model validation, followBars precedence, all modes' 20-transition simulations, prob=0 fallback, seeded replayability, JSON + share round-trips |
 | `tests/mixsnap.test.ts` | 14 | v0.8.0 scene mix snapshots: canonical validation/clamps, registry application, walk-order launch trace, persistence + share round-trips, composer energy-curve payloads (kick excluded), determinism incl. snapshots, form-fp unchanged |
@@ -99,13 +103,15 @@ Honest subset classification (v0.4.0):
 | `G26` (MIDI export), `G27` (follow actions) | v0.7.0 offline+pure set (format-1 parse-back / seeded chain simulation) | CI + local |
 | `G28` (scene mix snapshots), `G29` (master EQ+glue), `G30` (song stems + section bounce) | v0.8.0 offline+pure set (snapshot RMS ratio + null-mix control / neutral tolerance + crest compression / stem frames + RMS ordering + slice equality) | CI + local |
 | `G31` (chord progression engine), `G32` (per-bar evolution), `G33` (song library) | v0.9.0 offline+pure set (0 chord-tone violations via the shared expansion + determinism + diversity / OFF==pin + ON diff ≥200 + replay + intensity-0 / recipes compose deterministically + save/share round-trips + canonical rebuild) | CI + local |
+| `G34` (sample voice), `G35` (insert FX) | v0.10.0 offline set (engine-path load + mixed render both voices + tune-halves-support + reverse onset-flip + two-render maxDiff + missing→fallback counted / neutral perturb→restore maxDiff<1e-6 + structural zero-node restore + drive crest squash + LP high-band drop) | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.9.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **32 MAIN entries**, of
-which **30 are hard** (offline/pure — CI asserts all 30, including G24 song
+Gate-truth accounting (v0.10.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **34 MAIN entries**, of
+which **32 are hard** (offline/pure — CI asserts all 32, including G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
-G30 stems/sections, G31 progressions, G32 evolution, G33 library) and
+G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
+voice, G35 insert FX) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
@@ -208,6 +214,44 @@ standard MIDI file export, and seeded follow actions for performance.
   transitionCounter)`) — the same seed + start replays the identical
   sequence (G27 pins it). **PRECEDENCE: PLAY SONG always follows the
   arranger and ignores follow actions.**
+
+## Features (v0.10.0) — SONIC PALETTE
+
+- **USER SAMPLES** (Sound tab ▸ Samples) — import your own kicks, vocal
+  stabs, atmos (drag&drop or file input; wav/mp3/ogg/flac decoded by the
+  browser; caps: 20 s / 50 MB / 128 rows). PCM lives in **IndexedDB** —
+  project JSON, share links and localStorage carry id + metadata only.
+  Ids are content-derived (`fnv1a(name+length+rate+first-4096-samples)`) →
+  re-import is idempotent. Optional normalize (peak → 0.95, baked).
+- **SAMPLE VOICE** — any track switches VOICE SYNTH→SAMPLE (Sound tab):
+  per-hit buffer playback with gain/tune (±24 st)/start-end %/reverse/
+  attack/release, all registry-automatable. Per-track 8-voice cap with
+  oldest-stolen stealing (pool discipline). Missing sample → honest synth
+  fallback + one-shot toast. Offline renders use the SAME buffers through
+  the ONE renderer (bounce.js). **Not supported in WORKLET mode** (listed
+  in the on-screen limitations). Honest WebAudio note: sample voices create
+  a per-hit AudioBufferSourceNode + GainNode (buffers are pre-decoded once
+  into a cache; nodes are GC-reaped on ended).
+- **PER-TRACK INSERT FX** — drive / crush / filter per track, pre-send,
+  in the Sound tab INS row and via the registry (`ins*` params):
+  automatable lanes, ARM-AUTO recordable, MIDI-learnable,
+  scene-snapshot-able (`insDrive`/`insFiltFreq` ride scene.mix optionally;
+  old snapshots load unchanged). Defaults are EXACT bypass — a project with
+  zero samples and all inserts off renders identical to v0.9.0 (G35
+  neutral: perturb→restore maxDiff 8.94e-8; non-vacuous probes: drive
+  squashes saw crest 17.77→2.15 dB, LP 200 Hz drops the hat high band
+  73.3 dB).
+- **COMPOSER SAMPLE HINTS** — composed songs ASK for your material:
+  slots {0: kick, 3: perc, 6: atmos} resolve by NAME against the store at
+  compose arrival (hit → sample voice, miss → synth + honest toast). The
+  composer never requires samples; hints are names-only metadata.
+- **COMPOSER INSERT LANES** — BUILD sections open insFiltFreq sweeps on
+  the lead/pad, RISER opens the perc filter + rises its drive. THE KICK IS
+  SACRED: track 0 never receives inserts or insert lanes.
+- Honest storage notes: samples are per-BROWSER (IndexedDB); projects
+  referencing missing samples fall back to synth; file EXPORT can bundle
+  sample audio as base64 via an explicit checkbox confirm (30 MB hard
+  guard) and IMPORT rehydrates it.
 
 ## Features (v0.9.0) — SCENE EVOLUTION + PRO GROWTH
 

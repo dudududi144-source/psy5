@@ -42,8 +42,8 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
-/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 33 entries as of v0.10.0 P2) ──
- * MAIN engine, 33 entries on device — 31 hard (offline/pure, CI-asserted in
+/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 34 entries as of v0.10.0 P3) ──
+ * MAIN engine, 34 entries on device — 32 hard (offline/pure, CI-asserted in
  * tools/e2e.mjs) + 2 evidence-only realtime gates (G17 live capture, G25
  * record song — ScriptProcessor tap on wall-clock; pass on-device, reported
  * as info in CI, never asserted there).
@@ -64,6 +64,7 @@ function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(
  *   G32 per-bar evolution (offline, v0.9.0)
  *   G33 song library (offline, v0.9.0)
  *   G34 sample voice (offline, v0.10.0)
+ *   G35 per-track insert FX (offline, v0.10.0)
  * WORKLET reduced set: 3 entries (G2, G14w, G15w) — offline worklet renders.
  * NUMBERING GAPS (documented, never renumbered — all historical evidence
  * cites these ids): G3, G4, G7 and G20 have NEVER existed in any shipped

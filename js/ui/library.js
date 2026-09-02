@@ -12,6 +12,7 @@
 import { $, I, toast, pushHist, loadProjectObj } from '../state.js';
 import { libraryOf, libraryAdd, libraryRemove, libraryRename, librarySetActive, composeRecipe, recipeFromProject, libraryValid } from '../library.js';
 import { arrToggle } from '../arranger.js';
+import { applyComposerSampleHints } from './samples.js';
 
 function landOnPerform() {
   const btn = Array.from(document.querySelectorAll('nav button')).find(x => x.dataset.t === 'perform');
@@ -51,6 +52,7 @@ function renderLibrary() {
       const stash = I.p.library; /* album continuity (51ce434) */
       loadProjectObj(r.project);
       I.p.library = stash; /* restore the album — recipes survive LOAD */
+      applyComposerSampleHints(r); /* v0.10.0: resolve sample hints at recipe render */
       librarySetActive(I.p, id);
       I.renderDirty = true;
       renderLibrary();

@@ -50,6 +50,13 @@ import { normalizeSceneMix } from './scenes.js';
 /* composer length menu (minutes) — v0.9.0 P4 adds 12 and 20 (documented
  * tiers); the library's ADD CURRENT recovery snaps to the nearest of these. */
 export const COMPOSER_LENGTHS = [3, 5, 8, 12, 20];
+/* v0.10.0 SAMPLE HINTS — the composer's user-sample slots, by TRACK INDEX.
+   Hints are NAMES ONLY (never PCM, never ids): at compose arrival the UI
+   resolves each name against the IndexedDB sample store — a hit applies the
+   sample voice to that track, a miss keeps the synth voice (honest toast).
+   The composer NEVER requires samples: without any stored samples the
+   output is exactly the v0.9.0-style all-synth arrangement. */
+export const COMPOSER_SAMPLE_HINTS = { 0: 'kick', 3: 'perc', 6: 'atmos' };
 
 /* ── style templates ──
    v0.7.0: every style is a FULL RECIPE in this dict — section chain
@@ -653,6 +660,7 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   return {
     project: p,
     form: { style: styleId, seed: label, bpm, sections: formSections, totalBars: totalSecs, lengthSec: +lengthSec.toFixed(2), targetSec: targetMinutes * 60 },
+    sampleHints: COMPOSER_SAMPLE_HINTS,
     stats: { tracks: p.tracks.length, scenes: p.scenes.length, lanes: p.lanes.length, variants: variantCount, snapshots: snapCount, progression: prog.id, minVariantDiff: +minFamDiff.toFixed(3), lengthErr: +(((lengthSec - targetMinutes * 60) / (targetMinutes * 60)) * 100).toFixed(3), fingerprint },
   };
 }

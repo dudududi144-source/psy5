@@ -6,7 +6,7 @@
    the only writer. Hydration pulls referenced samples into the live engine
    cache (missing → synth fallback + one-shot toast, Phase 2). */
 import { $, I, toast } from '../state.js';
-import { createSampleStore, makeRecord, guardImport, referencedSampleIds, SAMPLE_CAPS } from '../samplestore.js';
+import { createSampleStore, makeRecord, guardImport, referencedSampleIds, applySampleHints, SAMPLE_CAPS } from '../samplestore.js';
 
 function ensureStore() {
   if (!I.sampleStore) I.sampleStore = createSampleStore();
@@ -132,6 +132,22 @@ function updateMeta(rows) {
     const usage = (est && est.usage || 0) / 1048576;
     el.textContent = rows.length + ' sample(s) · IndexedDB ≈ ' + usage.toFixed(1) + ' MB used' + (est && est.quota ? ' / ' + (est.quota / 1048576 | 0) + ' MB quota' : '') + ' · caps: 20s / 50MB / ' + SAMPLE_CAPS.maxCount + ' rows · PCM never enters project JSON, share links or localStorage';
   });
+}
+
+/* applyComposerSampleHints — the ONE compose-arrival hook: attach the
+ * composer's hints to the live project (names only, persisted), resolve
+ * them against the store (hit → sample voice, miss → synth + toast), and
+ * hydrate the engine cache. Called from the header/power compose paths and
+ * the library LOAD path — never on RESUME (baked track state is the
+ * authority there; re-applying would override user voice edits). */
+export async function applyComposerSampleHints(composeResult) {
+  if (!I.p || !I.sampleStore) return;
+  const hints = composeResult && composeResult.sampleHints;
+  if (hints && !I.p.sampleHints) I.p.sampleHints = JSON.parse(JSON.stringify(hints));
+  const hr = await applySampleHints(I.p, I.sampleStore);
+  if (hr.applied) toast('SAMPLE HINTS ✓ ' + hr.applied + ' track(s) → user samples (' + hr.appliedNames.join(', ') + ')');
+  if (hr.missing.length) toast('SAMPLE HINTS: ' + hr.missing.join(' · ') + ' — not in this browser → synth fallback');
+  hydrateProjectSamples();
 }
 
 function wireSamples() {

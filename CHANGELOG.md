@@ -3,6 +3,152 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.10.0] — Run 18: SONIC PALETTE (user samples + per-track insert FX)
+
+> The sonic frontier: the device was 100% synthesis with bus sends only.
+> This release adds the user's OWN material (sample import → IndexedDB →
+> sample voice) and per-track INSERT FX (drive/crush/filter) wired into the
+> registry, so the composer's builds can sweep filters and the composer can
+> ASK for the user's kicks. Zero behavior change by default: a project with
+> no samples and all inserts off renders identically to v0.9.0 (G35
+> neutral, below). Commands: `bun test` (371 tests / 32 files), `node
+> tools/verify.mjs`, `node tools/e2e.mjs` (32/32 HARD).
+
+### Added — sample store + import (`feat: sample store and import (IndexedDB, idempotent ids)`)
+
+- `js/samplestore.js` — injectable-backend store (memory for Bun tests,
+  IndexedDB `psy6-samples`/`samples`/v1 on device). Canonical record
+  `{id,name,sampleRate,channels,length,durationSec,peak,pcm,pcmReversed,addedAt}`
+  — PCM lives ONLY here, never in project JSON, share links or localStorage.
+- Identity: `id = 'S' + fnv1a(name:length:sampleRate:first-4096-samples)`,
+  computed BEFORE normalize → re-import is IDEMPOTENT (same id, PCM
+  refreshed, no duplicate). Import caps: 20 s / 50 MB / 128 rows (guarded,
+  toasted). Normalize bakes peak → 0.95 (f32-measured metadata).
+- Sound tab SAMPLES drawer: file input + drag&drop (decodeAudioData →
+  guards → normalize → store), AUDITION (live master), RENAME, DELETE with
+  referenced-track warning, storage estimate.
+- Persistence split: tracks carry `sampleId` + `sampleMeta {name,
+  durationSec, peak}` only. File EXPORT optionally bundles base64 PCM via
+  an explicit confirm + a 30 MB base64 hard guard (`exportBundle`);
+  IMPORT rehydrates bundled samples into IndexedDB (`importBundle`).
+- Evidence: `bun test tests/samplestore.test.ts` — 11 tests; headless smoke
+  (real file-input import of a synthesized WAV): row rendered, id
+  `S56f064d8ff2e`, re-import idempotent, audition spawned (6/6).
+
+### Added — sample voice (`feat: sample voice for drum tracks`)
+
+- Model: `track.voiceMode 'synth' (default) | 'sample'` + `track.sampleId`
+  + `track.sampleParams {gain 0..2 (1), tune −24..+24 (0), startPct (0),
+  endPct (100), reverse (0), attackMs (0), releaseMs (20)}` — canonical
+  backfill+clamp in `loadProjectObj` (byte-stable).
+- Engine: pre-decoded AudioBuffer cache (context-independent — the SAME
+  cache serves live + offline; `opts.samples` seeds it through bounce.js —
+  the ONE renderer, zero render-walk changes). Per-hit
+  AudioBufferSourceNode + env GainNode (the WebAudio API reality —
+  documented, not hidden behind a fake pool); `playbackRate = 2^(tune/12)`;
+  pct slicing; reverse via the pre-reversed PCM; per-track active-voice
+  cap 8, oldest-stolen stop(). Missing sample → honest synth fallback
+  (counted in `renderSong.sampleFallbacks` + one-shot UI toast).
+- Registry: `smpGain/smpTune/smpStart/smpEnd/smpRev/smpAtk/smpRel` →
+  automatable lanes + ARM-AUTO recordable by construction. Sound tab VOICE
+  row (SYNTH/SAMPLE + assign + 7-param editor). WORKLET limitation added
+  to the on-screen list: samples unsupported → synth voice plays.
+- **G34 evidence** (e2e 31/31 at P2): engine-path load, mixed render —
+  sample kick stem rms 0.0229, synth bass stem rms 0.0393 (both audible);
+  tune +12 halves the audible support (ratio 0.506); reverse flips the
+  onset order (argmax shift 8818 frames = 0.20 s); two renders
+  maxDiff = 0.0; missing → fallback counted (spawns 331, steals 0).
+- Lesson burned into the code: the offline walk schedules ALL events
+  before rendering — a cap-stealer that ignores voice START times would
+  stop() not-yet-played future sources and silently drop hits (observed:
+  rms 0.0009). The registry is TIME-AWARE: reap ended voices, count only
+  voices competing at `when`.
+
+### Added — per-track insert FX (`feat: per-track insert FX (drive, crush, filter)`)
+
+- Chain: `input → [drive: dTrim→dWS→dWet ‖ dDry] → cIn → cWS → [filt?] →
+  duck → pan → sends/master` — pre-send, per track. Defaults are EXACT
+  bypass: drive 0 = dry path only, crush 16 = null-curve WaveShaper
+  passthrough, filter node REMOVED from the chain.
+- `foundation/dsp/inserts.mjs` — fixed k=10 soft-clip `driveCurve`
+  (precomputed, peak-unity, monotone — bit-identical every build),
+  `driveTrim` (amount → input gain 1..10), `crushCurve` staircases.
+  **DESIGN RESOLUTION (offline correctness beats the literal reading):**
+  WaveShaper `.curve` swaps and node reconnects are NOT time-anchorable —
+  a per-amount curve grid would render wrongly in offline bounces. Drive
+  amount is an automatable input-TRIM AudioParam with an exact dry/wet
+  gate (`setValueAtTime` — exponential approaches never reach their
+  target, and the neutral contract needs exact 0/1). Filter freq/Q are
+  anchored AudioParams (composer sweeps render time-correctly); mode
+  changes (drive 0↔nonzero, crush bits, filter insert/remove/type) rebuild
+  immediately — documented click risk on mode changes only. Known honest
+  limitation: user-drawn insCrush lanes render with the final bits offline.
+- Registry: `insDrive/insCrush/insFiltOn/insFiltFreq/insFiltQ` →
+  automatable, ARM-AUTO recordable, MIDI-learnable (`track.<i>.ins.*`
+  paths), scene-snapshot-able (`scene.mix.tracks[idx]` gains OPTIONAL
+  `insDrive`/`insFiltFreq`; old snapshots load unchanged).
+- Composer: BUILD gets `insFiltFreq` opening lanes on the LEAD (5) and PAD
+  (6) tracks; RISER gets an `insFiltFreq` opening + an `insDrive` rise on
+  the PERC track (3) (base states `filtOn:1` — mode-static offline). **THE
+  KICK IS SACRED: track 0 never receives inserts** (pinned in
+  tests/inserts.test.ts across 4 styles).
+- **G35 evidence** (e2e 32/32): neutral — a lane-free buildStyle project
+  renders identically before/after a full ins perturb→restore round-trip
+  on ONE engine: maxDiff = 8.94e-8 (< 1e-6; the residue is the bypassed
+  wet branch's denormal-class tail, not a topology leak — structurally the
+  filter node is gone and crush is back to null-curve on every chain);
+  drive squashes the saw-bass crest 17.77 → 2.15 dB; LP 200 Hz drops the
+  hat stem's first-difference (HF) RMS by 73.3 dB.
+- **RE-PINS (v0.10.0 values — honestly measured, never fabricated):**
+  - Composer whole-project hashes (SHA-256/16, seeds 424242, 3/5/8 min):
+    FULL-ON `38651edda8df6cc8,fa4d72e80c483cd2,d5663948fe1e9727` →
+    `ffb3e7c9350ccfb6,bcb04a99c5b8c883,2fc28523aae7aa1c`;
+    DARK-PSY `e9d9e73a3350b54b,617e80edf1f70b77,4867687a52d13d02` →
+    `4d40a1820bc5c99f,913650f484f5eee5,2ab09cc2e6407cdd`;
+    PROGRESSIVE `d724150eef4b7e93,1a61027f125006af,d14ce4b11a17e6f3` →
+    `0e306937f6cca52c,661848d2df4f0126,5bddafec47419910`.
+    The form fingerprint (steps-only) is UNCHANGED: `bb16ce280ff48f88`.
+  - Evolution OFF pin: `3feaf9cb45503864` → **`b35b75f6a82e48ae`** (4385
+    events unchanged — the composer's ins lanes ride the `ev.lock` channel
+    per the v0.5.0 lane semantics, which injects ALL lanes' values into
+    the event lock payload). G32 ON diff stays 703/4385; new ON hash
+    `96d892bae015f91d`.
+  - The Phase 0 PCM baseline (`pcmHash 936b219932510490`, 10,075,254
+    frames) was measured pre-change as session evidence. **Chrome
+    OfflineAudioContext renders are NOT bit-identical ACROSS sessions**
+    (three identical-code sessions produced three different PCM hashes at
+    an identical scheduleHash) — the neutral contract is therefore enforced
+    (a) in-session (G35 maxDiff), (b) structurally (exact-bypass topology),
+    (c) at the schedule layer (all pure-JS pins). Cross-session PCM hashes
+    are not a Chrome invariant and were never a gate.
+
+### Added — composer sample hints (`docs: v0.10.0` phase wiring)
+
+- `COMPOSER_SAMPLE_HINTS = {0:'kick', 3:'perc', 6:'atmos'}` — the
+  composer's user-sample slots ride the compose result and the project
+  JSON as `p.sampleHints` (NAMES ONLY — never PCM, never ids; canonical
+  backfill drops garbage). At compose arrival (header modal, power-screen
+  compose, library LOAD) the names resolve against the IndexedDB store:
+  a hit applies the sample voice (mode+id+meta baked), a miss keeps the
+  synth voice with an honest toast. The composer NEVER requires samples;
+  hints are provenance — baked track state is the authority (hints are
+  never re-applied on RESUME). Evidence: `bun test tests/hints.test.ts`.
+
+### Fixed / hardening
+
+- G34's cap-stealing semantics (above) — offline hit-dropping caught by the
+  gate's own evidence numbers before commit.
+- The Run-17 baseline driver lesson re-applied: a native `confirm()` blocks
+  the headless page main thread forever — drivers override confirm/prompt
+  BEFORE any modal flow.
+
+### Battery (v0.10.0)
+
+- `bun test` — **371 pass / 0 fail** across 32 files, 351,014 expect() calls.
+- `node tools/verify.mjs` — GREEN (SW lock `psy6-v0.10.0` ↔ this changelog).
+- `node tools/e2e.mjs` — **GREEN (32/32 HARD asserted)** + G17/G25 evidence
+  on-device; WORKLET 3/3 local.
+
 ## [0.9.0] — Run 17: SCENE EVOLUTION + PRO GROWTH (rebuilt + published)
 
 > Provenance (honest): this release was engineered TWICE. Run 15 completed
