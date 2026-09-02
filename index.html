@@ -95,6 +95,8 @@
 <button id="smpGainB" title="derive: multiply by the factor (new sample, base untouched)">GAIN</button>
 <button id="smpNormB" title="derive: bake peak to 0.95 (new sample, base untouched)">NORM</button>
 <button id="smpRevB" title="derive: reversed copy (new sample, base untouched)">REVERSE</button>
+<button id="smpSliceB" title="derive: detect transients (deterministic energy flux) and store the boundaries — up to 16 slices, no PCM duplication">SLICE</button>
+<button id="smpAssignSlices" style="display:none" title="fill the SELECTED track's pattern with sequential slice locks (the classic breakbeat fill)">SLICES → STEPS</button>
 </div>
 <div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">edits create DERIVED samples (deterministic id = base+op+params) — the base import is immutable</div>
 </div>

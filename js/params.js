@@ -73,6 +73,7 @@ export const PARAMS = [
   P('smpRev',  'SMP reverse',  0, 1,   0,   'track', (t, v) => { ensureVoice(t).sampleParams.reverse = v >= 0.5 ? 1 : 0 }),
   P('smpAtk',  'SMP attack',   0, 100, 0,   'track', (t, v) => { ensureVoice(t).sampleParams.attackMs = Math.round(v) }),
   P('smpRel',  'SMP release',  0, 500, 20,  'track', (t, v) => { ensureVoice(t).sampleParams.releaseMs = Math.round(v) }),
+  P('smpSlice', 'SMP slice',   0, 16,  0,   'track', (t, v) => { ensureVoice(t).sampleParams.sliceIdx = Math.round(v) }), /* v0.11.0: 0 = full sample, 1..16 = detected slice; per-step via lock lanes */
   /* ── per-track INSERT FX (v0.10.0 P3): drive/crush/filter pre-send.
      All five are registry params → automatable lanes, ARM-AUTO recordable,
      MIDI-learnable, scene-snapshot-able by construction. Defaults are

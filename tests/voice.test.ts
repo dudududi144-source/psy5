@@ -81,12 +81,12 @@ describe('persistence (canonical rebuild + metadata-only)', () => {
     p.tracks[0].voiceMode = 'sample'
     p.tracks[0].sampleId = 'Sxyz'
     p.tracks[0].sampleMeta = { name: 'kick.wav', durationSec: 0.42, peak: 0.95 }
-    p.tracks[0].sampleParams = { gain: 1.5, tune: 3, startPct: 10, endPct: 90, reverse: 1, attackMs: 5, releaseMs: 120 }
+    p.tracks[0].sampleParams = { gain: 1.5, tune: 3, startPct: 10, endPct: 90, reverse: 1, attackMs: 5, releaseMs: 120, sliceIdx: 0 }
     const loaded = loadProjectObj(clone(p))
     expect(loaded.tracks[0].voiceMode).toBe('sample')
     expect(loaded.tracks[0].sampleId).toBe('Sxyz')
     expect(loaded.tracks[0].sampleMeta.name).toBe('kick.wav')
-    expect(loaded.tracks[0].sampleParams).toEqual({ gain: 1.5, tune: 3, startPct: 10, endPct: 90, reverse: 1, attackMs: 5, releaseMs: 120 })
+    expect(loaded.tracks[0].sampleParams).toEqual({ gain: 1.5, tune: 3, startPct: 10, endPct: 90, reverse: 1, attackMs: 5, releaseMs: 120, sliceIdx: 0 })
     /* load→save byte stability: a second load of the loaded JSON is a fixpoint */
     const again = loadProjectObj(clone(loaded))
     expect(JSON.stringify(again)).toBe(JSON.stringify(loaded))

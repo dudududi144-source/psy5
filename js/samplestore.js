@@ -140,8 +140,32 @@ export function pcmGain(channels, factor) {
 }
 
 /* deriveSample — build the derived record (base untouched). addedAt is
- * wall-clock metadata (allowed: non-musical, never part of the id). */
+ * wall-clock metadata (allowed: non-musical, never part of the id).
+ * v0.11.0 op 'slice': runs detectTransients and stores the boundaries as
+ * metadata (kind 'sliced') — the record SHARES the base PCM arrays (no PCM
+ * duplication; records are treated immutable); the id hashes the DETECTED
+ * pcts, so re-detection of the same base is idempotent. */
 export function deriveSample(rec, op, params) {
+  if (op === 'slice') {
+    const det = detectTransients(rec.pcm, rec.sampleRate);
+    const p = { pcts: det.pcts };
+    return {
+      id: deriveId(rec.id, 'slice', p),
+      name: (String(rec.name || 'sample') + '·sliced' + (det.pcts.length - 2)).slice(0, 32),
+      sampleRate: rec.sampleRate,
+      channels: rec.channels,
+      length: rec.length,
+      durationSec: rec.durationSec,
+      peak: rec.peak,
+      pcm: rec.pcm,
+      pcmReversed: rec.pcmReversed || reversedCopy(rec.pcm),
+      addedAt: Date.now(),
+      derivedFrom: rec.id,
+      derivedOp: 'slice',
+      derivedParams: p,
+      kind: 'sliced',
+    };
+  }
   const p = canonicalDeriveParams(op, params);
   const id = deriveId(rec.id, op, p);
   let channels;
@@ -329,8 +353,8 @@ export function referencedSampleIds(p) {
      attackMs 0..100 (0), releaseMs 0..500 (20) }.
    ensureVoice backfills + clamps IN PLACE (canonical key order on creation
    → load→save byte stability, the loadProjectObj pattern). */
-export const SAMPLE_PARAM_DEFAULTS = { gain: 1, tune: 0, startPct: 0, endPct: 100, reverse: 0, attackMs: 0, releaseMs: 20 };
-export const SAMPLE_PARAM_RANGES = { gain: [0, 2], tune: [-24, 24], startPct: [0, 100], endPct: [0, 100], reverse: [0, 1], attackMs: [0, 100], releaseMs: [0, 500] };
+export const SAMPLE_PARAM_DEFAULTS = { gain: 1, tune: 0, startPct: 0, endPct: 100, reverse: 0, attackMs: 0, releaseMs: 20, sliceIdx: 0 };
+export const SAMPLE_PARAM_RANGES = { gain: [0, 2], tune: [-24, 24], startPct: [0, 100], endPct: [0, 100], reverse: [0, 1], attackMs: [0, 100], releaseMs: [0, 500], sliceIdx: [0, 16] };
 
 export function ensureVoice(t) {
   if (!t || typeof t !== 'object') return t;
@@ -384,12 +408,58 @@ export async function applySampleHints(p, store) {
 
 /* samplePlayback — PURE playback math: tune semitones → rate, pct slice →
  * buffer-time window. tune +12 → the wall-clock support HALVES (rate 2).
- * endPct ≤ startPct is clamped to a full slice (never a zero-length hit). */
-export function samplePlayback(sp, durationSec) {
+ * endPct ≤ startPct is clamped to a full slice (never a zero-length hit).
+ * v0.11.0 P3: optional `pcts` (a SLICED record's boundaries, ascending,
+ * first == 0, last == 100). sliceIdx ≥ 1 selects the k-th [pcts[k-1],
+ * pcts[k]) window and REPLACES the start/end window (documented: the slice
+ * IS the edit); out-of-range sliceIdx clamps to the last slice; sliceIdx 0
+ * = the full start/end behavior (unchanged). */
+export function samplePlayback(sp, durationSec, pcts) {
   const tune = Math.min(24, Math.max(-24, (sp && sp.tune) || 0));
+  const rate = Math.pow(2, tune / 12);
+  const si = Math.round((sp && sp.sliceIdx) || 0);
+  if (pcts && pcts.length > 1 && si >= 1) {
+    const k = Math.min(si, pcts.length - 1);
+    const b0 = Math.min(100, Math.max(0, pcts[k - 1]));
+    const b1 = Math.min(100, Math.max(b0, pcts[k]));
+    return { rate, offsetSec: b0 / 100 * durationSec, durSec: (b1 - b0) / 100 * durationSec / rate, slice: k };
+  }
   let s0 = Math.min(100, Math.max(0, (sp && sp.startPct) || 0));
   let s1 = Math.min(100, Math.max(0, (sp && sp.endPct) != null ? sp.endPct : 100));
   if (s1 <= s0) { s0 = 0; s1 = 100 }
-  const rate = Math.pow(2, tune / 12);
-  return { rate, offsetSec: s0 / 100 * durationSec, durSec: (s1 - s0) / 100 * durationSec / rate };
+  return { rate, offsetSec: s0 / 100 * durationSec, durSec: (s1 - s0) / 100 * durationSec / rate, slice: 0 };
+}
+
+/* ── v0.11.0 P3: SLICES — deterministic transient detection ──
+   detectTransients — pure energy-flux onset detector (no rng, no time):
+   fixed 512-frame hop RMS energy → positive flux → adaptive threshold
+   (1.5 × mean flux) → strongest-first greedy pick with a 35 ms minimum
+   spacing, capped at SLICE_MAX onsets. Stable tie-break by hop index — the
+   same PCM ALWAYS yields the same boundaries (tested). Returns ascending
+   pcts (0 and 100 implicit) + the frame positions. */
+export const SLICE_MAX = 16;
+export const SLICE_HOP = 512;
+
+export function detectTransients(pcm, sampleRate) {
+  const d = (Array.isArray(pcm) ? pcm[0] : pcm) || new Float32Array(0);
+  const n = d.length;
+  const nHops = Math.floor(n / SLICE_HOP);
+  if (nHops < 4) return { pcts: [0, 100], frames: [0, n] };
+  const en = new Float64Array(nHops);
+  for (let h = 0; h < nHops; h++) { let s = 0; const s0 = h * SLICE_HOP; for (let i = s0; i < s0 + SLICE_HOP; i++) { const v = d[i]; s += v * v } en[h] = s / SLICE_HOP }
+  const flux = new Float64Array(nHops);
+  let mean = 0;
+  for (let h = 1; h < nHops; h++) { const f = Math.max(0, en[h] - en[h - 1]); flux[h] = f; mean += f }
+  mean /= (nHops - 1);
+  const th = Math.max(mean * 1.5, 1e-12);
+  const minGap = Math.max(1, Math.round(0.035 * sampleRate / SLICE_HOP));
+  const cand = [];
+  for (let h = 1; h < nHops; h++) if (flux[h] >= th) cand.push(h);
+  cand.sort((a, b) => flux[b] - flux[a] || a - b);
+  const picked = [];
+  for (const h of cand) { if (picked.length >= SLICE_MAX) break; let ok = true; for (const p of picked) if (Math.abs(p - h) < minGap) { ok = false; break } if (ok) picked.push(h) }
+  picked.sort((a, b) => a - b);
+  const inner = picked.map(h => Math.round((h * SLICE_HOP / n) * 10000) / 100).filter(p => p > 0 && p < 100);
+  const pcts = [0].concat(inner, [100]);
+  return { pcts, frames: pcts.map(p => Math.round(p / 100 * n)) };
 }

@@ -143,6 +143,17 @@ function drawWave(rec) {
     ctx.lineTo(x + 0.5, mid - mn * (mid - 1));
   }
   ctx.stroke();
+  /* v0.11.0 P3: slice markers on a SLICED record — amber verticals at the
+     detected boundaries (inner boundaries only; 0/100 are the edges) */
+  if (rec.derivedOp === 'slice' && rec.derivedParams && Array.isArray(rec.derivedParams.pcts)) {
+    ctx.strokeStyle = '#e8b04f';
+    ctx.beginPath();
+    for (const p of rec.derivedParams.pcts) {
+      const x = Math.round(p / 100 * W);
+      ctx.moveTo(x + 0.5, 2); ctx.lineTo(x + 0.5, H - 2);
+    }
+    ctx.stroke();
+  }
 }
 
 function selectEdit(rec, rows) {
@@ -154,8 +165,34 @@ function selectEdit(rec, rows) {
   if (nm) {
     let lineage = '';
     if (rec.derivedFrom) { const base = (rows || []).find(x => x.id === rec.derivedFrom); lineage = ' ← ' + (base ? base.name : rec.derivedFrom) }
-    nm.textContent = 'EDIT: ' + rec.name + lineage + ' · ' + rec.durationSec.toFixed(2) + 's · pk ' + rec.peak.toFixed(2);
+    const sliced = rec.derivedOp === 'slice' && rec.derivedParams ? ' · ' + (rec.derivedParams.pcts.length - 1) + ' slices' : '';
+    nm.textContent = 'EDIT: ' + rec.name + lineage + ' · ' + rec.durationSec.toFixed(2) + 's · pk ' + rec.peak.toFixed(2) + sliced;
   }
+  const asg = $('smpAssignSlices');
+  if (asg) asg.style.display = (rec.derivedOp === 'slice') ? '' : 'none';
+}
+
+/* assignSlicesToSteps (v0.11.0 P3) — the classic breakbeat move: fill the
+   SELECTED track's pattern with sequential slice locks (step i → slice
+   (i % nSlices) + 1, all steps ON). Locks ride the EXISTING per-step lock
+   channel (lock.smpSlice) — no new persistence surface. */
+function assignSlicesToSteps() {
+  const rec = editRows.find(x => x.id === editId);
+  if (!rec || rec.derivedOp !== 'slice' || !rec.derivedParams) { toast('SLICES: select a SLICED sample first (ED ▸ SLICE)'); return }
+  if (!I.p || I.selTrack == null || !I.p.tracks[I.selTrack]) { toast('SLICES: select a target track first'); return }
+  const pat = I.p.patterns && I.p.patterns[I.p.currentPattern];
+  const dk = pat && pat.data && pat.data[I.selTrack];
+  if (!dk || !Array.isArray(dk.steps) || !dk.steps.length) { toast('SLICES: the selected track has no pattern data'); return }
+  const nSlices = rec.derivedParams.pcts.length - 1;
+  pushHist();
+  for (let i = 0; i < dk.steps.length; i++) {
+    const st = dk.steps[i];
+    st.on = 1;
+    st.lock = Object.assign({}, st.lock || {}, { smpSlice: (i % nSlices) + 1 });
+  }
+  I.dirty = true; I.renderDirty = true;
+  after();
+  toast('SLICES → ' + (rec.name) + ' ✓ ' + dk.steps.length + ' steps filled with slices 1..' + nSlices + ' (cycling)');
 }
 
 async function applyDerive(op, params) {
@@ -291,6 +328,10 @@ function wireSamples() {
   if (gb) gb.onclick = () => applyDerive('gain', { factor: $('smpGainPct') ? ($('smpGainPct').value | 0) / 100 : 1 });
   if (nb) nb.onclick = () => applyDerive('normalize', {});
   if (rv) rv.onclick = () => applyDerive('reverse', {});
+  const sl = $('smpSliceB');
+  if (sl) sl.onclick = () => applyDerive('slice', {});
+  const asg = $('smpAssignSlices');
+  if (asg) asg.onclick = assignSlicesToSteps;
   if (drop) {
     drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = 'var(--acc,#4fd6c0)' });
     drop.addEventListener('dragleave', () => { drop.style.borderColor = '' });
