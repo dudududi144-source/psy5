@@ -68,6 +68,105 @@ export function reversedCopy(channels) {
   return channels.map(ch => { const o = new Float32Array(ch.length); for (let i = 0; i < ch.length; i++) o[i] = ch[ch.length - 1 - i]; return o });
 }
 
+/* ── v0.11.0 P2: DERIVED SAMPLES (non-destructive editing) ──
+   Edits NEVER mutate the base record: every op bakes a NEW PCM copy into a
+   NEW record whose id is DETERMINISTIC: fnv(baseId + ':' + op + ':' +
+   canonicalParams). Same base + op + params → SAME id → the store put
+   replaces (idempotent re-derivation). Derived-of-derived chains work
+   naturally (the id chains from the parent record's id — the effective
+   base). Base imports stay byte-immutable; deleting a derived record never
+   touches the base, and derived records carry their OWN PCM copies, so they
+   keep playing even if the base is later deleted (lineage display only). */
+export const DERIVE_MS_MAX = 2000;
+
+/* canonicalDeriveParams — clamp + round to the exact precision that feeds
+ * BOTH the id and the math (so the id always describes the actual PCM).
+ * fadein/fadeout: {ms} integer 0..2000 · gain: {factor} rounded to 0.001 in
+ * 0..2 · normalize/reverse: {} · unknown op → throw (tested). */
+export function canonicalDeriveParams(op, params) {
+  const p = params || {};
+  if (op === 'fadein' || op === 'fadeout') {
+    const ms = Math.max(0, Math.min(DERIVE_MS_MAX, Math.round(Number(p.ms) || 0)));
+    return { ms };
+  }
+  if (op === 'gain') {
+    const factor = Math.max(0, Math.min(2, Math.round((p.factor == null ? 1 : Number(p.factor)) * 1000) / 1000));
+    return { factor };
+  }
+  if (op === 'normalize' || op === 'reverse') return {};
+  throw new Error('unknown derive op: ' + op);
+}
+
+/* deriveId — deterministic content-lineage id (NOT content-of-PCM: two
+ * derivations of the same base+op+params land on one id; different bases
+ * never collide because baseId is part of the hash). */
+export function deriveId(baseId, op, params) {
+  return 'S' + fnv(String(baseId) + ':' + String(op) + ':' + JSON.stringify(params)).slice(0, 12);
+}
+
+function deriveTag(op, p) {
+  if (op === 'fadein') return 'fin' + p.ms;
+  if (op === 'fadeout') return 'fout' + p.ms;
+  if (op === 'gain') return 'g' + p.factor;
+  if (op === 'normalize') return 'norm';
+  return 'rev';
+}
+
+/* pcmFade — exact linear ramp: fade-in multiplies frame i (i < n) by i/n,
+ * fade-out multiplies the LAST n frames by (1 - i/n) with i counted from the
+ * ramp start. n = round(ms/1000·sampleRate) clamped to [0, len]; n = 0 or
+ * silent-length guards → exact copies. Pure: new arrays, input untouched. */
+export function pcmFade(channels, ms, sampleRate, fadeOut) {
+  const len = channels[0] ? channels[0].length : 0;
+  const n = Math.max(0, Math.min(len, Math.round((Math.max(0, ms) / 1000) * sampleRate)));
+  return channels.map(ch => {
+    const o = new Float32Array(ch.length);
+    for (let i = 0; i < ch.length; i++) {
+      let g = 1;
+      if (n > 0) {
+        if (!fadeOut && i < n) g = i / n;
+        else if (fadeOut && i >= ch.length - n) g = (ch.length - 1 - i) / n;
+      }
+      o[i] = ch[i] * g;
+    }
+    return o;
+  });
+}
+
+/* pcmGain — pure multiply (no clamping: the peak metadata reports the real
+ * value and NORMALIZE is the dedicated fix-up op). */
+export function pcmGain(channels, factor) {
+  return channels.map(ch => { const o = new Float32Array(ch.length); for (let i = 0; i < ch.length; i++) o[i] = ch[i] * factor; return o });
+}
+
+/* deriveSample — build the derived record (base untouched). addedAt is
+ * wall-clock metadata (allowed: non-musical, never part of the id). */
+export function deriveSample(rec, op, params) {
+  const p = canonicalDeriveParams(op, params);
+  const id = deriveId(rec.id, op, p);
+  let channels;
+  if (op === 'fadein') channels = pcmFade(rec.pcm, p.ms, rec.sampleRate, false);
+  else if (op === 'fadeout') channels = pcmFade(rec.pcm, p.ms, rec.sampleRate, true);
+  else if (op === 'gain') channels = pcmGain(rec.pcm, p.factor);
+  else if (op === 'normalize') channels = normalizePcm(rec.pcm, SAMPLE_CAPS.normalizePeak).channels;
+  else channels = reversedCopy(rec.pcm); /* reverse */
+  return {
+    id,
+    name: (String(rec.name || 'sample') + '·' + deriveTag(op, p)).slice(0, 32),
+    sampleRate: rec.sampleRate,
+    channels: rec.channels,
+    length: rec.length,
+    durationSec: rec.durationSec,
+    peak: peakOf(channels),
+    pcm: channels,
+    pcmReversed: reversedCopy(channels),
+    addedAt: Date.now(),
+    derivedFrom: rec.id,
+    derivedOp: op,
+    derivedParams: p,
+  };
+}
+
 /* guardImport — the documented import caps. Pure; the UI toasts the reason. */
 export function guardImport(fileBytes, durationSec) {
   if (!(fileBytes >= 1)) return { ok: false, reason: 'empty file' };

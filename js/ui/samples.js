@@ -6,7 +6,7 @@
    the only writer. Hydration pulls referenced samples into the live engine
    cache (missing → synth fallback + one-shot toast, Phase 2). */
 import { $, I, toast, pushHist } from '../state.js';
-import { createSampleStore, makeRecord, guardImport, referencedSampleIds, applySampleHints, SAMPLE_CAPS } from '../samplestore.js';
+import { createSampleStore, makeRecord, guardImport, referencedSampleIds, applySampleHints, SAMPLE_CAPS, deriveSample } from '../samplestore.js';
 import { armResample, captureStop, captureState } from './capture.js';
 import { resampleGuard } from '../capture.js';
 
@@ -116,6 +116,65 @@ async function resampleToStore(channels, meta) {
   } catch (e) { toast('RESAMPLE IMPORT FAILED — ' + (e && e.message || e)) }
 }
 
+/* ── v0.11.0 P2: SAMPLE EDITOR — waveform preview + derived versions ──
+   drawWave — deterministic min/max peaks per pixel bucket (ch0): the same
+   PCM always paints the same picture (no rng, no time). Slice markers
+   (P3) render on the same canvas. */
+let editId = null;
+let editRows = [];
+
+function drawWave(rec) {
+  const cv = $('smpWave');
+  if (!cv || !rec || !rec.pcm || !rec.pcm[0]) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, mid = H / 2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+  const d = rec.pcm[0], n = d.length, bucket = Math.ceil(n / W);
+  ctx.strokeStyle = '#4fd6c0';
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const s0 = x * bucket, s1 = Math.min(n, s0 + bucket);
+    if (s0 >= n) break;
+    let mn = d[s0], mx = d[s0];
+    for (let i = s0 + 1; i < s1; i++) { const v = d[i]; if (v < mn) mn = v; if (v > mx) mx = v }
+    ctx.moveTo(x + 0.5, mid - mx * (mid - 1));
+    ctx.lineTo(x + 0.5, mid - mn * (mid - 1));
+  }
+  ctx.stroke();
+}
+
+function selectEdit(rec, rows) {
+  editId = rec.id;
+  const cv = $('smpWave'), ed = $('smpEdit'), nm = $('smpEditName');
+  if (!cv || !ed) return;
+  drawWave(rec);
+  cv.style.display = ''; ed.style.display = '';
+  if (nm) {
+    let lineage = '';
+    if (rec.derivedFrom) { const base = (rows || []).find(x => x.id === rec.derivedFrom); lineage = ' ← ' + (base ? base.name : rec.derivedFrom) }
+    nm.textContent = 'EDIT: ' + rec.name + lineage + ' · ' + rec.durationSec.toFixed(2) + 's · pk ' + rec.peak.toFixed(2);
+  }
+}
+
+async function applyDerive(op, params) {
+  const rec = editRows.find(x => x.id === editId);
+  if (!rec) { toast('EDIT: select a sample first (ED button)'); return }
+  try {
+    const derived = deriveSample(rec, op, params);
+    const store = ensureStore();
+    const rows = await store.list();
+    if (!rows.find(x => x.id === derived.id) && rows.length >= SAMPLE_CAPS.maxCount) { toast('SAMPLE STORE FULL — ' + SAMPLE_CAPS.maxCount + ' rows cap; delete some first'); return }
+    await store.put(derived);
+    cacheSample(derived);
+    editId = derived.id;
+    selectEdit(derived, editRows.concat([derived]));
+    toast('DERIVED ✓ ' + derived.name + ' · pk ' + derived.peak.toFixed(2) + ' (base untouched)');
+    renderSamples();
+  } catch (e) { toast('DERIVE FAILED — ' + (e && e.message || e)) }
+}
+
 function audition(rec) {
   try {
     const ctx = I.ctx, eng = I.eng;
@@ -139,15 +198,20 @@ function renderSamples() {
     if (!rows.length) { $('smpBody').innerHTML = '<div class="note">No samples yet — IMPORT audio (wav/mp3/ogg/flac, ≤20s, ≤50MB) or drop files above. Samples live in IndexedDB; projects reference them by id.</div>'; updateMeta(rows); return }
     let html = '';
     rows.forEach(r => {
+      const base = r.derivedFrom ? rows.find(x => x.id === r.derivedFrom) : null;
       html += '<div style="display:flex;gap:4px;align-items:center;margin:3px 0;flex-wrap:wrap">'
         + '<span class="mono smpNm" style="font-size:10px;min-width:0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text" title="' + r.name + ' (double-click to rename)">' + r.name + '</span>'
+        + (base ? '<span class="mono" style="font-size:8px;color:var(--dim)" title="derived from ' + base.name + '">← ' + base.name + '</span>' : '')
         + '<span class="mono" style="font-size:9px;color:var(--dim)">' + r.durationSec.toFixed(2) + 's · ' + r.sampleRate + 'Hz · ' + r.channels + 'ch · pk ' + r.peak.toFixed(2) + '</span>'
         + '<button class="smpAud" data-id="' + r.id + '" title="audition through the live master">AUD</button>'
+        + '<button class="smpEd" data-id="' + r.id + '" title="waveform + derived edits (fade/gain/normalize/reverse — non-destructive)">ED</button>'
         + '<button class="smpDel" data-id="' + r.id + '" title="delete from the store (warns if a track references it)">✕</button>'
         + '</div>';
     });
     $('smpBody').innerHTML = html;
+    editRows = rows;
     $('smpBody').querySelectorAll('.smpAud').forEach(b => { b.onclick = () => { const r = rows.find(x => x.id === b.dataset.id); if (r) audition(r) } });
+    $('smpBody').querySelectorAll('.smpEd').forEach(b => { b.onclick = () => { const r = rows.find(x => x.id === b.dataset.id); if (r) selectEdit(r, rows) } });
     $('smpBody').querySelectorAll('.smpDel').forEach(b => {
       b.onclick = async () => {
         const id = b.dataset.id;
@@ -220,6 +284,13 @@ function wireSamples() {
     armResample(bars, resampleToStore);
   };
   const drop = $('smpDrop');
+  /* v0.11.0 P2 — derived-edit wiring (one store path, deterministic ids) */
+  const fin = $('smpFin'), fout = $('smpFout'), gb = $('smpGainB'), nb = $('smpNormB'), rv = $('smpRevB');
+  if (fin) fin.onclick = () => applyDerive('fadein', { ms: $('smpFadeMs') ? ($('smpFadeMs').value | 0) : 250 });
+  if (fout) fout.onclick = () => applyDerive('fadeout', { ms: $('smpFadeMs') ? ($('smpFadeMs').value | 0) : 250 });
+  if (gb) gb.onclick = () => applyDerive('gain', { factor: $('smpGainPct') ? ($('smpGainPct').value | 0) / 100 : 1 });
+  if (nb) nb.onclick = () => applyDerive('normalize', {});
+  if (rv) rv.onclick = () => applyDerive('reverse', {});
   if (drop) {
     drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = 'var(--acc,#4fd6c0)' });
     drop.addEventListener('dragleave', () => { drop.style.borderColor = '' });

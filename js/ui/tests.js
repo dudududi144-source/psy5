@@ -42,8 +42,8 @@ async function renderSteal(){const sr=44100,oc=new OfflineAudioContext(2,sr*7,sr
    the next kick, and zero automation events when every scAmount=0. */
 async function renderSidechain(scAmount){const sr=44100,oc=new OfflineAudioContext(2,sr*4,sr);const eng=new PooledEngine(oc);const p=buildStyle('PSYTRANCE',42);p.tracks.forEach((t,i)=>{t.mix.mute=i!==4;if(i===4){t.scAmount=scAmount;t.mix.vol=1}});eng.syncMix(p);const pat=p.patterns['A'];const sd=60/p.bpm/4;const kickT=[];let t=.05;for(let s=0;s<32;s++){if(s%4===0)kickT.push(t);for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}const buf=await oc.startRendering();return {buf,kickT,sd,eng,duckEvents:eng.duckEvents}}
 function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(d.length,end|0);for(let i=a;i<b;i++){s+=d[i]*d[i];n++}return n?Math.sqrt(s/n):0}
-/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 35 entries as of v0.11.0 P1) ──
- * MAIN engine, 35 entries on device — 33 hard (offline/pure, CI-asserted in
+/* ── CANONICAL GATE INVENTORY (Run 9 gate-truth hygiene; 36 entries as of v0.11.0 P2) ──
+ * MAIN engine, 36 entries on device — 34 hard (offline/pure, CI-asserted in
  * tools/e2e.mjs) + 2 evidence-only realtime gates (G17 live capture, G25
  * record song — ScriptProcessor tap on wall-clock; pass on-device, reported
  * as info in CI, never asserted there).
@@ -66,13 +66,14 @@ function winRMS(d,start,end){let s=0,n=0;const a=Math.max(0,start|0),b=Math.min(
  *   G34 sample voice (offline, v0.10.0)
  *   G35 per-track insert FX (offline, v0.10.0)
  *   G36 freeze track (offline, v0.11.0)
+ *   G37 sample editor (pure+store, v0.11.0)
  * WORKLET reduced set: 3 entries (G2, G14w, G15w) — offline worklet renders.
  * NUMBERING GAPS (documented, never renumbered — all historical evidence
  * cites these ids): G3, G4, G7 and G20 have NEVER existed in any shipped
  * commit (git log -S across all history); the sequence was assigned
  * topically and the gaps were left reserved-but-unused.
  * The device summary line "N/29" counts entries; the honest hard-pass count
- * cited in README/CI is 33 (35 − G17 − G25). */
+ * cited in README/CI is 34 (36 − G17 − G25). */
 async function runSelfGate(){$('log').innerHTML='';GATE_RES.length=0;if(I.engine==='worklet'){logLine('info','== PSY6 SELF-GATE — WORKLET engine (reduced but real: G2 + G14w + G15w) ==');await gateWorklet()}else{logLine('info','== PSY6 SELF-GATE — MAIN pooled engine (OfflineAudioContext) ==');for(const st of['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE']){try{const buf=await renderGenre(st);const pk=peakOf(buf);gate('G1-'+st,st+' renders non-silent audio',pk>0.05,'peak='+pk.toFixed(3))}catch(e){gate('G1-'+st,st+' renders non-silent audio',false,'ERR '+e.message)}}const h1=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));const h2=fnv(JSON.stringify(buildStyle('PSYTRANCE',42)));gate('G2','genre build deterministic (same seed = same hash)',h1===h2,'hash='+h1.slice(0,12));if(!I.p)I.p=buildStyle('TECHNO',1);const saved=saveProject();const loaded=loadStored();gate('G5','save/load byte-exact',saved.ok&&loaded&&JSON.stringify(loaded)===JSON.stringify(I.p),'round-trip');const c0=(I.p.tracks[5].sound.cutoff)||0;PERF.macro(M_ENERGY,1.0);const c1=I.p.tracks[5].sound.cutoff;PERF.macro(M_ENERGY,0.5);gate('G6','macro ENERGY resolves to real cutoff state',Math.abs(c1-c0)>1,'cutoff '+Math.round(c0)+'->'+Math.round(c1));gate('G8','voice pools pre-allocated',SYNTH_VOICES>0&&DRUM_VOICES>0,'synth='+SYNTH_VOICES+' drum='+DRUM_VOICES);try{const {buf,eng}=await renderSteal();const kicks=eng.trackCount[0],hats=eng.trackCount[2];const steals=eng.stealCount[1]+eng.stealCount[2]+eng.stealCount[3];const pk=peakOf(buf);const ok9=kicks===16&&hats===64&&eng.tier0StealAttempts===0&&steals>0&&pk>0.05;gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',ok9,'kicks='+kicks+'/16 hats='+hats+'/64 tier0Steals='+eng.tier0StealAttempts+' steals(h1/h2/h3)='+eng.stealCount[1]+'/'+eng.stealCount[2]+'/'+eng.stealCount[3]+' peak='+pk.toFixed(3))}catch(e){gate('G9','64 hats + kick every 4th step: kick never dropped, zero tier-0 voice starvation',false,'ERR '+e.message)}
 /* G10 — co-pilot learner (foundation/learning/bandit.mjs): scripted 50-decision
    session where FILL always rewards 1 and VARIATION always 0 → the learner
@@ -832,6 +833,47 @@ const framesOk=fB.frames===win.frames&&fB.frames===outR.channels[0].length;
 const relDiff=Math.abs(rmsB-rmsF)/Math.max(rmsF,1e-9);
 const ok36=formulaOk&&dI<1e-6&&dD<1e-6&&rmsF>0.005&&framesOk&&dX<1e-6&&relDiff<0.45&&rmsB>0.42*rmsF&&oR>=0&&Math.abs(oR-oF)<500;
 gate('G36','freeze track: pipeline == independent prep+render+trim (maxDiff<1e-6), determinism (maxDiff<1e-6), frames == freezeWindow formula, sample-track freeze == its plain render (maxDiff<1e-6), re-freeze RMS within the measured double-master bound (-7.5 dB), onset aligned <500f, non-silent',ok36,'frames='+f1.frames+'/'+win.frames+' dPipe='+dI.toExponential(2)+' dDet='+dD.toExponential(2)+' dExact='+dX.toExponential(2)+' rmsF='+rmsF.toFixed(4)+' rmsB='+rmsB.toFixed(4)+' rel='+(relDiff*100).toFixed(2)+'% onset '+oF+'\u2192'+oR+' nonSilent='+(rmsF>0.005))}catch(e){gate('G36','freeze track',false,'ERR '+e.message)}
+/* G37 — SAMPLE EDITOR (offline/pure — CI-asserted, v0.11.0 P2):
+   (a) FADE MATH ON AUDIO: a 440 Hz tone record → fade-in 300 ms derivation →
+       the onset region (first half of the ramp) is < 60% of the sustain
+       region RMS (linear ramp average gain 0.25 over the first half — logged);
+   (b) IDEMPOTENCE: two derivations of base+op+params → SAME id + byte-
+       identical PCM (maxDiff 0);
+   (c) CHAIN: gain 0.5 → reverse resolves (derivedFrom === d1.id), memory-
+       backend round-trip returns byte-identical PCM, re-derivation is
+       idempotent in the store (row count stable);
+   (d) BASE IMMUTABILITY: the base record's PCM is byte-identical after
+       every op. */
+try{
+const S37=await import('/js/samplestore.js');
+const ch37=new Float32Array(22050);
+for(let i=0;i<ch37.length;i++)ch37[i]=Math.sin(2*Math.PI*440*i/44100)*0.5;
+const rec37=S37.makeRecord('g37tone',44100,[ch37],{normalize:false,addedAt:0});
+const dFade=S37.deriveSample(rec37,'fadein',{ms:300});
+const n37=Math.round(0.3*44100);
+const rmsWin37=(d,a,b)=>{let s=0,c=0;for(let i=a;i<Math.min(b,d.length);i++){s+=d[i]*d[i];c++}return c?Math.sqrt(s/c):0};
+const onsetR=rmsWin37(dFade.pcm[0],0,Math.round(n37/2)),sustR=rmsWin37(dFade.pcm[0],n37,dFade.pcm[0].length);
+const fadeOk=onsetR>0&&onsetR<0.6*sustR;
+const d2=S37.deriveSample(rec37,'fadein',{ms:300});
+let dId37=0;for(let i=0;i<dFade.pcm[0].length;i++){const e=Math.abs(dFade.pcm[0][i]-d2.pcm[0][i]);if(e>dId37)dId37=e}
+const idemOk=dFade.id===d2.id&&dId37===0;
+const d1c=S37.deriveSample(rec37,'gain',{factor:0.5});
+const d2c=S37.deriveSample(d1c,'reverse',{});
+const store37=S37.createSampleStore(S37.memoryBackend());
+await store37.put(rec37);await store37.put(d1c);await store37.put(d2c);
+const got=await store37.get(d2c.id);
+let dRt=0;if(got)for(let i=0;i<d2c.pcm[0].length;i++){const e=Math.abs(got.pcm[0][i]-d2c.pcm[0][i]);if(e>dRt)dRt=e}
+await store37.put(S37.deriveSample(rec37,'fadein',{ms:100}));
+const cnt1=(await store37.list()).length;
+await store37.put(S37.deriveSample(rec37,'fadein',{ms:100}));
+const cnt2=(await store37.list()).length;
+const chainOk=d2c.derivedFrom===d1c.id&&!!got&&dRt===0&&cnt1===cnt2;
+const before37=rec37.pcm[0].slice();
+S37.deriveSample(rec37,'fadeout',{ms:200});S37.deriveSample(rec37,'normalize',{});S37.deriveSample(rec37,'reverse',{});
+let dBase=0;for(let i=0;i<rec37.pcm[0].length;i++){const e=Math.abs(rec37.pcm[0][i]-before37[i]);if(e>dBase)dBase=e}
+const immutOk=dBase===0;
+const ok37=fadeOk&&idemOk&&chainOk&&immutOk;
+gate('G37','sample editor: fade-in derivation drops onset-region RMS below 60% of sustain (linear ramp), two derivations of base+op+params are byte-identical with the same id, 2-step chain resolves through the store (round-trip byte-exact, re-derivation idempotent), base PCM immutable after every op',ok37,'onset/sustain='+(onsetR/sustR).toFixed(3)+' idemMaxDiff='+dId37+' chain='+(d2c.derivedFrom===d1c.id)+' rtMaxDiff='+dRt+' rowsStable='+(cnt1===cnt2)+' baseMaxDiff='+dBase)}catch(e){gate('G37','sample editor',false,'ERR '+e.message)}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
