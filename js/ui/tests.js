@@ -5,7 +5,7 @@ import { songMidi } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
 import { createMidiCore, emptyMidiMap } from '../midi.js';
 import { PooledEngine } from '../engine.js';
-import { buildStyle, libFind, assignPresetToTrack, addTrackToProject } from '../presets.js';
+import { buildStyle, libFind, libFilter, assignPresetToTrack, addTrackToProject, KITS } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval, SCALES } from '../model.js';
 import { recordPoint, quantStep, applyLanes } from '../autorec.js';
 import { compose, minVariantDiff, VARIANT_DIFF_MIN, COMPOSER_STYLES } from '../composer.js';
@@ -940,7 +940,7 @@ gate('G38','slices: deterministic detector hits >=90% of truth transients within
    hat   — bright: spectral centroid >= 6 kHz (v1 13103 / v2 12249);
            METALLIC: the top-8 peaks in 5–15 kHz form an INHARMONIC
            lattice — gap irregularity (cv of the 7 consecutive gaps)
-           >= .2, while a degenerate square comb (rim, tune .3, measured
+           >= .2, while a degenerate square comb (raw 525 Hz square, measured
            live in this gate) scores cv <= .1 (uniform gaps);
    clap  — multi-burst: >= 4 envelope bursts with an 8 ms refractory
            (v1 = 3 — the four-burst structure is the v2 change);
@@ -961,12 +961,14 @@ if(onset<0)return{peak:0,subRatio:0,toneRatio:0,noiseRatio:0,centroid:0,cv:0,dif
 let FW=2048;const sup=last+1-onset;if(sup<FW*1.5)FW=512;const hop=FW/2,bins=new Float64Array(FW/2),win=new Float64Array(FW);for(let i=0;i<FW;i++)win[i]=.5-.5*Math.cos(2*Math.PI*i/(FW-1));const seg=new Float64Array(FW);let frames=0;for(let st=onset;st+FW<=Math.min(N,last+1);st+=hop){for(let i=0;i<FW;i++)seg[i]=d[st+i]*win[i];const re=new Float64Array(FW),im=new Float64Array(FW);re.set(seg);fft39(re,im);for(let k=1;k<FW/2;k++)bins[k]+=Math.sqrt(re[k]*re[k]+im[k]*im[k]);frames++}
 if(!frames){for(let i=0;i<Math.min(FW,sup);i++)seg[i]=d[onset+i]*win[i];const re=new Float64Array(FW),im=new Float64Array(FW);re.set(seg);fft39(re,im);for(let k=1;k<FW/2;k++)bins[k]=Math.sqrt(re[k]*re[k]+im[k]*im[k]);frames=1}
 for(let k=1;k<bins.length;k++)bins[k]/=frames;const binHz=SR39/FW;let sum=0,wsum=0,sub=0,tot=0,tone=0,noise=0;for(let k=1;k<bins.length;k++){const m=bins[k],f=k*binHz;sum+=m;wsum+=f*m;tot+=m*m;if(f<150)sub+=m*m;if(f>=150&&f<=1500)tone+=m*m;if(f>=2000&&f<=8000)noise+=m*m}
-/* top-8 peaks in 5–15 kHz (local maxima, adjacent-bin dedup) + gap
-   irregularity: a HARMONIC voice is one comb — consecutive peak gaps are
-   all equal (cv = std/mean of the 7 gaps ≈ 0); the metallic stack mixes
-   SIX inharmonic square families — gaps are irregular (cv high). This is
-   the harmonic-incoherence test: cv >= .2 asserts inharmonicity. */
-const pk=[];for(let k=Math.round(5000/binHz);k<Math.min(bins.length,Math.round(15000/binHz))-1;k++)if(bins[k]>bins[k-1]&&bins[k]>=bins[k+1])pk.push([bins[k],k*binHz]);pk.sort((a,b)=>b[0]-a[0]);const top=pk.slice(0,8).map(x=>x[1]).sort((a,b)=>a-b);
+/* spectral peaks in 5–15 kHz (local maxima, up to 16 strongest, then
+   frequency-sorted) + gap irregularity: a HARMONIC voice is ONE comb —
+   consecutive peak gaps are uniform (cv = std/mean ≈ 0); the metallic
+   stack mixes SIX inharmonic square families — gaps are irregular (cv
+   high). cv >= .2 asserts inharmonicity; taking ALL detected peaks (not
+   a fixed top-8) avoids the arbitrary-drop double-gap artifact on sparse
+   combs. */
+const pk=[];for(let k=Math.round(5000/binHz);k<Math.min(bins.length,Math.round(15000/binHz))-1;k++)if(bins[k]>bins[k-1]&&bins[k]>=bins[k+1])pk.push([bins[k],k*binHz]);pk.sort((a,b)=>b[0]-a[0]);const top=pk.slice(0,16).map(x=>x[1]).sort((a,b)=>a-b);
 let cv=0;if(top.length>=4){const gaps=[];for(let i=1;i<top.length;i++)gaps.push(top[i]-top[i-1]);const mean=gaps.reduce((a,b)=>a+b,0)/gaps.length;if(mean>0){const va=gaps.reduce((a,b)=>a+(b-mean)*(b-mean),0)/gaps.length;cv=Math.sqrt(va)/mean}}
 const n6=Math.min(Math.round(.006*SR39),N-onset);let se=0;for(let i=1;i<n6;i++){const h=d[onset+i]-d[onset+i-1];se+=h*h}const diff6=Math.sqrt(se/Math.max(n6-1,1));
 const zcr=span=>{const n=Math.min(Math.round(span*SR39),N-onset);let c=0;for(let i=1;i<n;i++)if((d[onset+i-1]<0)!==(d[onset+i]<0))c++;return c/(n/SR39)};
@@ -977,10 +979,11 @@ for(const[nm,sd]of Object.entries({kick:{type:'kick',tune:.9,decay:.6,tone:1,pun
 b39[nm]=await hit39(sd,1.6);m39[nm]=an39(b39[nm].getChannelData(0));
 /* determinism: fresh-context re-render → PCM maxDiff */
 const b2=await hit39(sd,1.6);const a=b39[nm].getChannelData(0),bb=b2.getChannelData(0);for(let i=0;i<Math.min(a.length,bb.length);i++){const e2=Math.abs(a[i]-bb[i]);if(e2>det39)det39=e2}}
-/* the degenerate harmonic reference: a low-tuned square voice (rim, tune .3
-   → 525 Hz comb) must score cv ≈ 0 (uniform comb gaps) — proves the
-   incoherence test bites on a harmonic voice */
-m39.rimRef=an39((await hit39({type:'rim',tune:.3,decay:1,tone:1.5,punch:0},.5)).getChannelData(0));
+/* the degenerate harmonic reference: a RAW square oscillator (525 Hz comb,
+   rendered outside the engine — voices may evolve, a pure comb never does)
+   must score cv ≈ 0 (uniform gaps) — proves the incoherence test bites on
+   harmonic lattices */
+{const rc=new OfflineAudioContext(1,Math.round(SR39*.5),SR39);const ro=rc.createOscillator();ro.type='square';ro.frequency.value=525;ro.connect(rc.destination);ro.start(.05);ro.stop(.45);m39.rimRef=an39((await rc.startRendering()).getChannelData(0))}
 const K=m39.kick,S=m39.snare,H=m39.hatC,C=m39.clap;
 const kickOk=K.subRatio>=.45&&K.diff6>=.05&&K.zcr10>K.zcr30;
 const hatOk=H.centroid>=6000&&H.cv>=.2&&m39.rimRef.cv<=.1&&H.cv>m39.rimRef.cv;
@@ -988,7 +991,62 @@ const clapOk=C.bursts>=4;
 const snareOk=S.toneRatio>=.04&&S.noiseRatio>=.04;
 const detOk=det39<1e-6;
 const ok39=kickOk&&hatOk&&clapOk&&snareOk&&detOk;
-gate('G39','drum engine v2: kick sub>=.45 + click diff6>=.05 (v1 .0151) + pitch-env ZCR descent; hat centroid>=6k + inharmonic (gap cv>=.2; degenerate square comb cv<=.1); clap >=4 bursts (v1=3); snare dual-band >=.04; all four voices deterministic maxDiff<1e-6',ok39,'kick sub='+K.subRatio+' diff6='+K.diff6+'(v1 .0151) zcr '+K.zcr10+'>'+K.zcr30+' | hat c='+H.centroid+' cv='+H.cv+'(rim cv='+m39.rimRef.cv+') | clap b='+C.bursts+'(v1 3) | snare t='+S.toneRatio+' n='+S.noiseRatio+' | detMaxDiff='+det39.toExponential(2))}catch(e){gate('G39','drum engine v2',false,'ERR '+e.message)}
+gate('G39','drum engine v2: kick sub>=.45 + click diff6>=.05 (v1 .0151) + pitch-env ZCR descent; hat centroid>=6k + inharmonic (peak-gap cv>=.2; degenerate square comb cv<=.1); clap >=4 bursts (v1=3); snare dual-band >=.04; all four voices deterministic maxDiff<1e-6',ok39,'kick sub='+K.subRatio+' diff6='+K.diff6+'(v1 .0151) zcr '+K.zcr10+'>'+K.zcr30+' | hat c='+H.centroid+' cv='+H.cv+'(rim cv='+m39.rimRef.cv+') | clap b='+C.bursts+'(v1 3) | snare t='+S.toneRatio+' n='+S.noiseRatio+' | detMaxDiff='+det39.toExponential(2))}catch(e){gate('G39','drum engine v2',false,'ERR '+e.message)}
+/* G40 — PERCUSSION v2 + LIBRARY (offline — CI-asserted, v0.12.0 P2):
+   LIBRARY BREADTH: the factory library holds >= 150 presets and >= 100
+   drum presets, unique ids, genre coverage 8/8 (PSYTRANCE, DARK-PSY, GOA,
+   FULL-ON, TECHNO, TRANCE, PROGRESSIVE, HI-TECH), and EVERY preset passes
+   the schema check (id/name/genre/cat/engine + known drum type + numeric
+   params in sane ranges). KITS: 8 kits, every kit role resolves through
+   libFind. NEW-VOICE SPECTRAL EVIDENCE (solo offline hits, Phase-0
+   methodology): tom pitch sweep present (ZCR descends across the hit),
+   cowbell dual-square partials (energy in both the 560 and 845 Hz bands),
+   zap monotone descent (windowed ZCR strictly decreasing), boom sub-band
+   dominance (<120 Hz ratio > .8). DETERMINISM: tom/cowbell/zap re-rendered
+   fresh → maxDiff < 1e-6 (through-graph Chrome standard, G39 note). */
+try{
+const all40=libFilter('all','ALL');const drums40=all40.filter(x=>x.cat==='drum');
+const ids40=new Set(all40.map(x=>x.id));
+const uniq40=ids40.size===all40.length;
+const GEN40=['PSYTRANCE','DARK-PSY','GOA','FULL-ON','TECHNO','TRANCE','PROGRESSIVE','HI-TECH'];
+const genMissing=GEN40.filter(g=>!all40.some(x=>x.genre===g));
+const TYPES40=new Set(['kick','snare','clap','hatC','hatO','tom','rim','glitch','shaker','conga','bongo','cowbell','clave','zap','boom','riser','impact']);
+const cl2=(v,a,b)=>v>=a&&v<=b;
+const bad40=all40.filter(x=>!x.id||!x.name||!x.genre||!x.cat||(x.engine!=='DRUM'&&x.engine!=='SYNTH')||(x.cat==='drum'&&(!TYPES40.has(x.type)||!cl2(x.tune??.1,.3,2)||!cl2(x.decay??.5,.1,4)||!cl2(x.tone??1,.3,2.5)||!cl2(x.punch??0,0,1))));
+const kits40=Object.keys(KITS||{});
+const kitsOk=kits40.length===8&&kits40.every(k=>{const roles=KITS[k];return['kick','snare','hat','perc','bass','lead','pad','arp','fx'].every(r=>libFind(roles[r]))});
+const libOk=all40.length>=150&&drums40.length>=100&&uniq40&&genMissing.length===0&&bad40.length===0&&kitsOk;
+/* new-voice spectral evidence */
+const SR4=44100;
+const hit4=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR4*dur),SR4);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g40',name:'g40',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
+const zcrWin=(d,a,b)=>{let z=0;for(let i=a+1;i<b;i++)if((d[i-1]<0)!==(d[i]<0))z++;return z/Math.max((b-a)/SR4,1)};
+const dTom=(await hit4({type:'tom',tune:1.1,decay:.7,tone:1,punch:0},1)).getChannelData(0);
+const w40=(t)=>Math.round(t*SR4);
+const tomZ=[zcrWin(dTom,w40(.05),w40(.09)),zcrWin(dTom,w40(.09),w40(.13)),zcrWin(dTom,w40(.13),w40(.17)),zcrWin(dTom,w40(.17),w40(.21))];
+const tomOk=tomZ[0]>=tomZ[1]&&tomZ[1]>=tomZ[2]&&tomZ[2]>=tomZ[3]&&tomZ[0]>tomZ[3];
+const dCow=(await hit4({type:'cowbell',tune:1,decay:1,tone:1,punch:0},.6)).getChannelData(0);
+/* dual-square partials: exact DFT (Goertzel) at 560 and 845 Hz — both must
+   reach >= 50% of the strongest partial in the 200-2000 Hz coarse scan */
+const mag4=(d,f)=>{let re=0,im=0;const a0=w40(.05);for(let i=0;i<16384;i++){const ph=2*Math.PI*f*i/SR4;re+=d[a0+i]*Math.cos(ph);im-=d[a0+i]*Math.sin(ph)}return Math.sqrt(re*re+im*im)/8192};
+let cowMax=0;for(let f=200;f<=2000;f+=25){const m=mag4(dCow,f);if(m>cowMax)cowMax=m}
+const cowA=mag4(dCow,560),cowB=mag4(dCow,845);
+const cowOk40=cowA>=.5*cowMax&&cowB>=.5*cowMax;
+const dZap=(await hit4({type:'zap',tune:1,decay:.8,tone:1,punch:0},.6)).getChannelData(0);
+const zapZ=[zcrWin(dZap,w40(.05),w40(.08)),zcrWin(dZap,w40(.08),w40(.11)),zcrWin(dZap,w40(.11),w40(.14)),zcrWin(dZap,w40(.14),w40(.17)),zcrWin(dZap,w40(.17),w40(.2))];
+let zapDesc=0;for(let i=0;i<4;i++)if(zapZ[i]>zapZ[i+1])zapDesc++;
+const zapOk=zapDesc>=4;
+const dBoom=(await hit4({type:'boom',tune:.9,decay:1,decay2:0,tone:1,punch:0},1.8)).getChannelData(0);
+let subB=0,totB=0;for(let i=w40(.05);i<dBoom.length;i++){totB+=dBoom[i]*dBoom[i]}
+{const bw2=(lo,hi)=>{let e=0;for(let i=0;i<8192;i++){const t=i/SR4;const w=.5-.5*Math.cos(2*Math.PI*i/8191);const s=dBoom[w40(.05)+i]*(Math.cos(2*Math.PI*lo*t)-Math.cos(2*Math.PI*hi*t));e+=s*s}return e};subB=bw2(20,120)/Math.max(totB,1e-12)}
+const boomOk=subB>.8;
+/* determinism on the new voices */
+let det40=0;
+for(const sd of [{type:'tom',tune:1.1,decay:.7,tone:1,punch:0},{type:'cowbell',tune:1,decay:1,tone:1,punch:0},{type:'zap',tune:1,decay:.8,tone:1,punch:0}]){
+const a=(await hit4(sd,1)).getChannelData(0),b=(await hit4(sd,1)).getChannelData(0);for(let i=0;i<Math.min(a.length,b.length);i++){const e=Math.abs(a[i]-b[i]);if(e>det40)det40=e}}
+const detOk40=det40<1e-6;
+const ok40=libOk&&tomOk&&cowOk40&&zapOk&&boomOk&&detOk40;
+gate('G40','percussion v2 + library: >=150 presets (>=100 drums), unique ids, genres 8/8, schema-valid, 8 kits resolve; tom pitch sweep (ZCR monotone), cowbell dual-square partials, zap monotone descent, boom sub>0.8; new voices deterministic maxDiff<1e-6',ok40,'lib='+all40.length+'('+drums40.length+' drums) badSchema='+bad40.length+' kits='+kits40.length+'/8 | tomZ='+tomZ.map(x=>x.toFixed(0)).join('/')+' cowA='+cowA.toFixed(3)+' cowB='+cowB.toFixed(3)+' cowMax='+cowMax.toFixed(3)+' zapDesc='+zapDesc+'/4 sub='+subB.toFixed(2)+' det='+det40.toExponential(2))}catch(e){gate('G40','percussion v2 + library',false,'ERR '+e.message)}
+
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

@@ -18,10 +18,10 @@
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 export type EngineType = 'DRUM' | 'SYNTH' | 'FM' | 'NOISE' | 'WAVETABLE';
-export type DrumType = 'kick' | 'snare' | 'clap' | 'hatC' | 'hatO' | 'tom' | 'rim' | 'glitch' | 'shaker' | 'riser' | 'impact' | 'downlifter';
+export type DrumType = 'kick' | 'snare' | 'clap' | 'hatC' | 'hatO' | 'tom' | 'rim' | 'glitch' | 'shaker' | 'conga' | 'bongo' | 'cowbell' | 'clave' | 'zap' | 'boom' | 'riser' | 'impact' | 'downlifter';
 export type FilterType = 'lowpass' | 'highpass' | 'bandpass' | 'notch' | 'allpass';
 export type Category = 'drum' | 'bass' | 'lead' | 'pad' | 'pluck' | 'arp' | 'fx' | 'texture';
-export type Genre = 'PSYTRANCE' | 'TECHNO' | 'TRANCE' | 'PROGRESSIVE' | 'DARK-PSY' | 'GOA' | 'ANY';
+export type Genre = 'PSYTRANCE' | 'TECHNO' | 'TRANCE' | 'PROGRESSIVE' | 'DARK-PSY' | 'GOA' | 'FULL-ON' | 'HI-TECH' | 'ANY';
 export type LFODest = 'off' | 'cutoff' | 'pitch' | 'gain' | 'pan';
 
 export interface SoundPreset {
