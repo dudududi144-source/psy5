@@ -111,9 +111,10 @@ reproducible with the command shown next to it.
 
 ### Gates
 
-- Self-Gate inventory: **38 entries = 36 HARD (CI e2e 35/35 asserted ids +
-  G2×… — the canonical list lives in js/ui/tests.js) + 2 evidence-only
-  realtime (G17, G25)**. New HARD gates: G36 (freeze), G37 (editor), G38
+- Self-Gate inventory: **37 entries = 35 HARD (CI e2e asserts all 35 — the
+  canonical list lives in js/ui/tests.js) + 2 evidence-only realtime (G17,
+  G25)**. Production Self-Gate from https://dudududi144-source.github.io/psy5/
+  (first ever): **37/37 passed**. New HARD gates: G36 (freeze), G37 (editor), G38
   (slices). G3/G4/G7/G20 never existed — unchanged, never renumbered.
 - Battery at release: `bun test` → **420 pass / 0 fail** across 36 files
   (356,314 expect() calls). `tools/verify.mjs` GREEN (SW lock
@@ -938,9 +939,10 @@ reproducible with the command shown next to it.
 
 ### Gates
 
-- Self-Gate inventory: **38 entries = 36 HARD (CI e2e 35/35 asserted ids +
-  G2×… — the canonical list lives in js/ui/tests.js) + 2 evidence-only
-  realtime (G17, G25)**. New HARD gates: G36 (freeze), G37 (editor), G38
+- Self-Gate inventory: **37 entries = 35 HARD (CI e2e asserts all 35 — the
+  canonical list lives in js/ui/tests.js) + 2 evidence-only realtime (G17,
+  G25)**. Production Self-Gate from https://dudududi144-source.github.io/psy5/
+  (first ever): **37/37 passed**. New HARD gates: G36 (freeze), G37 (editor), G38
   (slices). G3/G4/G7/G20 never existed — unchanged, never renumbered.
 - Battery at release: `bun test` → **420 pass / 0 fail** across 36 files
   (356,314 expect() calls). `tools/verify.mjs` GREEN (SW lock

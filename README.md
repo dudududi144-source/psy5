@@ -114,8 +114,8 @@ Honest subset classification (v0.4.0):
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
 Gate-truth accounting (v0.11.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **38 MAIN entries**, of
-which **36 are hard** (offline/pure — CI asserts 35 ids incl. G24 song
+`runSelfGate()` in js/ui/tests.js): the device runs **37 MAIN entries**, of
+which **35 are hard** (offline/pure — CI asserts all 35 ids incl. G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
 voice, G35 insert FX, G36 freeze, G37 editor, G38 slices) and
