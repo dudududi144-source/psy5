@@ -142,6 +142,22 @@ DrumVoice (v0.12.0 — multi-layer; every layer zeroed at the hit anchor,
   ZAP    osc glide 1600*tune -> 70*tune + BP chirp 4000 -> 200
   BOOM   osc sub drop 70*tune -> 28 + LP 400 touch (reverb-ready tail)
   IMPACT osc sub 60->30 + osc2 triangle body 120->55
+  DARBUKA (v0.14.0) osc2 triangle DUM sweep 1.5*f0->f0 (165 Hz base, 45 ms
+         bend) + osc sine TEK ping 690->560*tune + BP snap 4200*tone
+  TAMBOURINE (v0.14.0) metal stack at 95 Hz base -> BP 8.2k ->
+         HP(5600*sqrt(tone)) + osc sine membrane thump 195*tune
+  TRIANGLE (v0.14.0) metal stack at 205 Hz base -> BP 10.5k -> HP 3.2k,
+         TWO-stage decay (fast set-down then long ring; decay maps ring)
+  DOWNLIFTER (v0.14.0) noise HP 6.2k -> 180 (exponential descent) +
+         osc sine 180*tune -> 42 (the riser's mirror)
+  v0.14.0 optional params (all legacy-neutral — absent = exact v0.13.1):
+    kick dist 0..1 (lazy drive gain 1+5.5*d^2 into the EXISTING shaper,
+         node built on first use, rerouted via connect()),
+    kick glide 0..1 (SUB pitch-env start += 2.6*f0),
+    clap bursts 2..6 (precomputed CLAP_B/CLAP_D tables; nb=4 = the exact
+         v0.12.0 arrays — Chrome truncates overlapping ramps, so middle
+         bursts render as damped ripples: honest, deterministic),
+    hat bright 0.5..2 (BP corner *= sqrt(bright))
 
 Master chain (v0.12.0 P3):
   master -> [width network] -> EQ3 -> [glue comp -> makeup] -> comp -> analyser -> destination
@@ -190,7 +206,7 @@ UI OPTIONS EXPOSURE (v0.13.1) — the v0.12.0/v0.13.0 engine capabilities get
   byte-untouched). A11y: all labels associated (for= / nesting /
   aria-label) — G45 pins the whole exposure contract with numbers.
 
-Library: 250 presets (133 drums + 72 gen:'v13' synths), unique ids,
+Library: 310 presets (193 drums + 117 synths), unique ids,
 schema-validated (G40 +
 tests/v2-library.test.ts). KITS: 8 layered per-genre kits mapping the 9
 composer roles {kick, snare, hat, perc, bass, lead, pad, arp, fx} to

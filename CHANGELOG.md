@@ -3,6 +3,101 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.14.0] — Run 20d: DRUM v2 params + 4 new percussion voices + drum track editor (sounds + options)
+
+> The owner's standing brief: keep adding higher-level sounds ("יש להמשיך
+> להוסיף סאונדים ברמה גבוהה יותר"), keep the choice surface growing, and
+> keep the load/latency discipline. v0.14.0 answers on the DRUM side — the
+> side the owner flagged originally: four OPTIONAL drum params, four new
+> voices, a real drum-track editor, and the library 250 → 310. Commands:
+> `bun test` (441 tests / 39 files), `node tools/verify.mjs`,
+> `bun tools/e2e.mjs` (44/44 HARD — G46/G47 new).
+
+### DRUM v2 params — four OPTIONAL fields, every one legacy-neutral
+
+Absence of the field renders EXACTLY v0.13.1 (gate-asserted, see G47
+neutral: maxDiff < 1e-6; fresh voices never even build the drive node):
+
+| param | voice | meaning | legacy default (absent) |
+|---|---|---|---|
+| `dist` | kick | drive 1 → 6.5 (quadratic law) into the EXISTING tanh shaper (lazy node + reroute on first use) | 0 = exact fixed path |
+| `glide` | kick | SUB pitch-env start += 2.6×f0 | 0 = exact v0.13.1 start |
+| `bursts` | clap | burst count 2..6 from precomputed tables | 4 = the EXACT v0.12.0 arrays |
+| `bright` | hat | BP corner ×√bright | 1 = exact 10 kHz corner |
+
+G47 evidence (solo hits, fresh offline contexts, the G39/G42 methodology):
+dist RMS **×2.12** the same kick without (audible, maxDiff .45); glide
+sub-register centroid (30–400 Hz, first 46 ms) **136/111 = 1.23**; bursts
+mid-span (20–44 ms post-hit) RMS **×7.2** the nb=2 render (bursts at
+25/34 ms where nb=2 is silent) plus audible maxDiff .12; bright 9–14 kHz
+band share **0.410 vs 0.272**; ALL four neutral pairs maxDiff < 1e-6;
+determinism **0.0**. Honest DSP note (documented in ARCHITECTURE): Chrome
+truncates overlapping envelope ramps, so clap bursts 5–6 render as DAMPED
+RIPPLES between the first burst and the tail — deterministic, audible as a
+roll, and the gate measures what the engine really does.
+
+### FOUR NEW PERCUSSION VOICES — including the goa-lineage goblet drum
+
+- **darbuka** — DUM body (triangle sweep 1.5×f0→f0 at a 165 Hz base, 45 ms
+  bend) + TEK (sine ping 690→560 Hz + bandpass snap 4.2 kHz). G46: the low
+  band dominates the snap band **0.506 vs 0.046**.
+- **tambourine** — the metal stack at a 95 Hz base (shell-resonance
+  partials) + membrane thump; tone leans jingle vs skin. G46: 5–9 kHz
+  dominates 150–400 Hz **0.405 vs 0.139**.
+- **triangle** — struck-rod 2-stage ring: metal stack at 205 Hz, fast
+  set-down then long decay (decay maps the ring, up to 4.1 s). G46: the
+  0.8–2.2 s window holds **.115×** the early RMS (a one-shot sits <5%).
+- **downlifter** — the riser's mirror, closing sections (declared in the
+  soundBank type union since v0.10, implemented only now): noise highpass
+  descends 6.2k→180 Hz while a sine drops 180→42. G46: the 100–1000 Hz
+  band **drains ~1e4×** (the sweep descends through and below it —
+  broadband shares stay flat, so the gate measures absolute band RMS).
+
+All four: pool-disciplined (exact `drumDurEst` windows), lazy (metal stack
+built on first hit), deterministic (double render maxDiff < 1e-6), and
+non-silent (min peak 0.33). Worklet parity: the WORKLET engine keeps its
+documented REDUCED set — the new types map to V_PERC with honest drumDur
+windows (.35/.3/2/1.8 s); no worklet code pretends to the new models.
+
+### DRUM TRACK EDITOR — drums are first-class in the Sound tab
+
+Drum tracks previously dead-ended with "synth editor N/A". v0.14.0 gives
+every drum track a **TYPE select** (all 21 engine types) plus sliders for
+the four core params (TUNE/DECAY/TONE/PUNCH) and the four v2 params —
+written on first move, absence stays legacy-neutral. Assigning presets
+still works exactly as before; the editor just removes the preset hunt.
+Labels are `for=`-associated (the G45 orphan-label count stays 0).
+
+### LIBRARY 250 → 310
+
+60 `v0.14.0` drum presets across all 8 genres: 9 darbuka (GOA/DARK-PSY/
+FULL-ON/PSYTRANCE), 6 tambourine, 5 triangle, 6 downlifter, 10 kick
+dist/glide showcases (TE-KICK-DIST, DPSY-KICK-SUCK…), 6 clap-burst
+layouts, 6 hat-bright shades, 12 extra perc v2 variants. Data-layer rules
+(tests/drum-v14.test.ts): the 17-type legacy `drumDurEst` table pinned
+unchanged; optional fields opt-in per preset and clamped; source pins
+cover the tables, the lazy drive and the worklet windows.
+
+### CI watch (owner-reported risk, none hit)
+
+The gates job ran 44/44 HARD in a single run (~9 min wall) — the e2e job
+growth (35→36→…→44 since v0.11.0) is approaching the 10-minute default
+runner budget; the job already carries an explicit `timeout-minutes`
+headroom and splits are prepared (pure vs offline-render halves) if a run
+ever approaches it.
+
+### Known infra note (owner action required)
+
+`Deploy to Cloudflare Pages` fails on every recent commit: the workflow
+needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` repo secrets
+(Settings → Secrets → Actions). GitHub Pages — the production URL —
+deploys fine; this is a credentials gap, not a code defect.
+
+### SW
+
+CACHE_VERSION → `psy6-v0.14.0` (network-first SW — clients pick the new
+build on next visit).
+
 ## [0.13.1] — Run 20c: OPTIONS+ (more choices, exposed engine power) + a11y fix pass
 
 > The owner's bug report from the field: DevTools flagged a CSP `eval` block
