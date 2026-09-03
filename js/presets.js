@@ -270,6 +270,43 @@ DP('GA-BONGO-FLUTTER','Goa Bongo Flutter','GOA',{type:'bongo',tune:1.25,decay:.8
 DP('TE-SHAKER-MECH','Techno Mech Shaker','TECHNO',{type:'shaker',decay:.55,tone:1.4});
 DP('PS-GLITCH-CELL','Psy Cell Glitch','PSYTRANCE',{type:'glitch',tone:1.4,decay:.9});
 DP('DPSY-GLITCH-CANCER','Dark Cancer Glitch','DARK-PSY',{type:'glitch',tone:1.8,decay:1.1});
+/* ── v0.15.0 P2: PERCUSSION v3 GENERATION — four NEW voices (crash/
+   revcym/agogo/timbale) + v3 showcase variants of the rebuilt membrane
+   family. Every value sits inside the engine clamps (DrumVoice.hit;
+   tests/drum-v15.test.ts enforces the data layer). ── */
+DP('CR-PSY-SPLASH','Psy Splash Crash','PSYTRANCE',{type:'crash',tune:1.15,decay:.7,tone:1.2,punch:.5});
+DP('CR-DPSY-DOOM','Dark Doom Crash','DARK-PSY',{type:'crash',tune:.8,decay:1.5,tone:.8,punch:.6});
+DP('CR-GOA-BLOOM','Goa Bloom Crash','GOA',{type:'crash',tune:1.05,decay:1.2,tone:1.35,punch:.45});
+DP('CR-FB-LIFT','Full-On Lift Crash','FULL-ON',{type:'crash',tune:1.1,decay:.9,tone:1.15,punch:.55});
+DP('CR-PR-SOFT','Prog Soft Crash','PROGRESSIVE',{type:'crash',tune:.9,decay:1,tone:.85,punch:.3});
+DP('CR-TE-RAW','Techno Raw Crash','TECHNO',{type:'crash',tune:1.2,decay:.6,tone:1.5,punch:.7});
+DP('RV-PSY-SUCK','Psy Reverse Suck','PSYTRANCE',{type:'revcym',tune:1,decay:1,tone:1.1,punch:.6});
+DP('RV-DPSY-VOID','Dark Void Riser','DARK-PSY',{type:'revcym',tune:.85,decay:1.4,tone:.9,punch:.7});
+DP('RV-TR-LIFT','Trance Lift Swell','TRANCE',{type:'revcym',tune:1.1,decay:.85,tone:1.25,punch:.5});
+DP('RV-GOA-SPIRAL','Goa Spiral Swell','GOA',{type:'revcym',tune:1.2,decay:1.1,tone:1.4,punch:.55});
+DP('RV-PR-BLOOM','Prog Bloom Swell','PROGRESSIVE',{type:'revcym',tune:.9,decay:1.25,tone:.8,punch:.4});
+DP('AG-GOA-BELL','Goa Agogo Bell','GOA',{type:'agogo',tune:1.1,decay:.9,tone:1.3,punch:.4});
+DP('AG-PSY-TICK','Psy Agogo Tick','PSYTRANCE',{type:'agogo',tune:1.35,decay:.5,tone:1.15,punch:.5});
+DP('AG-DPSY-IRON','Dark Iron Bell','DARK-PSY',{type:'agogo',tune:.8,decay:1.2,tone:.85,punch:.6});
+DP('AG-FB-ROLL','Full-On Agogo Roll','FULL-ON',{type:'agogo',tune:1.2,decay:.7,tone:1.2,punch:.45});
+DP('AG-PR-WOOD','Prog Wooden Bell','PROGRESSIVE',{type:'agogo',tune:.9,decay:.85,tone:.9});
+DP('TB-FB-SHELL','Full-On Timbale Shell','FULL-ON',{type:'timbale',tune:1.1,decay:.9,tone:1.2,punch:.6});
+DP('TB-PSY-LADLE','Psy Timbale Ladle','PSYTRANCE',{type:'timbale',tune:1.25,decay:.6,tone:1.3,punch:.7});
+DP('TB-TE-METAL','Techno Metal Timbale','TECHNO',{type:'timbale',tune:.95,decay:.75,tone:1.45,punch:.8});
+DP('TB-GOA-BRASS','Goa Brass Timbale','GOA',{type:'timbale',tune:1.05,decay:1,tone:1.1,punch:.5});
+DP('TB-DPSY-CLANG','Dark Timbale Clang','DARK-PSY',{type:'timbale',tune:.85,decay:1.15,tone:.9,punch:.65});
+DP('TB-HT-SLICE','Hi-Tech Timbale Slice','HI-TECH',{type:'timbale',tune:1.35,decay:.5,tone:1.6,punch:.75});
+DP('PS-CONGA2-WOODY','Woody Conga Slap','PSYTRANCE',{type:'conga',tune:.95,decay:.85,tone:1.3,punch:.75});
+DP('PR-CONGA2-DEEP','Deep Earth Conga','PROGRESSIVE',{type:'conga',tune:.8,decay:1.3,tone:.8,punch:.3});
+DP('GO-CONGA2-OPEN','Open Ritual Conga','GOA',{type:'conga',tune:1.05,decay:1.1,tone:1.1,punch:.5});
+DP('PS-BONGO2-SNAP','Snap Bongo','PSYTRANCE',{type:'bongo',tune:1.15,decay:.7,tone:1.35,punch:.8});
+DP('FO-BONGO2-SKIN','Full-On Skin Bongo','FULL-ON',{type:'bongo',tune:.95,decay:.9,tone:.9,punch:.4});
+DP('TE-TOM2-CANNON','Techno Cannon Tom','TECHNO',{type:'tom',tune:.85,decay:1.2,tone:1.1,punch:.6});
+DP('TR-TOM2-808','Trance 808 Tom','TRANCE',{type:'tom',tune:.75,decay:1.4,tone:.9,punch:.35});
+DP('PS-COW2-BEAT','Beat Cowbell','PSYTRANCE',{type:'cowbell',tune:1.05,decay:.9,tone:1.35,punch:.5});
+DP('TE-COW2-CLUB','Club Cowbell','TECHNO',{type:'cowbell',tune:.95,decay:.7,tone:.85});
+DP('PS-CLAVE2-KNOCK','Knock Clave','PSYTRANCE',{type:'clave',tune:1.1,tone:1.2,punch:.7});
+DP('HT-CLAVE2-WOOD','Hi-Tech Wood Clave','HI-TECH',{type:'clave',tune:.9,tone:.9,punch:.5});
 
 /* ── v0.13.0 P2: SYNTH v2-lite generation — gen:'v13' marks presets that use
    the new optional engine params (fenv/fdec/penv/pdec/sub). Every value sits
