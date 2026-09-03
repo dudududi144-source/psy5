@@ -3,6 +3,63 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.18.0] — Run 20h: LIBRARY 345→381 (+36 presets, FOREST's first own voices) + FILL VARIANTS + DJ TOOLS (on-demand transitions)
+
+> Owner report (verbatim): "תמשיך" — continue: more content, richer
+> variety, deeper playability, everything verified, pushed properly.
+
+### LIBRARY 345→381 — the thin side gets fat
+- +36 factory presets, purely additive (every id new, zero collisions —
+  bun-tested; no pinned id moves; the v0.12.0 floor + legacy pins intact):
+  - 9 drums across underrepresented type/genre cells, including the
+    FIRST TWO FOREST presets ever (Forest Camo Kick, Forest Twig Perc —
+    FOREST rode the DARK-PSY kit with zero presets of its own until now),
+    Hi-Tech Crush Snare + Black Crash, Goa Dune Clap, Full-On Heat Conga,
+    Prog Soft Bongo, Trance Silk Darbuka, Techno Steel Cowbell
+  - 27 synths weighted to the thin categories: 6 bass, 6 lead, 5 pad,
+    5 pluck, 5 arp — Goa Sitar Pluck, Hi-Tech Scream Bass, Full-On Amber
+    Pad, Psy Hoover Lead, Trance Crystal Arp and friends
+- Data-layer discipline kept: presets using the v2-lite opt-in fields
+  (penv/pdec) carry `gen:'v18'` — the legacy-neutrality rule now reads
+  ANY gen marker as an explicit opt-in generation (synth-v2 tests
+  generalized, clamps still enforced).
+
+### FILL VARIANTS — the FILL button learned three patterns
+- `fillEvents(type)` (pure, model.js, bun-owned): CLASSIC (the legacy
+  8×8th crescendo), ROLL (16×16th .35→.95), TOMLINE (perc tune-climb
+  .8→1.4 through parameter locks + snare accents). The FILL button/`f`
+  key cycles and shows the variant on its label (⚡ FILL · ROLL).
+- Deterministic layouts, velocities clamped, missing tracks skipped
+  honestly; type wraps modulo 3.
+
+### DJ TOOLS — the v0.16 transition voices, fired ON DEMAND
+- RISER / SWELL / IMPACT buttons in Perform (plus `q` / `w` / `e` keys):
+  the transition-voice types (riser/revcym/impact, v0.12–v0.15 drum
+  types) triggered NOW through the same eng.trigger path the scene
+  transitions use — for jams and manual builds.
+- Carrier logic = `findTransTrack` (the SAME lookup scene transitions
+  use): a set without that voice type refuses HONESTLY with a toast
+  pointing at the Sound-tab fix — never retypes or creates tracks.
+  Every READY SET carries a riser on the FX lane (bun-tested per style);
+  TRANCE carries an impact; revcym is one ASSIGN away.
+
+### G51 — the new gate (offline, CI-asserted)
+- Four representative NEW voices (GO-PLUCK-SITAR, DH-BASS-SCREAM,
+  FU-PAD-AMBER, FO-KICK-CAMO) render through the real preset→track→
+  PooledEngine path: non-silent (peak .26), pairwise distinct
+  (min PCM maxDiff .38), spectral-centroid spread 2564 Hz across the
+  four, deterministic (maxDiff 0.0), FOREST presets present.
+- e2e now asserts 48 gates (G51 added to EXPECTED).
+
+### Verification (every claim reproducible)
+- `bun test` → 501 pass / 0 fail (15 new in tests/presets-v018.test.ts;
+  synth-v2 neutrality generalized to gen opt-ins).
+- `node tools/verify.mjs` → GREEN. `bun tools/e2e.mjs` → GREEN 48/48
+  (single full run on this box). `bun tools/ui-evidence.mjs` → GREEN
+  14/14 (adds DJ buttons, riser carrier, fill-cycle label checks).
+- GitHub CI (ci-gates.yml) asserts the full suite on push with a
+  60-minute window + automatic retry.
+
 ## [0.17.0] — Run 20g: READY SET boot (never empty) + MACROS 8/8 REAL + playability layer
 
 > Owner report (verbatim): "עוד לא סיימנו בחן שוב ותמשיך גם כהמשתמש יקבל
