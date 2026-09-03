@@ -3,6 +3,115 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.16.0] — Run 20f: TRANSITIONS v1 (smooth section hand-offs) + the LOAD/CRASH fix + UI precision & layout overhaul
+
+> Owner report (verbatim): "כרגע המערכת עם מלא לאגים ובעיות וחוסר דיוק היה
+> יותר טוב מקודם אבל חשוב להמשיך לשפר להגיע להישגים לבחון הכל היטב משהו
+> שם מעמיס וזה קורס בנוסף דברים יושבים לא טוב עדיין לבחון הכל וכל הדרכים
+> תריץ תבחן תראה מה שאתה יכול בכל דרך לביצוע שיפור ותיקון וייעול ווידוא
+> שהכל רץ חלק וברמה מסחרית גבוהה מאוד" — the system is full of lags,
+> problems and imprecision; something overloads and it crashes; things
+> don't sit well; run/test/fix/optimize everything until it runs smoothly
+> at a very high commercial level. Prior round added the standing asks:
+> smoother transitions between built sections, more presets/genres,
+> real-time playability. v0.16.0 ships the missing transition vocabulary,
+> finds and kills the render storm behind the reported overload, fixes
+> transition-precision bugs (double impact, beat-math, glide-vs-automation),
+> and repairs the two visible layout defects. Commands: `bun test`
+> (469 tests / 41 files), `node tools/verify.mjs`, `bun tools/e2e.mjs`
+> (50/50 HARD in two chunks — G50 new; see the CI memory note in README).
+
+### TRANSITIONS v1 — the section hand-off vocabulary (js/transition.js, new)
+- `scene.trans` (OPTIONAL, per scene, canonical/normalized, legacy-neutral):
+  `riser 0|1|2` (bars of riser INTO the next section — 2 stacks an earlier
+  under-sweep), `revcym 0|1` (reverse-cymbal swell across the last bar),
+  `impact 0|1` (hit exactly ON the boundary), `cut 0|1` (bass vacuum — the
+  last 2 steps are silent, the DJ pre-drop cut), `xfade 0..8` beats (the
+  glide span of THIS scene's own mix snapshot at launch; 0 = the exact
+  legacy 20 ms). Absent/null trans = byte-identical legacy behavior.
+- Elements ride EXISTING drum voices by TYPE (riser/revcym/impact are drum
+  types since v0.12.0–v0.15.0) through the SAME `eng.trigger` path — no new
+  DSP, no parallel engine. A project without a matching voice type skips
+  that element honestly (`findTransTrack → −1`).
+- ONE plan, TWO consumers: offline `songTransPlan` (single source for the
+  `songSchedule` oracle AND `renderSong`) + live `armTrans` in the
+  scheduler (arranger = full vocabulary; chain/follow = 1–2 bar lookahead;
+  manual quantized launch = impact + xfade, documented honestly).
+- UI: a TRANS row on every scene card — R (cycles off/1bar/2bar), REV,
+  IMP, CUT, xf—/xf1b/xf2b/xf4b/xf8b — plus a "T" badge on cards that
+  carry a config. Everything writes through `sceneSetTrans` (normalized).
+- G50 (HARD, CI): on a real 2×4-bar composed song with a mix snapshot
+  (bass 1 → .25): bass-cut ratio 4.9e-4; HF swell ×14.1 into the boundary;
+  impact sub-peak ×1.89 control; xfade 2-beat glide mid-window 0.273 vs
+  instant 0.079 converging to 0.081; determinism 1.2e-7.
+- Bun suite: normalize/clamp/canonical stability, xfade beat-math,
+  cutSpan, transEvents step math (incl. song-start clamp + missing-voice
+  skip), planTransLive lookahead gates, songSchedule integration
+  (events at exact steps, bass vanishes in the cut window, trans-free
+  schedule byte-identical via evHash).
+
+### THE LOAD/CRASH FIX — the render storm is gone
+- Root cause: the scheduler set `I.renderDirty=true` on EVERY 25 ms tick
+  while playing, and `renderAll()` rebuilt SIXTEEN UI subsystems per flag —
+  scene cards (innerHTML × ~45 nodes × up to 64 scenes), the whole mixer
+  (strips + master + FX bars), the 345-row preset list, the step grid,
+  synth editor, lanes, param selects — up to 60×/s, forever, even for
+  hidden tabs. That is the reported "משהו שם מעמיס וזה קורס".
+- Now: full renders are EVENT-driven (project load, launches, edits, tab
+  switches) + ONE bar-aligned refresh when automation or per-bar evolution
+  actually moved visible state (≤ ~0.5 Hz at 128 BPM — an ~80× reduction
+  in the steady-playing case). Audio timing was never touched by the flag.
+- Per-tab rendering: hidden tabs no longer rebuild at all (the 345-row
+  list, the mixer, the seq grid all lived behind `display:none`); switching
+  tabs renders the arriving tab within one frame.
+- Signature caches where event-rate renders remain: scene bank (content
+  signature → class-only active/pending refresh), mixer two-tier (value
+  sync guarded by `document.activeElement` so an in-flight fader drag is
+  never yanked; rebuild only on structure change), master bar value-sync,
+  preset list + lane param select sig-gates.
+- G45 had to follow the contract change: it now force-builds the library
+  list before counting (mirroring its existing `renderMixer()` call) —
+  same assertions, honest against on-demand rendering.
+
+### TRANSITION PRECISION — three real bugs fixed
+- Double impact: the pending-apply branch cleared `I.transArmedFor` BEFORE
+  the manual-impact guard read it — an armed boundary fired TWO impacts
+  (queue + manual). Now the fired state (`I.transImpFired`) is captured
+  before the clear; the manual path only fills the un-armed gap.
+- Beat math: `xfadeTc` treated xfade beats as STEPS (τ off by 4× — an
+  "xf2b" glide closed in half a beat). Now τ = 4N·sd/3 (N beats, ~95 % at
+  3τ); bun tests pin the formula.
+- Glide vs automation: the composer's mix lanes call `syncMix()` every
+  step with the legacy 20 ms τ — which re-anchored the strips mid-xfade
+  and audibly snapped the glide shut (both offline and live). The launch
+  now records the in-flight glide (τ + 3τ settle deadline) and lane-driven
+  syncMix inside the span REUSES that τ; after settle, legacy behavior.
+
+### LAYOUT — "דברים יושבים לא טוב" (verified with DOM overflow audits + screenshots at 780/1440)
+- ACTIVE TAB WAS INVISIBLE: the global `button.on` (orange background,
+  specificity 0-1-1) beat `nav button`'s transparent background (0-0-2) —
+  the current tab rendered as a solid orange block with orange-on-orange
+  text. Explicit `nav button.on` overrides (transparent bg + orange text).
+- SCENE CARDS: 3-up at ~230 px could not hold 4 control rows (ops, follow,
+  TRANS) — overlapping/clipped text. Now 2 comfortable cards per row (1 on
+  narrow phones), every row on one line; the follow row FINALLY has the
+  compact chip styling (it was raw 13 px controls breaking the 8 px grid);
+  prob/bars inputs widened (no more "10" for "100").
+- PADS: 8-wide grid on desktop (2 compact rows instead of a 4×4 wall that
+  pushed every panel ~1900 px down); 4-wide stays on narrow screens.
+- Horizontal overflow: 0 px on every tab at both audited widths.
+
+### Verification (v0.16.0)
+- `bun test`: 469 pass / 0 fail (41 files, 504,987 expects; +18 transition
+  tests in tests/transitions.test.ts).
+- `node tools/verify.mjs`: GREEN (0 failures).
+- `bun tools/e2e.mjs`: 50/50 HARD in two chunks — A: 49/49 (all except
+  G50), B: G50 GREEN. Single-run peak OOMs a 4 GB box (documented in
+  README; chunking is evidence-neutral — every gate is independent).
+- Live checks: boot → play → all five tabs → scene TRANS row edits →
+  arranger on — zero page errors, zero layout overflow, LOAD chip single
+  digits while playing.
+
 ## [0.15.0] — Run 20e: PERCUSSION v3 (owner-flagged conga fix) + 4 new voices (crash/revcym/agogo/timbale) + library 312→345
 
 > Owner report (verbatim): "יש הרבה בעיות במיוחד עם סאונדים בשם conga הם

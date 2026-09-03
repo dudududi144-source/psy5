@@ -121,23 +121,31 @@ Honest subset classification (v0.4.0):
 | `G47` (drum v2 params) | v0.14.0: dist RMS ×2.12 + audible (maxDiff .45); glide sub-centroid 136/111=1.23; bursts mid-span (20–44 ms) ×7.2 vs nb=2 (bursts@25/34 ms vs silence) + audible; bright 9–14k 0.410/0.272; ALL neutral pairs <1e-6 (dist0/glide0/bursts4/bright1 = exact v0.13.1); determinism 0.0 | CI + local |
 | `G48` (percussion v3) | v0.15.0: conga shell-partial(744–920 Hz) share .039 + attack/body ×2.04 (was a bare-sine beep); bongo partial(1080–1280 Hz) .017; tom bend-band ×12.4 glide-band; cowbell tone-spread audible (2.8e-1); clave knock audible (2.2e-2); peak .31; determinism 6.0e-8 | CI + local |
 | `G49` (v0.15 voices) | v0.15.0: crash mid-ring .371× early + 4–12k share .49 (2-stage shimmer); revcym swell ×428 + hard cut 3.5e-18; agogo upper-mode .162 + mid ring .108× early; timbale ping .525 > low .017 + crack .044; peak .34; determinism 1.8e-7 | CI + local |
+| `G50` (transitions v1) | v0.16.0: bass-cut ratio 4.9e-4 (exact 2-step vacuum); HF swell ×14.1 into the boundary (riser+revcym); impact sub-peak ×1.89 control; xfade 2-beat glide mid-window 0.273 vs instant 0.079 (measurably slower) converging to floor 0.081; determinism 1.2e-7 | CI + local (chunk-isolated — see below) |
 | `G41` (master space) | v0.12.0: neutral perturb→restore maxDiff 2.46e-7; width 1.8 HF-side ×1.77 (300 Hz protection by design); ping-pong L−R flips 2→46; long-IR decay 48.7× short | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.15.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **48 MAIN entries**, of
-which **46 are hard** (offline/pure — CI asserts all 46 ids incl. G24 song
+Gate-truth accounting (v0.16.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **49 MAIN entries**, of
+which **47 are hard** (offline/pure — CI asserts all 47 ids incl. G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
 voice, G35 insert FX, G36 freeze, G37 editor, G38 slices, G39 drum engine
 v2, G40 percussion + library, G41 master space, G42 synth v2-lite, G43 moog
 insert, G44 load/steal stress, G45 UI options exposure, G46 new voices,
-G47 drum v2 params, G48 percussion v3, G49 v0.15 voices) and
+G47 drum v2 params, G48 percussion v3, G49 v0.15 voices, G50 transitions v1) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
 never existed in any shipped commit (verified with `git log -S` across all
 history) and are left unrenumbered.
+
+**CI memory note (v0.16.0):** the single-run suite's offline-render peak
+(G29 long masters + G39–G41 stems + G50's six renderSong passes) exceeds a
+4 GB runner — Chrome gets OOM-killed near the tail. The suite therefore
+asserts **50/50 HARD in two chunks**: A = all gates except G50, B = G50
+alone. Both chunks GREEN = release. Chunking is evidence-neutral (every
+gate is independent and deterministic; same evidence values either way).
 
 Note: although G9/G14/G15 were originally labelled "realtime-ish", code
 inspection (js/ui/tests.js) shows that in MAIN mode they run entirely through

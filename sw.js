@@ -14,7 +14,7 @@
  * on EVERY release. tools/verify.mjs asserts the version matches the latest
  * CHANGELOG entry — a release that forgets the bump fails verification.
  */
-const CACHE_VERSION = 'psy6-v0.15.0';
+const CACHE_VERSION = 'psy6-v0.16.0';
 const PRECACHE = [
   './',
   './index.html',
