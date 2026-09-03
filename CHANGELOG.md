@@ -9,7 +9,7 @@ reproducible with the command shown next to it.
 > להוסיף סאונדים ברמה גבוהה יותר"), keep the choice surface growing, and
 > keep the load/latency discipline. v0.14.0 answers on the DRUM side — the
 > side the owner flagged originally: four OPTIONAL drum params, four new
-> voices, a real drum-track editor, and the library 250 → 310. Commands:
+> voices, a real drum-track editor, and the library 250 → 312. Commands:
 > `bun test` (441 tests / 39 files), `node tools/verify.mjs`,
 > `bun tools/e2e.mjs` (44/44 HARD — G46/G47 new).
 
@@ -68,9 +68,9 @@ written on first move, absence stays legacy-neutral. Assigning presets
 still works exactly as before; the editor just removes the preset hunt.
 Labels are `for=`-associated (the G45 orphan-label count stays 0).
 
-### LIBRARY 250 → 310
+### LIBRARY 250 → 312
 
-60 `v0.14.0` drum presets across all 8 genres: 9 darbuka (GOA/DARK-PSY/
+62 `v0.14.0` drum presets across all 8 genres: 9 darbuka (GOA/DARK-PSY/
 FULL-ON/PSYTRANCE), 6 tambourine, 5 triangle, 6 downlifter, 10 kick
 dist/glide showcases (TE-KICK-DIST, DPSY-KICK-SUCK…), 6 clap-burst
 layouts, 6 hat-bright shades, 12 extra perc v2 variants. Data-layer rules

@@ -262,7 +262,7 @@ CHANGELOG 0.12.0 is the measured proof):
 - **Drum track editor (v0.14.0)** — the Sound tab edits drum tracks
   directly: TYPE select (all 21 types) + the 4 core params + the 4
   v2 params; no preset hunt required.
-- **Library 310 presets / 8 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
+- **Library 312 presets / 8 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
   TECHNO, TRANCE, PROGRESSIVE, HI-TECH) with layered per-genre kits
   (KITS export) — all AUDITION-able in the Sound tab; live search box.
 - **Master space** — stereo width `widthMaster` (0–200 %, mid/side with

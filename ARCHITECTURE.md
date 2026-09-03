@@ -206,7 +206,7 @@ UI OPTIONS EXPOSURE (v0.13.1) — the v0.12.0/v0.13.0 engine capabilities get
   byte-untouched). A11y: all labels associated (for= / nesting /
   aria-label) — G45 pins the whole exposure contract with numbers.
 
-Library: 310 presets (193 drums + 117 synths), unique ids,
+Library: 312 presets (195 drums + 117 synths), unique ids,
 schema-validated (G40 +
 tests/v2-library.test.ts). KITS: 8 layered per-genre kits mapping the 9
 composer roles {kick, snare, hat, perc, bass, lead, pad, arp, fx} to
