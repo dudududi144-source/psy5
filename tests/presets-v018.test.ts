@@ -12,7 +12,7 @@
  *     everywhere, impact on TRANCE, revcym honestly absent)
  */
 import { describe, expect, test } from 'bun:test'
-import { libFind, libCount, libFilter } from '../js/presets.js'
+import { libFind, libCount, libFilter, KITS } from '../js/presets.js'
 import { fillEvents, FILL_NAMES } from '../js/model.js'
 import { findTransTrack } from '../js/transition.js'
 import { compose } from '../js/composer.js'
@@ -34,8 +34,8 @@ const NEW_IDS = [
 ]
 
 describe('preset batch v0.18 — richer variety, purely additive', () => {
-  test('library total is exactly 381 (345 + 36)', () => {
-    expect(libCount()).toBe(381)
+  test('library total is exactly 423 (381 + 42 in v0.19.0)', () => {
+    expect(libCount()).toBe(423)
   })
   test('all 36 new ids resolve with the right category', () => {
     for (const id of NEW_IDS) {
@@ -58,12 +58,16 @@ describe('preset batch v0.18 — richer variety, purely additive', () => {
     }
     expect(dups).toBe(0)
   })
-  test('per-category deltas: drum 237, bass 43, lead 29, pad 21, pluck 15, arp 20, fx 15', () => {
-    const want: Record<string, number> = { drum: 237, bass: 43, lead: 29, pad: 21, pluck: 15, arp: 20, fx: 15 }
+  test('per-category deltas: drum 257, bass 47, lead 33, pad 25, pluck 23, arp 22, fx 15', () => {
+    const want: Record<string, number> = { drum: 257, bass: 47, lead: 33, pad: 25, pluck: 23, arp: 22, fx: 15 }
     for (const [c, n] of Object.entries(want)) expect(libFilter(c, 'ALL').length).toBe(n)
   })
-  test('FOREST carries its own presets now (was zero — it rode DARK-PSY)', () => {
-    expect(libFilter('drum', 'FOREST').length).toBeGreaterThanOrEqual(2)
+  test('FOREST carries its own kit now (was 2 presets — it rode DARK-PSY)', () => {
+    expect(libFilter('drum', 'FOREST').length).toBeGreaterThanOrEqual(10)
+    expect(libFilter('bass', 'FOREST').length).toBeGreaterThanOrEqual(2)
+    for (const role of ['kick', 'snare', 'hat', 'perc', 'bass', 'lead', 'pad', 'arp', 'fx']) {
+      expect(libFind((KITS as any)['FOREST'][role])).toBeTruthy()
+    }
   })
   test('pinned legacy ids are untouched (additive contract)', () => {
     for (const id of ['PS-KICK-TIGHT', 'PS-KICK-DEEP', 'PR-KICK', 'HAT-TE-O', 'TE-KICK-SUB']) {
@@ -72,9 +76,9 @@ describe('preset batch v0.18 — richer variety, purely additive', () => {
   })
 })
 
-describe('fill variants — three deterministic layouts', () => {
-  test('FILL_NAMES exactly CLASSIC/ROLL/TOMLINE', () => {
-    expect(FILL_NAMES).toEqual(['CLASSIC', 'ROLL', 'TOMLINE'])
+describe('fill variants — five deterministic layouts', () => {
+  test('FILL_NAMES exactly CLASSIC/ROLL/TOMLINE/SNARE16/CLIMB', () => {
+    expect(FILL_NAMES).toEqual(['CLASSIC', 'ROLL', 'TOMLINE', 'SNARE16', 'CLIMB'])
   })
   test('CLASSIC (0): 8 × 8th-note perc hits, velocity crescendo .5→.85', () => {
     const ev = fillEvents(0)
@@ -102,32 +106,55 @@ describe('fill variants — three deterministic layouts', () => {
     expect(perc[0].lock!.tune).toBeCloseTo(.8, 3)
     expect(perc[7].lock!.tune).toBeCloseTo(1.4, 3)
   })
+  test('SNARE16 (3): full-bar accelerating 16th snare roll + 2 perc accents', () => {
+    const ev = fillEvents(3)
+    const snare = ev.filter(e => e.track === 1)
+    const perc = ev.filter(e => e.track === 3)
+    expect(snare.length).toBe(16)
+    expect(perc.length).toBe(2)
+    expect(snare[0].off).toBe(0)
+    expect(snare[15].off).toBe(15) /* every step of the bar — true 16ths */
+    expect(snare[0].vel).toBeCloseTo(.3, 10)
+    expect(snare[15].vel).toBeCloseTo(.95, 10)
+  })
+  test('CLIMB (4): rising-tune perc sweep .7→1.33 via locks', () => {
+    const ev = fillEvents(4)
+    expect(ev.length).toBe(8)
+    expect(ev.every(e => e.track === 3)).toBe(true)
+    expect(ev[0].lock!.tune).toBeCloseTo(.7, 3)
+    expect(ev[7].lock!.tune).toBeCloseTo(1.33, 3)
+    expect(ev[7].vel).toBeGreaterThan(ev[0].vel)
+  })
   test('velocities never leave the engine range and layouts are deterministic', () => {
-    for (const t of [0, 1, 2]) {
+    for (const t of [0, 1, 2, 3, 4]) {
       const a = fillEvents(t), b = fillEvents(t)
       expect(JSON.stringify(a)).toBe(JSON.stringify(b))
       for (const e of a) { expect(e.vel).toBeGreaterThan(0); expect(e.vel).toBeLessThanOrEqual(1) }
     }
   })
-  test('type wraps modulo 3 (negative safe)', () => {
-    expect(JSON.stringify(fillEvents(3))).toBe(JSON.stringify(fillEvents(0)))
-    expect(JSON.stringify(fillEvents(-1))).toBe(JSON.stringify(fillEvents(2)))
+  test('type wraps modulo 5 (negative safe)', () => {
+    expect(JSON.stringify(fillEvents(5))).toBe(JSON.stringify(fillEvents(0)))
+    expect(JSON.stringify(fillEvents(-1))).toBe(JSON.stringify(fillEvents(4)))
   })
 })
 
 describe('DJ tools — carrier logic per composed kit', () => {
-  test('riser: every composer style carries one (the FX lane)', () => {
-    for (const st of ['FULL-ON', 'PSYTRANCE', 'GOA', 'HI-TECH', 'DARK-PSY', 'TECHNO', 'PROGRESSIVE', 'FOREST']) {
+  test('riser: every composer style carries one (FX lane, or TRANZ on TRANCE)', () => {
+    for (const st of ['FULL-ON', 'PSYTRANCE', 'GOA', 'HI-TECH', 'DARK-PSY', 'TECHNO', 'PROGRESSIVE', 'FOREST', 'TRANCE']) {
       const p = compose(st, 3, 424242).project
-      expect(findTransTrack(p, 'riser')).toBe(8)
+      expect(findTransTrack(p, 'riser')).toBeGreaterThanOrEqual(8)
     }
   })
-  test('impact: TRANCE carries one; revcym honestly absent everywhere', () => {
-    const tr = compose('TRANCE', 3, 424242).project
-    expect(findTransTrack(tr, 'impact')).toBe(8)
-    const fu = compose('FULL-ON', 3, 424242).project
-    expect(findTransTrack(fu, 'impact')).toBe(-1)
-    expect(findTransTrack(fu, 'revcym')).toBe(-1)
+  test('v0.19.0: EVERY composed set carries riser+impact on distinct lanes; revcym honestly absent', () => {
+    for (const st of ['FULL-ON', 'TRANCE', 'TECHNO', 'FOREST']) {
+      const p = compose(st, 3, 424242).project
+      const ri = findTransTrack(p, 'riser')
+      const im = findTransTrack(p, 'impact')
+      expect(ri).toBeGreaterThanOrEqual(8)
+      expect(im).toBeGreaterThanOrEqual(8)
+      expect(im).not.toBe(ri) /* the TRANZ complement contract */
+      expect(findTransTrack(p, 'revcym')).toBe(-1)
+    }
   })
   test('a project with an assigned revcym track becomes SWELL-capable', () => {
     const p = compose('FULL-ON', 3, 424242).project

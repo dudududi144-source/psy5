@@ -176,6 +176,7 @@ describe('songSchedule integration (the oracle reflects what renders)', () => {
        starts at 0, so pattern index = abs % loopLen) so the comparison is
        deterministic instead of pattern-dependent */
     const p2: any = compose('PSYTRANCE', 1, 42).project
+    for (const sc of p2.scenes) delete sc.trans /* v0.19.0: composed projects SHIP with trans — strip it to build the trans-free control */
     addFxCarriers(p2)
     const pat0 = p2.patterns[p2.scenes[p2.arranger.steps[0].scene].pattern]
     const L0 = pat0.data[4].len

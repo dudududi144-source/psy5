@@ -191,9 +191,16 @@ describe('output integrity', () => {
       for (let i = 1; i < tops.length; i++) expect(tops[i]).toBeGreaterThan(tops[i - 1])
     }
   })
-  test('9th FX track carries the riser preset', () => {
-    expect(p.tracks.length).toBe(9)
+  test('9th FX track carries the riser preset; 10th TRANZ carries the complement', () => {
+    expect(p.tracks.length).toBe(10)
     expect(p.tracks[8].presetId).toMatch(/FX-/)
+    /* v0.19.0 TRANZ: the carrier TYPE is the one the fx lane lacks —
+       riser-kits get an impact TRANZ; TRANCE (fx=impact) gets a riser */
+    const fxT = (p.tracks[8].sound && p.tracks[8].sound.type) || p.tracks[8].type
+    const zT = (p.tracks[9].sound && p.tracks[9].sound.type) || p.tracks[9].type
+    expect(p.tracks[9].name).toBe('TRANZ')
+    expect(zT === 'impact' || zT === 'riser').toBe(true)
+    expect(zT).not.toBe(fxT)
   })
 })
 
@@ -376,17 +383,20 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
        CHANGELOG 0.10.0). Determinism re-proven: same seed → byte-identical;
        rhythm tracks byte-identical to v0.8.0 (pinned in the harmony suite). */
     const pins: Record<string, string[]> = {
-      /* v0.13.0 RE-PIN: bass/lead/pad/arp roles ride gen:'v13' presets
-         (kick/snare/hat/perc sacred-consistent from v0.12.0) — whole-project
-         hashes moved; the v0.12.0 values (FULL-ON a89f76062f5cc2d5/
-         a6f74ab733dbb180/eca3f96245253bd6, DARK-PSY d5a0dd3bc576a0bc/
-         88ced66a2cdd127f/1823f63e7b25542c, PROGRESSIVE c36e3f979c764693/
-         39ff990601dc3717/12e3fb8b026384cb) are recorded in CHANGELOG 0.13.0.
-         PATTERN-level form-fp (bb16ce280ff48f88) is UNCHANGED — asserted
-         above; determinism re-proven (double run byte-identical). */
-      'FULL-ON': ['83dc9fd03da4dfb4', '8d9f4e650f55ab87', 'b0236a5c7bd79fb6'],
-      'DARK-PSY': ['c5447a30c3f617cd', '5869a01eeb4731be', 'b47472b344feb926'],
-      'PROGRESSIVE': ['d2b3aa8779e19e26', '06b85c7953e71189', 'f892f5610afff47e'],
+      /* v0.19.0 RE-PIN: (1) the composer now WRITES scene.trans transition
+         configs onto section landings (the v0.16 vocabulary, composed) and
+         (2) composed projects carry a 10th TRANZ carrier track — whole-
+         project hashes moved; the v0.13.0 values (FULL-ON 83dc9fd03da4dfb4/
+         8d9f4e650f55ab87/b0236a5c7bd79fb6, DARK-PSY c5447a30c3f617cd/
+         5869a01eeb4731be/b47472b344feb926, PROGRESSIVE d2b3aa8779e19e26/
+         06b85c7953e71189/f892f5610afff47e) are recorded in CHANGELOG
+         0.19.0. PATTERN-level form-fp (bb16ce280ff48f88) is UNCHANGED —
+         asserted above; determinism re-proven (double run byte-identical);
+         the RHYTHM pins (harmony suite) are UNCHANGED — trans is scene
+         metadata, never pattern data. */
+      'FULL-ON': ['40cd42b5f8c1c3ea', '4ba8c7892f244f25', '101778dc977656fa'],
+      'DARK-PSY': ['eb85df67415b9298', 'ddd653d5c6304767', '92e128811d39fcbc'],
+      'PROGRESSIVE': ['3514d67754b217dc', '1e66916ab14e18e9', '158c4e6cfa28905d'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {
@@ -506,7 +516,7 @@ describe('chord progression engine (v0.9.0 P1)', () => {
       expect(PROGRESSION_TEMPLATES[styleId]).toContain(pickProgression(styleId, 555))
       /* loads through the project pipeline */
       loadProjectObj(a.project)
-      expect(I.p.tracks.length).toBe(9)
+      expect(I.p.tracks.length).toBe(10)
       expect(I.p.arranger.steps.length).toBe(a.project.arranger.steps.length)
     }
     /* different styles at the same seed give DIFFERENT songs (bpm/form vary) */
@@ -592,6 +602,10 @@ describe('composer growth (v0.9.0 P4)', () => {
   })
 
   test('12/20-min length accuracy ≤±5% and determinism (all styles)', () => {
+    /* 9 styles × 2 lengths × 2 determinism runs = 36 full extended forms —
+       legitimately the suite's heaviest test; carries an explicit generous
+       per-test cap (the default 5 s is a CI-box lottery on the 2-core
+       runner, v0.19.0). */
     for (const styleId of Object.keys(COMPOSER_STYLES)) {
       for (const minutes of [12, 20]) {
         const a = compose(styleId, minutes, SEED)
@@ -601,7 +615,7 @@ describe('composer growth (v0.9.0 P4)', () => {
         expect(err).toBeLessThanOrEqual(0.05)
       }
     }
-  })
+  }, 30000)
 
   test('vmin ≥ 0.15 holds at 12/20-min across all 5 styles', () => {
     let minV = 1

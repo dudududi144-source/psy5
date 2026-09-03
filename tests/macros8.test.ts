@@ -204,7 +204,7 @@ describe('READY SET boot — ready to perform, not empty', () => {
       expect(r.project.arranger.on).toBe(true)
       expect(r.project.arranger.steps.length).toBeGreaterThan(4)
       expect(r.form.totalBars).toBeGreaterThan(28)
-      expect(r.project.tracks.length).toBe(9)
+      expect(r.project.tracks.length).toBe(10)
     }
   })
 

@@ -277,17 +277,19 @@ export function songMidi(p) {
   const chOf = new Map();
   melodic.forEach((t, i) => chOf.set(t, i));      /* channels 0..7 = MIDI 1..8 */
   const ppq = 480, stepTicks = ppq / 4, sd = 60 / cp.bpm / 4;
+  const tp = songTransPlan(cp, sd); /* v0.19.0: the .mid mirrors the WAV — trans FX triggers ride along (tick = y.abs·stepTicks, the schedule maps them identically) */
   const buckets = new Map(); /* track → notes[] */
+  const put = (t, note, tick, vel) => {
+    if (!buckets.has(t)) buckets.set(t, []);
+    buckets.get(t).push({ tick, durTicks: stepTicks, midi: note, vel });
+  };
   for (const y of songSteps(cp)) {
+    const te = tp.byStep.get(y.abs);
+    if (te) for (const e of te) put(e.track, e.note, y.abs * stepTicks, e.vel);
     const list = evolvedSongEvents(cp, y.abs, y.phase); /* v0.9.0: evolution-aware (OFF → stepEvents unchanged) */
     for (const e of list) {
-      if (!buckets.has(e.track)) buckets.set(e.track, []);
-      buckets.get(e.track).push({
-        tick: y.abs * stepTicks + Math.round((e.off / sd) * stepTicks),
-        durTicks: stepTicks,
-        midi: e.note,
-        vel: e.vel,
-      });
+      if (e.track === 4 && tp.cut.has(y.abs)) continue; /* the bass vacuum — the schedule drops it, so the .mid drops it too */
+      put(e.track, e.note, y.abs * stepTicks + Math.round((e.off / sd) * stepTicks), e.vel);
     }
   }
   const tracks = [];

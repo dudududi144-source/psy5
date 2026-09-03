@@ -137,6 +137,6 @@ function renderMacros(){const w=$('macros');w.innerHTML='';/* v0.17.0 — all EI
 /* v0.18.0 DJ TOOLS — honest-refusal toast: the set lacks a voice of that TYPE → point at the Sound tab fix */
 function djFire(kind){const r=PERF.dj(kind);if(!r.ok){if(r.reason==='offline')toast('ENGINE OFFLINE — boot first');else toast((kind==='revcym'?'SWELL':kind.toUpperCase())+' — no '+kind+' voice in this set. Assign one: Sound tab → drum type '+kind+' → ASSIGN')}return r.ok}
 
-function wirePerform(){$('bFill').onclick=()=>{const t=PERF.fillCycle();$('bFill').textContent='⚡ FILL · '+FILL_NAMES[t];PERF.fill()};$('bVar').onclick=()=>PERF.variation();const dj=(id,kind)=>{const b=$(id);if(b)b.onclick=()=>djFire(kind)};dj('bRiser','riser');dj('bSwell','revcym');dj('bImpact','impact');}
+function wirePerform(){$('bFill').onclick=()=>{const t=PERF.fillCycle();$('bFill').textContent='⚡ FILL · '+FILL_NAMES[t];PERF.fill()};$('bVar').onclick=()=>PERF.variation();const dj=(id,kind)=>{const b=$(id);if(b)b.onclick=()=>djFire(kind)};dj('bRiser','riser');dj('bSwell','revcym');dj('bImpact','impact');dj('bDown','downlifter');}
 
 export { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform, padHit, djFire };

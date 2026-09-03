@@ -18,7 +18,7 @@ import { SCALES, stepEvents } from '../js/model.js'
 import { evolutionState, evolutionSeedOf, evolvedSongEvents, evolvedLiveEvents, absBarOf } from '../js/evolution.js'
 
 const SEED = 424242
-const OFF_PIN = 'b35b75f6a82e48ae' /* post-P3 OFF baseline (v0.10.0: composer ins lanes ride the ev.lock channel per v0.5.0 lane semantics; 4385 events — count unchanged; v0.9.0 value 3feaf9cb45503864 recorded in CHANGELOG) */
+const OFF_PIN = 'b8de08b276873400' /* post-v0.19.0 OFF baseline (the composer now writes scene.trans onto section landings — the schedule carries the trans FX triggers; v0.19.0: 4389 events; v0.10.0 value b35b75f6a82e48ae / 4385 events recorded in CHANGELOG) */
 const GATE_SEED = 777
 const GATE_MIN_DIFF = 200
 
@@ -49,7 +49,7 @@ describe('evolution OFF contract (strict determinism)', () => {
     const p = compose('FULL-ON', 3, SEED).project
     expect(p.evolution).toBeUndefined() /* untouched projects gain NO field */
     const sch = songSchedule(clone(p), 0.05)
-    expect(sch.evs.length).toBe(4385)
+    expect(sch.evs.length).toBe(4389)
     expect(evHash(sch.evs)).toBe(OFF_PIN)
   })
   test('evolution field present but OFF → identical hash; lazy state is canonical', () => {

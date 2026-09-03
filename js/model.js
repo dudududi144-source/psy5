@@ -65,16 +65,21 @@ humanize:{label:'Humanize',off:(t,s,rng,sd,tick)=>((rng()+rng()+rng()-1.5)/1.5)*
    apply). DOM-free so the Bun suite owns the math. */
 function tapTempo(taps,now,windowMs){const w=windowMs||2500;const t=(Array.isArray(taps)?taps:[]).filter(x=>now-x>=0&&now-x<w);t.push(now);if(t.length<2)return{count:t.length,bpm:null};const d=[];for(let i=1;i<t.length;i++)d.push(t[i]-t[i-1]);const avg=d.reduce((a,b)=>a+b,0)/d.length;if(!(avg>0))return{count:t.length,bpm:null};return{count:t.length,bpm:clamp(Math.round(60000/avg),40,300)}}
 
-/* ── FILL VARIANTS (v0.18.0) — the FILL button/`f` key cycles three
-   deterministic layouts. Offsets are in STEPS (×sd at trigger time),
-   track indexes are the canonical drum lanes (3 = perc, 1 = snare).
+/* ── FILL VARIANTS (v0.18.0, five since v0.19.0) — the FILL button/`f` key
+   cycles the deterministic layouts. Offsets are in STEPS (×sd at trigger
+   time), track indexes are the canonical drum lanes (3 = perc, 1 = snare).
+   CLASSIC (perc 8ths crescendo) · ROLL (16-hit 32nd machine-gun) ·
+   TOMLINE (tuned toms + snare) · SNARE16 (full-bar accelerating 16th snare
+   roll + perc accents) · CLIMB (rising-tune perc sweep).
    Pure — bun-owned; the trigger path (PERF.fill) only maps these onto
    eng.trigger. tune rides the parameter lock (the drum voice reads
    tune from the merged lock — the same mechanism step locks use). */
-const FILL_NAMES=['CLASSIC','ROLL','TOMLINE'];
-function fillEvents(type){const t=((type|0)%3+3)%3;const out=[];
+const FILL_NAMES=['CLASSIC','ROLL','TOMLINE','SNARE16','CLIMB'];
+function fillEvents(type){const t=((type|0)%5+5)%5;const out=[];
 if(t===1){for(let k=0;k<16;k++)out.push({track:3,off:k*.5,vel:.35+.6*k/15,lock:{}})}
 else if(t===2){for(let k=0;k<8;k++)out.push({track:3,off:k*.5,vel:.55+.04*k,lock:{tune:Math.round((0.8+0.6*k/7)*1000)/1000}});for(let k=0;k<4;k++)out.push({track:1,off:k,vel:.5,lock:{}})}
+else if(t===3){for(let k=0;k<16;k++)out.push({track:1,off:k,vel:.3+.65*k/15,lock:{}});out.push({track:3,off:12,vel:.6,lock:{}});out.push({track:3,off:14,vel:.7,lock:{}})}
+else if(t===4){for(let k=0;k<8;k++)out.push({track:3,off:k*1.5,vel:.4+.06*k,lock:{tune:Math.round((0.7+0.09*k)*1000)/1000}})}
 else{for(let k=0;k<8;k++)out.push({track:3,off:k*.5,vel:.5+.05*k,lock:{}})}
 return out}
 

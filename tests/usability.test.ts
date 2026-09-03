@@ -99,7 +99,7 @@ describe('demo songs', () => {
       expect(I.p.scenes.length).toBeGreaterThan(7) /* variants exist in every demo */
       expect(I.p.arranger.steps.length).toBe(a.project.arranger.steps.length)
       expect(I.p.arranger.on).toBe(true)
-      expect(I.p.tracks.length).toBe(9)
+      expect(I.p.tracks.length).toBe(10)
     }
   })
   test('the two demos use different styles', () => {

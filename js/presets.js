@@ -426,6 +426,55 @@ SP('fx','GTX-HISS-V13','Goa Hiss Texture','GOA',{gen:'v13',wave1:'square',wave2:
 SP('fx','PTX-DRONE-V13','Prog Drone','PROGRESSIVE',{gen:'v13',wave1:'triangle',wave2:'sawtooth',detune:6,cutoff:500,res:2,atk:2,dec:4,sus:.95,rel:2.5,sub:.5});
 SP('fx','TTP-PULSE-V13','Techno Pulse Texture','TECHNO',{gen:'v13',wave1:'sawtooth',wave2:'square',detune:9,cutoff:800,res:11,atk:.02,dec:.4,sus:.4,rel:.2,gate:.3,poly:2});
 SP('fx','PSTX-SPACE-V13','Psy Space Texture','PSYTRANCE',{gen:'v13',wave1:'sawtooth',wave2:'sawtooth',detune:28,oct2:1,cutoff:3000,res:3,atk:1,dec:3,sus:.9,rel:1.8,lfoRate:.35,lfoDepth:.2,lfoDest:'cutoff'});
+/* ── v0.19.0 P1: FOREST's own kit — the genre had exactly 2 presets while
+   every other genre owned 40-60; now all 9 KITS roles are native FOREST
+   voices (kick/snare/hat/conga×2/shaker/glitch drums + bass/lead/pad/arp
+   synths + riser/impact FX). Plus thin-category refills: pluck 15→23,
+   revcym/downlifter carriers, 4 more congas (the owner's historical pain
+   point), 2 bass / 2 lead / 2 pad. Library 381 → 423. gen:'v19' marks the
+   presets that opt into the synth-v2 params (penv/pdec) — clamped. ── */
+DP('FS-KICK-ROOT','Forest Root Kick','FOREST',{type:'kick',tune:.78,decay:1.05,punch:.5});
+DP('FS-KICK-MOSS','Forest Moss Kick','FOREST',{type:'kick',tune:.66,decay:1.5,punch:.28});
+DP('FS-SNARE-TWIG','Forest Twig Snare','FOREST',{type:'snare',tune:1.2,decay:.45,tone:1.4});
+DP('FS-HAT-FERN','Forest Fern Hat','FOREST',{type:'hatC',decay:.28,tone:1.7});
+DP('FS-CONGA-ROOT','Forest Root Conga','FOREST',{type:'conga',tune:.95,decay:.7,tone:1.2});
+DP('FS-CONGA-VINE','Forest Vine Conga','FOREST',{type:'conga',tune:1.25,decay:.55,tone:1.45});
+DP('FS-PERC-DRIP','Forest Drip Perc','FOREST',{type:'shaker',tune:1.1,decay:.4});
+DP('FS-GLITCH-SPORE','Forest Spore Glitch','FOREST',{type:'glitch',tone:.85,decay:.9});
+DP('FX-FS-RISE','Forest Riser','FOREST',{type:'riser'});
+DP('FX-FS-IMPACT','Forest Impact','FOREST',{type:'impact'});
+SP('bass','FS-BASS-LICHEN','Forest Lichen Bass','FOREST',{gen:'v19',wave1:'sawtooth',wave2:'square',detune:10,cutoff:900,res:7,atk:.004,dec:.22,sus:.5,rel:.14,gate:.5,sub:.4});
+SP('bass','FS-BASS-UNDERGROWTH','Forest Undergrowth Bass','FOREST',{gen:'v19',wave1:'sawtooth',wave2:'sawtooth',detune:14,cutoff:700,res:10,atk:.003,dec:.3,sus:.55,rel:.12,gate:.45,penv:5,pdec:.09});
+SP('lead','FS-LEAD-BARK','Forest Bark Lead','FOREST',{wave1:'sawtooth',wave2:'square',detune:16,cutoff:2200,res:12,atk:.004,dec:.25,sus:.55,rel:.18,gate:.5,lfoRate:5.5,lfoDepth:.09,lfoDest:'cutoff'});
+SP('lead','FS-LEAD-CANOPY','Forest Canopy Lead','FOREST',{gen:'v19',wave1:'square',wave2:'sawtooth',detune:9,cutoff:3200,res:6,atk:.01,dec:.4,sus:.6,rel:.3,gate:.6,penv:8,pdec:.16});
+SP('pad','FS-PAD-MOSS','Forest Moss Pad','FOREST',{wave1:'sawtooth',wave2:'triangle',detune:12,cutoff:1100,res:3,atk:1.6,dec:3,sus:.85,rel:2.2,lfoRate:.4,lfoDepth:.18,lfoDest:'cutoff'});
+SP('pad','FS-PAD-FOG','Forest Fog Pad','FOREST',{wave1:'triangle',wave2:'sawtooth',detune:20,cutoff:800,res:5,atk:2.2,dec:4,sus:.9,rel:3,lfoRate:.25,lfoDepth:.22,lfoDest:'cutoff'});
+SP('arp','FS-ARP-BRANCH','Forest Branch Arp','FOREST',{wave1:'sawtooth',wave2:'square',detune:11,cutoff:2600,res:8,atk:.003,dec:.16,sus:.35,rel:.1,gate:.3,poly:4});
+SP('arp','FS-ARP-SPORE','Forest Spore Arp','FOREST',{gen:'v19',wave1:'square',wave2:'sawtooth',detune:7,cutoff:3400,res:9,atk:.002,dec:.12,sus:.3,rel:.08,gate:.25,poly:4,penv:6,pdec:.1});
+SP('pluck','PL-PS-FAERY','Psy Faery Pluck','PSYTRANCE',{gen:'v19',wave1:'sawtooth',wave2:'triangle',detune:12,cutoff:2800,res:9,atk:.002,dec:.14,sus:.1,rel:.12,gate:.25,penv:7,pdec:.1});
+SP('pluck','PL-FO-GLINT','Full-On Glint Pluck','FULL-ON',{wave1:'square',wave2:'sawtooth',detune:8,cutoff:3200,res:6,atk:.002,dec:.12,sus:.15,rel:.1,gate:.22});
+SP('pluck','PL-GO-HARP','Goa Harp Pluck','GOA',{wave1:'triangle',wave2:'sawtooth',detune:6,cutoff:3600,res:4,atk:.002,dec:.2,sus:.12,rel:.18,gate:.3});
+SP('pluck','PL-TR-DROP','Trance Drop Pluck','TRANCE',{gen:'v19',wave1:'sawtooth',wave2:'sawtooth',detune:15,cutoff:2400,res:8,atk:.002,dec:.16,sus:.1,rel:.14,gate:.25,penv:9,pdec:.12});
+SP('pluck','PL-DR-THORN','Dark Thorn Pluck','DARK-PSY',{wave1:'square',wave2:'square',detune:19,cutoff:1800,res:13,atk:.002,dec:.1,sus:.1,rel:.09,gate:.2});
+SP('pluck','PL-PR-DEW','Prog Dew Pluck','PROGRESSIVE',{wave1:'triangle',wave2:'triangle',detune:5,cutoff:1600,res:3,atk:.004,dec:.24,sus:.2,rel:.2,gate:.35});
+SP('pluck','PL-HT-SHARD','Hi-Tech Shard Pluck','HI-TECH',{wave1:'sawtooth',wave2:'square',detune:22,cutoff:4200,res:14,atk:.001,dec:.08,sus:.08,rel:.07,gate:.18});
+SP('pluck','PL-TE-METAL','Techno Metal Pluck','TECHNO',{wave1:'square',wave2:'sawtooth',detune:10,cutoff:2000,res:11,atk:.001,dec:.11,sus:.12,rel:.1,gate:.2});
+DP('FX-PS-REV','Psy Reverse Swell','PSYTRANCE',{type:'revcym'});
+DP('FX-FO-REV','Full-On Reverse Swell','FULL-ON',{type:'revcym'});
+DP('FX-GO-IMP','Goa Ritual Impact','GOA',{type:'impact'});
+DP('FX-PR-DOWN','Prog Downlifter','PROGRESSIVE',{type:'downlifter'});
+DP('FX-HT-DOWN','Hi-Tech Downlifter','HI-TECH',{type:'downlifter'});
+DP('FX-TE-REV','Techno Reverse Air','TECHNO',{type:'revcym'});
+DP('GO-CONGA-DEEP','Goa Deep Conga','GOA',{type:'conga',tune:.8,decay:.9,tone:1.1});
+DP('TR-CONGA-SAND','Trance Sand Conga','TRANCE',{type:'conga',tune:1.1,decay:.5,tone:1.3});
+DP('TE-CONGA-GHOST','Techno Ghost Conga','TECHNO',{type:'conga',tune:.9,decay:.65,tone:1.5});
+DP('FO-CONGA-GLADE','Full-On Glade Conga','FULL-ON',{type:'conga',tune:1.05,decay:.6,tone:1.25});
+SP('bass','TE-BASS-PULSE','Techno Pulse Bass','TECHNO',{gen:'v19',wave1:'square',wave2:'sawtooth',detune:5,cutoff:600,res:8,atk:.003,dec:.28,sus:.5,rel:.1,gate:.4,sub:.5});
+SP('bass','TR-BASS-PLUCK','Trance Pluck Bass','TRANCE',{wave1:'sawtooth',wave2:'triangle',detune:7,cutoff:1200,res:6,atk:.002,dec:.2,sus:.3,rel:.12,gate:.35});
+SP('lead','FO-LEAD-SOLAR','Full-On Solar Lead','FULL-ON',{gen:'v19',wave1:'sawtooth',wave2:'sawtooth',detune:13,cutoff:3800,res:7,atk:.005,dec:.3,sus:.6,rel:.22,gate:.55,penv:10,pdec:.18});
+SP('lead','PR-LEAD-VIBE','Prog Vibe Lead','PROGRESSIVE',{wave1:'triangle',wave2:'sawtooth',detune:6,cutoff:2400,res:4,atk:.01,dec:.35,sus:.5,rel:.3,gate:.5});
+SP('pad','HT-PAD-RUST','Hi-Tech Rust Pad','HI-TECH',{wave1:'sawtooth',wave2:'square',detune:24,cutoff:1400,res:9,atk:1.4,dec:2.8,sus:.8,rel:2,lfoRate:.5,lfoDepth:.3,lfoDest:'cutoff'});
+SP('pad','GO-PAD-MIRAGE','Goa Mirage Pad','GOA',{wave1:'sawtooth',wave2:'triangle',detune:15,cutoff:1800,res:6,atk:1.8,dec:3.2,sus:.85,rel:2.4,lfoRate:.3,lfoDepth:.2,lfoDest:'cutoff'});
 /* ── v0.12.0 P2: layered kits — full drum-row + role assignments per genre
    (the composer maps roles {kick,snare,hat,perc,bass,lead,pad,arp,fx} →
    preset ids; Phase 4 swaps COMPOSER_STYLES over to these) ── */
@@ -440,6 +489,8 @@ const KITS={
 'TRANCE':{kick:'TR-KICK2-UPIFT',snare:'TR-CLAP2-WIDE',hat:'TR-HAT2-GLASS',perc:'TR-CONGA-ISLE',bass:'TR-BASS-OFFBEAT',lead:'TR-LEAD-SAW',pad:'TR-PAD-ATMO',arp:'TR-ARP-ROLL',fx:'FX-TR-IMPACT'},
 'PROGRESSIVE':{kick:'PR-KICK2-SILK',snare:'PR-SNARE2-BRUSH',hat:'PR-HAT2-MIST',perc:'PR-CONGA-EARTH',bass:'PB-DEEP-V13',lead:'PBL-SOFT-V13',pad:'PP-DEEP-V13',arp:'PA-ARP-V13',fx:'FX-TE-RISE'},
 'HI-TECH':{kick:'HT-KICK-PULSE',snare:'HT-SNARE-RAZOR',hat:'HT-HAT-BLITZ',perc:'HT-CONGA-CIRCUIT',bass:'HB-GLITCH-V13',lead:'HB-CHROME-V13',pad:'HP-METAL-V13',arp:'HA-ARP-V13',fx:'FX-TE-RISE'},
+/* v0.19.0: FOREST's OWN kit (rode DARK-PSY since v0.7.0) — every role native */
+'FOREST':{kick:'FS-KICK-ROOT',snare:'FS-SNARE-TWIG',hat:'FS-HAT-FERN',perc:'FS-CONGA-ROOT',bass:'FS-BASS-LICHEN',lead:'FS-LEAD-BARK',pad:'FS-PAD-MOSS',arp:'FS-ARP-BRANCH',fx:'FX-FS-RISE'},
 };
 
 function libFind(id){for(const cat in LIB){const f=LIB[cat].find(x=>x.id===id);if(f)return f}return null}

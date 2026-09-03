@@ -688,7 +688,7 @@ gate('G31','chord progression engine: every bass/lead/pad/arp note ∈ the activ
 try{
 const c32=compose('FULL-ON',3,424242);const p32=JSON.parse(JSON.stringify(c32.project));
 const off32=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
-const offOk=off32.evs.length===4385&&evHash(off32.evs)==='b35b75f6a82e48ae';
+const offOk=off32.evs.length===4389&&evHash(off32.evs)==='b8de08b276873400'; /* v0.19.0: composed sets ship scene.trans — the OFF schedule carries the trans FX triggers (was 4385/b35b75f6a82e48ae) */
 const key32=e=>e.s+'|'+e.track;const sig32=e=>JSON.stringify([e.t.toFixed(6),e.vel.toFixed(3),e.note,JSON.stringify(e.lock||{})]);
 const diff32=(A,B)=>{const ma=new Map(A.map(e=>[key32(e),sig32(e)])),mb=new Map(B.map(e=>[key32(e),sig32(e)]));let d=0;for(const[k,v]of ma)if(mb.get(k)!==v)d++;for(const k of mb.keys())if(!ma.has(k))d++;return d};
 evolutionState(p32);p32.evolution.on=true;p32.evolution.intensity=35;p32.evolution.seed=777;
@@ -697,8 +697,8 @@ const on32b=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
 const p32z=JSON.parse(JSON.stringify(c32.project));evolutionState(p32z);p32z.evolution.on=true;p32z.evolution.intensity=0;p32z.evolution.seed=777;
 const z32=songSchedule(JSON.parse(JSON.stringify(p32z)),0.05);
 const d32=diff32(off32.evs,on32.evs);
-const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='b35b75f6a82e48ae';
-gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4385) diff='+d32+'/4385 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='b35b75f6a82e48ae')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
+const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='b8de08b276873400';
+gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4389) diff='+d32+'/4389 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='b8de08b276873400')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
 /* G33 — song library (offline — CI-asserted, v0.9.0 P3): recipes are
    RECIPES — 3 stored (style,seed,len) recipes compose twice → identical
    JSON + non-empty scenes + length within ±5%. Persistence: the library
@@ -1067,13 +1067,13 @@ if((window.__psy6GateSkip||[]).includes('G40')){gate('G40','subset-skipped (wind
 const all40=libFilter('all','ALL');const drums40=all40.filter(x=>x.cat==='drum');
 const ids40=new Set(all40.map(x=>x.id));
 const uniq40=ids40.size===all40.length;
-const GEN40=['PSYTRANCE','DARK-PSY','GOA','FULL-ON','TECHNO','TRANCE','PROGRESSIVE','HI-TECH'];
+const GEN40=['PSYTRANCE','DARK-PSY','GOA','FULL-ON','TECHNO','TRANCE','PROGRESSIVE','HI-TECH','FOREST']; /* v0.19.0: FOREST joins the genre audit */
 const genMissing=GEN40.filter(g=>!all40.some(x=>x.genre===g));
 const TYPES40=new Set(['kick','snare','clap','hatC','hatO','tom','rim','glitch','shaker','conga','bongo','cowbell','clave','zap','boom','riser','impact','darbuka','tambourine','triangle','downlifter','crash','revcym','agogo','timbale']);
 const cl2=(v,a,b)=>v>=a&&v<=b;
 const bad40=all40.filter(x=>!x.id||!x.name||!x.genre||!x.cat||(x.engine!=='DRUM'&&x.engine!=='SYNTH')||(x.cat==='drum'&&(!TYPES40.has(x.type)||!cl2(x.tune??.1,.3,2)||!cl2(x.decay??.5,.1,4)||!cl2(x.tone??1,.3,2.5)||!cl2(x.punch??0,0,1))));
 const kits40=Object.keys(KITS||{});
-const kitsOk=kits40.length===8&&kits40.every(k=>{const roles=KITS[k];return['kick','snare','hat','perc','bass','lead','pad','arp','fx'].every(r=>libFind(roles[r]))});
+const kitsOk=kits40.length===9&&kits40.every(k=>{const roles=KITS[k];return['kick','snare','hat','perc','bass','lead','pad','arp','fx'].every(r=>libFind(roles[r]))}); /* v0.19.0: 9 kits — FOREST native */
 const libOk=all40.length>=150&&drums40.length>=100&&uniq40&&genMissing.length===0&&bad40.length===0&&kitsOk;
 /* new-voice spectral evidence */
 const SR4=44100;
@@ -1104,7 +1104,7 @@ for(const sd of [{type:'tom',tune:1.1,decay:.7,tone:1,punch:0},{type:'cowbell',t
 const a=(await hit4(sd,1)).getChannelData(0),b=(await hit4(sd,1)).getChannelData(0);for(let i=0;i<Math.min(a.length,b.length);i++){const e=Math.abs(a[i]-b[i]);if(e>det40)det40=e}}
 const detOk40=det40<1e-6;
 const ok40=libOk&&tomOk&&cowOk40&&zapOk&&boomOk&&detOk40;
-gate('G40','percussion v2 + library: >=150 presets (>=100 drums), unique ids, genres 8/8, schema-valid, 8 kits resolve; tom pitch sweep (ZCR monotone), cowbell dual-square partials, zap monotone descent, boom sub>0.8; new voices deterministic maxDiff<1e-6',ok40,'lib='+all40.length+'('+drums40.length+' drums) badSchema='+bad40.length+' kits='+kits40.length+'/8 | tomZ='+tomZ.map(x=>x.toFixed(0)).join('/')+' cowA='+cowA.toFixed(3)+' cowB='+cowB.toFixed(3)+' cowMax='+cowMax.toFixed(3)+' zapDesc='+zapDesc+'/4 sub='+subB.toFixed(2)+' det='+det40.toExponential(2))}catch(e){gate('G40','percussion v2 + library',false,'ERR '+e.message)}}
+gate('G40','percussion v2 + library: >=150 presets (>=100 drums), unique ids, genres 8/8, schema-valid, 9 kits resolve; tom pitch sweep (ZCR monotone), cowbell dual-square partials, zap monotone descent, boom sub>0.8; new voices deterministic maxDiff<1e-6',ok40,'lib='+all40.length+'('+drums40.length+' drums) badSchema='+bad40.length+' kits='+kits40.length+'/9 | tomZ='+tomZ.map(x=>x.toFixed(0)).join('/')+' cowA='+cowA.toFixed(3)+' cowB='+cowB.toFixed(3)+' cowMax='+cowMax.toFixed(3)+' zapDesc='+zapDesc+'/4 sub='+subB.toFixed(2)+' det='+det40.toExponential(2))}catch(e){gate('G40','percussion v2 + library',false,'ERR '+e.message)}}
 
 /* G41 — MASTER SPACE (offline — CI-asserted, v0.12.0 P3):
    NEUTRAL CONTRACT: widthMaster 1 + pingPong off + classic IR leaves the

@@ -44,8 +44,9 @@ import { arcAt } from '../foundation/composition/form.mjs';
 import { motifFromEvents, MotifTransformer } from '../foundation/music/motif.mjs';
 import { pickProgression, chordDegreeAt, chordClasses, snapDegreeToChord } from '../foundation/music/progression.mjs';
 import { SCALES, mkStep, deep } from './model.js';
-import { initTracks, addTrackToProject, libFind, assignPresetToTrack, KITS } from './presets.js';
+import { initTracks, addTrackToProject, libFind, libFilter, assignPresetToTrack, KITS } from './presets.js';
 import { normalizeSceneMix } from './scenes.js';
+import { normalizeTrans } from './transition.js';
 
 /* composer length menu (minutes) — v0.9.0 P4 adds 12 and 20 (documented
  * tiers); the library's ADD CURRENT recovery snaps to the nearest of these. */
@@ -88,7 +89,9 @@ export const COMPOSER_STYLES = {
   },
   'FOREST': {
     label: 'FOREST', bpm: 150, scale: 'harmonicMinor', /* darker scale bias */
-    presets: Object.assign({}, KITS['DARK-PSY'], { kick: 'PS-KICK-DEEP' }), /* v0.12.0 kit swap (FOREST rides the DARK-PSY kit) — kick sacred-consistent */
+    /* v0.19.0: FOREST rides its OWN kit (it borrowed DARK-PSY from v0.7.0
+       to v0.18.0) — every role is a native FOREST voice now. */
+    presets: Object.assign({}, KITS['FOREST'], { kick: 'FS-KICK-ROOT' }), /* kick sacred-consistent */
     /* longer builds, more BREAK weight (weights sum to 1) */
     chain: [
       { id: 'INTRO', w: 0.11, energy: [0.20, 0.35], color: 3 },
@@ -555,6 +558,23 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
     const pr = libFind(style.presets[key]);
     if (pr) assignPresetToTrack(p, +ti, pr);
   }
+  /* 2b. TRANZ carrier (v0.19.0) — a 10th drum track whose TYPE is the one
+     the kit's FX lane does NOT carry (fx=riser → TRANZ=impact; fx=impact
+     [TRANCE] → TRANZ=riser), so EVERY composed project can fire both build
+     elements of the v0.16 transition vocabulary. Genre-matched preset where
+     one exists. revcym stays an honest skip in composed projects (no third
+     silent lane for a garnish) — documented in CHANGELOG 0.19.0. */
+  {
+    const fxPr = libFind(style.presets.fx);
+    const needType = (fxPr && fxPr.cat === 'drum' && fxPr.type === 'riser') ? 'impact' : 'riser';
+    const zIdx = addTrackToProject(p);
+    if (zIdx >= 0) {
+      const genre = (fxPr && fxPr.genre) || 'ANY';
+      const pool = libFilter('drum', 'ALL').filter(x => x.type === needType);
+      const pr = pool.find(x => x.genre === genre) || pool[0];
+      if (pr) { assignPresetToTrack(p, zIdx, pr); p.tracks[zIdx].name = 'TRANZ'; }
+    }
+  }
   /* macro base snapshots — ENERGY/SPACE macros must work on composed projects
      exactly like on buildStyle projects (resolveMacros reads t.base) */
   p.tracks.forEach(t => { t.base = deep({ sound: t.sound, mix: { sendA: t.mix.sendA, sendB: t.mix.sendB, vol: t.mix.vol } }) });
@@ -633,6 +653,44 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
   /* family difference evidence (base included in every pairwise set) */
   let minFamDiff = 1;
   for (const [, pats] of famPats) minFamDiff = Math.min(minFamDiff, minVariantDiff(pats));
+
+  /* 3c. SECTION TRANSITIONS (v0.19.0) — the v0.16 transition vocabulary is
+     now WRITTEN BY THE COMPOSER: every true section landing gets a
+     deterministic, style-aware hand-off (riser/revcym/impact/cut fire INTO
+     the landing scene; xfade glides ITS mix snapshot at launch). The
+     arranger gives the live scheduler the lookahead; renderSong gives the
+     offline path full knowledge — both read the SAME scene.trans. Variant
+     scenes are intra-family repeats (no trans). Scene 0 (song start) is
+     never a boundary. Patterns are untouched — scene.trans is metadata, so
+     the RHYTHM pins stay byte-identical; only whole-project hashes move
+     (re-pinned per the documented contract).
+     Style flavor: drop landings on aggressive styles (everything except
+     TRANCE/TECHNO/PROGRESSIVE) ride longer stacked risers + harder cuts;
+     gentle styles glide longer (xfade 4) and cut half as often. */
+  {
+    const trng = rngFor(seedInt, 'trans');
+    const aggro = !['TRANCE', 'TECHNO', 'PROGRESSIVE'].includes(styleId);
+    for (let i = 1; i < sceneMeta.length; i++) {
+      const m = sceneMeta[i];
+      if (m.k > 0) continue;               /* variant occurrence: intra-family */
+      /* DROP2 is a base-chain section without a beh field — its canonical
+         behavior is DROP (v0.9.0 contract). DROP3/OUTRO2/BREAK2/BRIDGE carry
+         explicit beh; BRIDGE maps to BREAK below. */
+      const id = m.sec.beh || (m.sec.id === 'DROP2' ? 'DROP' : m.sec.id);
+      let t = null;
+      if (id === 'DROP') {
+        t = { riser: trng() < 0.7 ? 2 : 1, revcym: 0, impact: 1, cut: trng() < (aggro ? 0.85 : 0.5) ? 1 : 0, xfade: aggro ? 2 : 4 };
+      } else if (id === 'RISER') {
+        t = { riser: 1, revcym: 0, impact: 0, cut: 0, xfade: 1 };
+      } else if (id === 'BREAK' || id === 'BRIDGE') {
+        t = { riser: 0, revcym: 0, impact: 0, cut: 0, xfade: 4 };
+      } else if (id === 'OUTRO') {
+        t = { riser: 0, revcym: 0, impact: 0, cut: 0, xfade: 8 };
+      }
+      const n = normalizeTrans(t);
+      if (n) p.scenes[i].trans = n;
+    }
+  }
 
   p.currentPattern = 'C1'; p.activeScene = 0;
   p.arranger = { v: 1, on: true, steps: arrSteps, idx: 0, barsIn: 0 };

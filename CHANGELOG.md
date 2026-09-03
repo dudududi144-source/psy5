@@ -3,6 +3,101 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.19.0] — Run 20i: COMPOSED TRANSITIONS (the composer finally ships the v0.16 vocabulary) + TRANZ carrier + library 381→423 + fills 3→5 + DJ DOWN
+
+> Owner report (verbatim): "צירפתי קודם שפר משמעותית מה שעשית נתח תבין איך
+> אפשר להשיג עוד מה צריך לתקן אם יש באגים והכל משמעותית אני רוצה לשפר ואז
+> בסוף תדחוף הכל מסודר צירפתי קובץ טוקן" — analyze deeply, fix the bugs,
+> improve everything significantly, push it all organized.
+
+### COMPOSED TRANSITIONS — the fix that matters most
+- The v0.16 transition vocabulary existed but **the composer never wrote
+  it**: every composed set (READY SET boot, COMPOSE, the library — the
+  product's main content path) shipped bare pattern swaps. Now `compose()`
+  writes a deterministic, style-aware `scene.trans` onto every TRUE section
+  landing:
+  - DROP / DROP2 / DROP3 landings — stacked riser (2 bars 70 % / 1 bar),
+    impact on the boundary, bass-cut vacuum (85 % aggressive styles /
+    50 % gentle), xfade 2 beats (aggressive) / 4 (gentle: TRANCE, TECHNO,
+    PROGRESSIVE)
+  - RISER landings — 1-bar riser + 1-beat glide; BREAK/BRIDGE landings —
+    a pure 4-beat glide (a breath, never a hit); OUTRO landings — the long
+    8-beat glide out
+  - Song start (scene 0) is never a boundary; variant scenes (intra-family
+    repeats) never carry trans; every payload canonical through
+    `normalizeTrans` (loader/scheduler see exactly the v0.16 shape)
+- Deterministic: the whole plan draws from `rngFor(seedInt, 'trans')` —
+  same seed + style → byte-identical trans payloads (bun-tested).
+- ONE plan, three consumers: the live scheduler (arranger lookahead), the
+  offline render (`renderSong`/`songSchedule`), and now the MIDI export —
+  no parallel logic anywhere.
+- **Pin discipline (the documented contract):** the 9 whole-project
+  composer hashes moved (re-pinned above the test, v0.13.0 values recorded
+  here: FULL-ON 83dc9fd03da4dfb4/8d9f4e650f55ab87/b0236a5c7bd79fb6,
+  DARK-PSY c5447a30c3f617cd/5869a01eeb4731be/b47472b344feb926,
+  PROGRESSIVE d2b3aa8779e19e26/06b85c7953e71189/f892f5610afff47e) and the
+  evolution OFF baseline moved (4385→4389 events, hash
+  b8de08b276873400). **UNMOVED:** the pattern-level form-fp
+  (bb16ce280ff48f88) and the rhythm/harmony byte-identity pins — trans is
+  scene metadata, never pattern data. The three static demo JSONs keep
+  their legacy 9-track shape; every FRESH compose carries the new one.
+
+### THE TRANZ CARRIER — composed sets can actually fire the vocabulary
+- Before: composed kits carried a riser on the FX lane (8/9 styles) and an
+  impact only on TRANCE (1/9) — most composed drop landings would have
+  fired a riser and skipped the hit. Now `compose()` adds a 10th drum
+  track, **TRANZ**, carrying the TYPE the FX lane lacks (fx=riser →
+  TRANZ=impact; fx=impact → TRANZ=riser), genre-matched preset where one
+  exists. Every composed set can fire riser AND impact (bun-tested across
+  all 9 styles). revcym stays an honest skip in composed projects — a
+  third always-almost-silent lane for a garnish was judged not worth it
+  (SWELL remains fully available: assign any revcym preset, or the DJ
+  tool toasts the Sound-tab fix).
+- `songMidi` now rides the SAME transition plan (trans triggers + the
+  bass-cut windows) — the ".mid == WAV schedule" contract holds at full
+  fidelity, note-for-note (the identity test walks both).
+
+### LIBRARY 381→423 (+42, purely additive — zero id moves, zero collisions)
+- **FOREST's own kit (9 roles):** the genre rode DARK-PSY from v0.7.0 and
+  owned exactly 2 presets — now Root/Moss kicks, Twig Snare, Fern Hat,
+  Root+Vine Congas, Drip Shaker, Spore Glitch, Lichen+Undergrowth Bass,
+  Bark+Canopy Leads, Moss+Fog Pads, Branch+Spore Arps, Riser+Impact FX.
+  The composer's FOREST style rides `KITS['FOREST']` (its own row).
+- Pluck 15→23 (the thinnest synth category): 8 new voices, one per genre
+  (Faery, Glint, Harp, Drop, Thorn, Dew, Shard, Metal).
+- Carrier refills: 3 revcym + 2 downlifter + 1 impact presets (the DJ
+  tools' honest-refusal paths now have genre-local answers).
+- 4 more congas (the owner's historical pain point: Goa Deep, Trance
+  Sand, Techno Ghost, Full-On Glade) + 2 bass / 2 lead / 2 pad refills.
+- `gen:'v19'` marks the presets opting into the synth-v2 params (penv/
+  pdec/sub) — the legacy-neutrality rule (ANY gen marker = explicit
+  opt-in, clamps enforced) is enforced by test.
+
+### FILLS 3→5 + DJ DOWN
+- Two new fill layouts (pure `fillEvents` in model.js, bun-owned):
+  **SNARE16** — a full-bar accelerating 16th snare roll (.3→.95) with two
+  perc accents; **CLIMB** — a rising-tune perc sweep (.7→1.33 through
+  parameter locks). `PERF.fillCycle` generalizes over `FILL_NAMES.length`
+  (the %3 hardcode is gone).
+- **DJ DOWN** — the downlifter fired ON DEMAND (Perform button + `d` key):
+  the riser's mirror for endings and wind-downs. Honest refusal toast when
+  the set lacks the voice; the library now carries 6 downlifter presets.
+
+### FIX — the genre filter that silently dropped FOREST
+- `wireSound()` hardcoded the genre dropdown and had drifted: FOREST (a
+  first-class genre since v0.18.0) was **unfilterable** in the Sound tab.
+  The dropdown is now DERIVED from the library itself — every genre that
+  owns presets appears, and a future genre can never silently vanish
+  again (pinned by test). The fill cycle's %3 hardcode died the same day.
+
+### Battery
+- bun **514/514** across 44 files (the new `tests/v019.test.ts` adds 11:
+  composed-transition contract, determinism, schedule-fires evidence,
+  carrier pair, genre data contract, DJ DOWN wiring, fill vocabulary;
+  composer/evolution/presets/midifile/v2-library pins re-recorded).
+- `verify` GREEN. e2e 48/48 HARD (single run). ui-evidence 14/14 (the
+  fill-label check now accepts all five variant names).
+
 ## [0.18.0] — Run 20h: LIBRARY 345→381 (+36 presets, FOREST's first own voices) + FILL VARIANTS + DJ TOOLS (on-demand transitions)
 
 > Owner report (verbatim): "תמשיך" — continue: more content, richer
@@ -1585,11 +1680,6 @@ bun -e "import('./js/composer.js').then(async m=>{const c=m.compose('FULL-ON',3,
   and may exceed its ±50 ms skew under concurrent offline-render load
   (ScriptProcessor buffer-fill artifact) — it remains info-only in CI, as
   documented since v0.4.0.
-
-# CHANGELOG — PSY6
-
-All notable changes to the PSY6 device repository. Every claim below is
-reproducible with the command shown next to it.
 
 ## [0.11.0] — Run 19: RESAMPLE + SLICES + KEY (the sonic-palette loop closes)
 

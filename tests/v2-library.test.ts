@@ -35,8 +35,8 @@ describe('v2 library breadth (v0.12.0 P2)', () => {
       }
     }
   })
-  test('8 kits, every kit role resolves through libFind', () => {
-    expect(Object.keys(KITS).length).toBe(8)
+  test('9 kits (FOREST native since v0.19.0), every kit role resolves through libFind', () => {
+    expect(Object.keys(KITS).length).toBe(9)
     for (const k of Object.keys(KITS)) {
       for (const role of ['kick', 'snare', 'hat', 'perc', 'bass', 'lead', 'pad', 'arp', 'fx']) {
         expect(libFind((KITS as any)[k][role])).toBeTruthy()

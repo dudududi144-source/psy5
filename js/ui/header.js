@@ -93,6 +93,7 @@ else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();if(!I.p)re
 else if(e.key==='f')PERF.fill();
 else if(e.key==='v')PERF.variation();
 else if(e.key==='q'||e.key==='w'||e.key==='e'){/* v0.18.0 DJ tools — honest refusal toast via the shared performer helper */djFire(e.key==='q'?'riser':e.key==='w'?'revcym':'impact')}
+else if(e.key==='d')djFire('downlifter');/* v0.19.0 DJ OUT — the riser's mirror */
 else if(e.key==='t')PERF.tap();/* v0.17.0 tap tempo */
 else if(e.key==='['||e.key===']'){if(!I.p)return;pushHist();I.p.bpm=clamp(I.p.bpm+(e.key===']'?1:-1),40,300);after()}/* v0.17.0 live tempo ride */
 else if(e.key==='x')$('bPanic').click();/* v0.17.0 panic */
