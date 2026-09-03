@@ -378,6 +378,47 @@ SP('fx','HFX-ZAPDOWN-V13','Hi-Tech Zap Down','HI-TECH',{gen:'v13',wave1:'square'
 SP('fx','TFX-RAISE-V13','Techno Raiser','TECHNO',{gen:'v13',wave1:'sawtooth',wave2:'square',cutoff:600,res:10,atk:1.4,dec:3,sus:.9,rel:.9,lfoRate:.5,lfoDepth:1,lfoDest:'cutoff',poly:2});
 SP('fx','PFX-DIVE-V13','Prog Dive FX','PROGRESSIVE',{gen:'v13',wave1:'sawtooth',wave2:'sawtooth',detune:15,cutoff:1600,res:7,atk:.02,dec:1.6,sus:.2,rel:.7,fenv:5,fdec:1.5,penv:24,pdec:.6,poly:2});
 SP('fx','PSFX-DROP-V13','Psy Sub Drop','PSYTRANCE',{gen:'v13',wave1:'sine',wave2:'sawtooth',cutoff:400,res:2,atk:.005,dec:1.4,sus:.1,rel:.6,sub:1,penv:19,pdec:.5,poly:2});
+/* ── v0.18.0 PRESET BATCH (+36: library 345→381) — the standing "richer
+   variety" ask (owner: מבחר עשיר). Weighted to the thin side of the
+   library (pluck/pad/arp/lead) and to FOREST, which until now rode the
+   DARK-PSY kit with zero presets of its own. Purely additive: every id is
+   new (uniqueness bun-tested), no pinned id moves. ── */
+DP('FO-KICK-CAMO','Forest Camo Kick','FOREST',{type:'kick',tune:.72,decay:1.3,punch:.35});
+DP('FO-PERC-TWIG','Forest Twig Perc','FOREST',{type:'clave',tone:1.5,decay:1});
+DP('DH-SNARE-CRUSH','Hi-Tech Crush Snare','HI-TECH',{type:'snare',tune:1.25,decay:.5,tone:1.5,punch:.6});
+DP('GO-CLAP-DUNE','Goa Dune Clap','GOA',{type:'clap',decay:1.2,tone:1.2});
+DP('FU-CONGA-HEAT','Full-On Heat Conga','FULL-ON',{type:'conga',tune:1.25,decay:.55,tone:1.2});
+DP('PR-BONGO-SOFT','Prog Soft Bongo','PROGRESSIVE',{type:'bongo',tune:.95,decay:.7,tone:.8});
+DP('TR-DARBUKA-SILK','Trance Silk Darbuka','TRANCE',{type:'darbuka',tune:1.1,decay:.6,tone:1.1});
+DP('TE-COWBELL-STEEL','Techno Steel Cowbell','TECHNO',{type:'cowbell',tune:1.05,tone:1.3});
+DP('DH-CRASH-BLACK','Hi-Tech Black Crash','HI-TECH',{type:'crash',decay:1.4,tone:1.2});
+SP('bass','FO-BASS-GATE','Full-On Gate Bass','FULL-ON',{wave1:'sawtooth',wave2:'square',oct2:-1,detune:7,cutoff:850,res:8,gate:.32,dec:.11,sus:.2,poly:2});
+SP('bass','DH-BASS-SCREAM','Hi-Tech Scream Bass','HI-TECH',{wave1:'sawtooth',wave2:'sawtooth',oct2:-1,detune:22,cutoff:1500,res:12,gate:.3,poly:2});
+SP('bass','GO-BASS-SQUARE','Goa Square Bass','GOA',{wave1:'square',wave2:'sawtooth',oct2:-1,detune:5,cutoff:900,res:7,gate:.45,poly:2});
+SP('bass','FU-BASS-SUBPUMP','Full-On Sub Pump','FULL-ON',{wave1:'sine',wave2:'triangle',oct2:-1,cutoff:300,gate:.6,poly:2});
+SP('bass','DH-BASS-WOBBLE','Hi-Tech Wobble Bass','HI-TECH',{wave1:'sawtooth',wave2:'square',oct2:-1,detune:9,cutoff:600,res:14,lfoRate:5.5,lfoDepth:.5,lfoDest:'cutoff',gate:.4,poly:2});
+SP('bass','FU-BASS-ROLLOCT','Full-On Roll Oct Bass','FULL-ON',{gen:'v18',wave1:'sawtooth',wave2:'square',detune:3,cutoff:1000,res:9,penv:12,pdec:.05,gate:.28,dec:.1,sus:.15,poly:2});
+SP('lead','GO-LEAD-TRANCESAW','Goa Trance Saw','GOA',{wave1:'sawtooth',wave2:'sawtooth',detune:16,cutoff:2600,res:5,gate:.5,dec:.3,sus:.5,poly:4});
+SP('lead','DH-LEAD-ALIEN','Hi-Tech Alien Lead','HI-TECH',{wave1:'sawtooth',wave2:'square',detune:28,cutoff:2000,res:9,lfoRate:7,lfoDepth:.4,lfoDest:'cutoff',poly:3});
+SP('lead','PS-LEAD-HOOVER','Psy Hoover Lead','PSYTRANCE',{gen:'v18',wave1:'sawtooth',wave2:'square',detune:32,cutoff:1700,res:4,penv:9,pdec:.12,gate:.6,poly:3});
+SP('lead','TR-LEAD-LEDPLK','Trance LED Pluck Lead','TRANCE',{wave1:'sawtooth',wave2:'triangle',detune:12,cutoff:3000,res:6,gate:.3,dec:.16,sus:.2,poly:4});
+SP('lead','FU-LEAD-RAZOR','Full-On Razor Lead','FULL-ON',{wave1:'sawtooth',detune:20,cutoff:2400,res:10,gate:.45,poly:3});
+SP('lead','TE-LEAD-METAL','Techno Metal Lead','TECHNO',{wave1:'square',wave2:'sawtooth',oct2:1,detune:4,cutoff:1300,res:16,gate:.35,dec:.12,sus:.25,poly:3});
+SP('pad','GO-PAD-SHIMMER','Goa Shimmer Pad','GOA',{wave1:'sawtooth',wave2:'triangle',oct2:1,detune:18,cutoff:1900,res:3,atk:.6,dec:1.2,sus:.8,rel:1.4,gate:2.5,poly:6});
+SP('pad','DH-PAD-BLACKVEIL','Hi-Tech Blackveil Pad','HI-TECH',{wave1:'sawtooth',wave2:'sawtooth',oct2:-1,detune:26,cutoff:800,res:6,atk:.9,dec:1.5,sus:.7,rel:1.8,gate:3,poly:6});
+SP('pad','FU-PAD-AMBER','Full-On Amber Pad','FULL-ON',{wave1:'triangle',wave2:'sawtooth',detune:12,cutoff:1500,atk:.5,dec:1,sus:.75,rel:1.2,gate:2.2,poly:6});
+SP('pad','PR-PAD-MIST','Prog Mist Pad','PROGRESSIVE',{wave1:'sine',wave2:'triangle',detune:8,cutoff:1100,atk:.8,dec:1.6,sus:.85,rel:2,gate:3,poly:6});
+SP('pad','FU-PAD-VOCODE','Full-On Vocode Pad','FULL-ON',{wave1:'square',wave2:'square',oct2:-1,detune:14,cutoff:950,res:8,lfoRate:2.5,lfoDepth:.3,lfoDest:'cutoff',atk:.4,dec:1.1,sus:.7,rel:1.1,gate:2,poly:6});
+SP('pluck','PS-PLUCK-MORNING','Psy Morning Pluck','PSYTRANCE',{wave1:'sawtooth',wave2:'triangle',detune:9,cutoff:2600,res:7,gate:.25,dec:.12,sus:.08,poly:6});
+SP('pluck','GO-PLUCK-SITAR','Goa Sitar Pluck','GOA',{gen:'v18',wave1:'square',wave2:'sawtooth',oct2:1,detune:3,cutoff:2200,res:10,penv:16,pdec:.04,gate:.22,dec:.1,sus:.05,poly:5});
+SP('pluck','DH-PLUCK-GLASS','Hi-Tech Glass Pluck','HI-TECH',{wave1:'triangle',wave2:'sine',oct2:1,cutoff:3200,res:5,gate:.18,dec:.09,sus:.05,poly:6});
+SP('pluck','FU-PLUCK-SPARK','Full-On Spark Pluck','FULL-ON',{wave1:'sawtooth',wave2:'square',detune:14,cutoff:2800,res:8,gate:.24,dec:.11,sus:.1,poly:6});
+SP('pluck','FU-PLUCK-WOOD','Full-On Wood Pluck','FULL-ON',{gen:'v18',wave1:'triangle',wave2:'square',cutoff:1600,res:12,penv:10,pdec:.05,gate:.2,dec:.1,sus:.05,poly:5});
+SP('arp','DH-ARP-NEEDLE','Hi-Tech Needle Arp','HI-TECH',{wave1:'square',wave2:'sawtooth',detune:7,cutoff:2400,res:12,gate:.2,dec:.09,sus:.15,poly:4});
+SP('arp','GO-ARP-TEMPLE','Goa Temple Arp','GOA',{wave1:'sawtooth',wave2:'triangle',oct2:-1,detune:10,cutoff:1400,res:8,gate:.3,dec:.14,sus:.25,poly:4});
+SP('arp','FU-ARP-HELIX','Full-On Helix Arp','FULL-ON',{wave1:'sawtooth',wave2:'sawtooth',detune:19,cutoff:2100,res:6,lfoRate:4,lfoDepth:.35,lfoDest:'cutoff',gate:.26,dec:.12,sus:.2,poly:4});
+SP('arp','PR-ARP-GENTLE','Prog Gentle Arp','PROGRESSIVE',{wave1:'triangle',wave2:'sine',detune:5,cutoff:1200,res:4,gate:.4,dec:.2,sus:.35,poly:5});
+SP('arp','TR-ARP-CRYSTAL','Trance Crystal Arp','TRANCE',{wave1:'sine',wave2:'triangle',oct2:1,detune:6,cutoff:3000,res:5,gate:.28,dec:.13,sus:.18,poly:5});
 SP('fx','TRFX-SWELL-V13','Trance Swell','TRANCE',{gen:'v13',wave1:'sawtooth',wave2:'sawtooth',detune:12,cutoff:1500,res:5,atk:.8,dec:2,sus:.85,rel:.9,fenv:3,fdec:1.5,poly:2});
 SP('fx','FTX-AIR-V13','Full-On Air Texture','FULL-ON',{gen:'v13',wave1:'sawtooth',wave2:'triangle',detune:25,cutoff:2600,res:2,atk:1.2,dec:3,sus:.95,rel:1.5,lfoRate:.25,lfoDepth:.3,lfoDest:'cutoff'});
 SP('fx','DTX-VOID-V13','Dark Void Texture','DARK-PSY',{gen:'v13',wave1:'sawtooth',wave2:'sawtooth',detune:33,cutoff:700,res:7,atk:1.5,dec:3.5,sus:.9,rel:2,lfoRate:.15,lfoDepth:.4,lfoDest:'cutoff'});

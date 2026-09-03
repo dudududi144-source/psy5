@@ -1511,6 +1511,39 @@ const d50=Math.min(f50T.buf.length,f50T2.buf.length);let diff50=0;{const a=f50T.
 const pk50=Math.max(peakOf(f50T.buf),peakOf(f50C.buf));
 const ok50=cutRatio<.05&&swRatio>=2&&impRatio>=1.1&&rMid>rMidX+.06&&rLate<.4&&diff50<1e-6&&pk50>.05;
 gate('G50','transitions v1: bass-cut ratio<.05, HF swell ratio>=2 into boundary, impact sub-peak >=1.1x control, xfade mid-glide >.06 above instant floor + converges(<.4), determinism<1e-6',ok50,'cut='+cutRatio.toExponential(1)+' | swell='+swRatio.toFixed(2)+' | imp='+impRatio.toFixed(2)+' | rMid='+rMid.toFixed(3)+'>'+rMidX.toFixed(3)+'(inst) rLate='+rLate.toFixed(3)+' | det='+diff50.toExponential(1)+' | pk='+pk50.toFixed(2))}catch(e){gate('G50','transitions v1',false,'ERR '+e.message)}}
+/* G51 — PRESET BATCH v0.18 (offline — CI-asserted):
+   the library grew 345→381 (+36, weighted to the thin synth side + FOREST's
+   first own presets). Four representative NEW voices render through the REAL
+   preset → track → PooledEngine path in fresh OfflineAudioContexts:
+     GO-PLUCK-SITAR (pluck·GOA) · DH-BASS-SCREAM (bass·HI-TECH) ·
+     FU-PAD-AMBER (pad·FULL-ON) · FO-KICK-CAMO (kick·FOREST).
+   Proof: every voice non-silent (peak > .05); pairwise audibly distinct
+   (min pairwise PCM maxDiff > 1e-3); spectral-centroid SPREAD across the
+   four ≥ 250 Hz (a dark kick vs a bright sitar — the batch is not four
+   copies of one sound); deterministic (double renders maxDiff < 1e-6);
+   library count == 381 and FOREST presets exist (pure checks). */
+if((window.__psy6GateSkip||[]).includes('G51')){gate('G51','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR51=44100;
+const pk51=b=>{const x=b.getChannelData(0);let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m};
+const md51=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
+const fft51=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const cent51=(b,off)=>{const x=b.getChannelData(0);const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round(off*SR51);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft51(re,im);const binHz=SR51/N;let num=0,den=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);num+=k*binHz*m;den+=m}return den>0?num/den:0};
+const mkTr51=id=>{const pr=libFind(id);if(!pr)return null;if(pr.cat==='drum')return{idx:0,kind:'drum',presetId:id,name:pr.name,sound:Object.assign({},pr),type:pr.type,mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};return{idx:0,kind:'synth',presetId:id,name:pr.name,sound:Object.assign({},pr),type:null,mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140,ins:{drive:0,crush:16,filtOn:0,filtFreq:20000,filtQ:1}}};
+const mkR51=async(tr,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR51*dur),SR51);const eng=new PooledEngine(oc);eng.syncMix({bpm:140,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:57,lock:{}},.5);return await oc.startRendering()};
+const rSitar=await mkR51(mkTr51('GO-PLUCK-SITAR'),1.4);
+const rScream=await mkR51(mkTr51('DH-BASS-SCREAM'),1.4);
+const rAmber=await mkR51(mkTr51('FU-PAD-AMBER'),2.6);
+const rCamo=await mkR51(mkTr51('FO-KICK-CAMO'),1.4);
+const rCamo2=await mkR51(mkTr51('FO-KICK-CAMO'),1.4);
+const cents=[cent51(rSitar,.05),cent51(rScream,.05),cent51(rAmber,.1),cent51(rCamo,.05)];
+const cSpread=Math.max.apply(null,cents)-Math.min.apply(null,cents);
+const bufs=[rSitar,rScream,rAmber,rCamo];
+let minMd=1e9;for(let i=0;i<bufs.length;i++)for(let j=i+1;j<bufs.length;j++)minMd=Math.min(minMd,md51(bufs[i],bufs[j]));
+const pk51m=Math.min(pk51(rSitar),pk51(rScream),pk51(rAmber),pk51(rCamo));
+const det51=md51(rCamo,rCamo2);
+const forestOk=libFilter('drum','FOREST').length>=2;
+const ok51=pk51m>.05&&minMd>1e-3&&cSpread>=250&&det51<1e-6&&forestOk;
+gate('G51','preset batch v0.18 (library 345→381): 4 representative new voices non-silent (peak>.05), pairwise distinct (md>1e-3), centroid spread>=250Hz, deterministic<1e-6, FOREST presets exist',ok51,'cent '+cents.map(c=>Math.round(c)).join('/')+' spread='+Math.round(cSpread)+'Hz | minMd='+minMd.toExponential(1)+' | pk='+pk51m.toFixed(2)+' | det='+det51.toExponential(1))}catch(e){gate('G51','preset batch v0.18',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 

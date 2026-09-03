@@ -26,13 +26,16 @@ const CLAMPS: Record<string, [number, number]> = {
 }
 const CATS = ['drum', 'bass', 'lead', 'pad', 'pluck', 'arp', 'fx', 'synth', 'texture']
 
-describe('synth v2-lite data layer (v0.13.0 P1)', () => {
+describe('synth v2-lite data layer (v0.13.0 P1; v0.18.0 adds the gen opt-in)', () => {
   test('legacy (unmarked) presets carry ZERO new fields — legacy neutrality', () => {
     const all = libFilter('all', 'ALL')
     expect(all.length).toBeGreaterThanOrEqual(178) // the v0.12.0 floor
     let marked = 0
     for (const p of all) {
-      if ((p as any).gen === 'v13') { marked++; continue }
+      /* v0.18.0: ANY gen marker (v13, v18, …) is an explicit OPT-IN generation —
+         the neutrality rule protects only UNMARKED presets; marked presets get
+         their opt-in fields clamp-checked in the next test. */
+      if ((p as any).gen) { marked++; continue }
       for (const f of NEW_FIELDS) {
         expect((p as any)[f]).toBeUndefined()
       }
@@ -40,9 +43,9 @@ describe('synth v2-lite data layer (v0.13.0 P1)', () => {
     expect(marked).toBeGreaterThanOrEqual(60) // the v0.13.0 v2-lite generation
   })
 
-  test("gen:'v13' presets opt in ONLY through the engine clamps", () => {
+  test("gen-marked presets (v13, v18, …) opt in ONLY through the engine clamps", () => {
     for (const p of libFilter('all', 'ALL')) {
-      if ((p as any).gen !== 'v13') continue
+      if (!(p as any).gen) continue
       for (const f of NEW_FIELDS) {
         const v = (p as any)[f]
         if (v !== undefined) {

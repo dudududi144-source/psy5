@@ -184,6 +184,12 @@ async function main() {
     const kb3 = await cdp.eval(`(()=>{window.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keydown',{key:'t',bubbles:true}));return window.__psy6.taps?window.__psy6.taps.length:0})()`);
     ck('keys: t tap tempo accumulates taps', kb3 >= 2, 'taps=' + kb3);
 
+    /* 5. v0.18.0 DJ tools + fill variants */
+    const dj = JSON.parse(await cdp.eval(`(()=>{const p=window.__psy6.p;const has=p.tracks.some(t=>t.kind==='drum'&&((t.sound&&t.sound.type)||t.type)==='riser');const f0=document.getElementById('bFill').textContent;document.getElementById('bFill').click();const f1=document.getElementById('bFill').textContent;return JSON.stringify({has,f0,f1,btns:['bRiser','bSwell','bImpact'].map(id=>!!document.getElementById(id))})})()`));
+    ck('dj: RISER/SWELL/IMPACT buttons exist', dj.btns.every(x => x), JSON.stringify(dj.btns));
+    ck('dj: READY SET carries a riser voice (q fires honestly)', dj.has === true, 'riser carrier=' + dj.has);
+    ck('fill: button cycles into a named variant', dj.f0 === '⚡ FILL' && /ROLL|TOMLINE|CLASSIC/.test(dj.f1), dj.f0 + ' → ' + dj.f1);
+
     ok = checks.every(c => c.ok);
   } catch (e) {
     ck('fatal', false, String(e && e.message || e));

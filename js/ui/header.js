@@ -6,7 +6,7 @@ import { writeMidi } from '../midifile.js';
 import { encodeShare } from '../share.js';
 import { exportBundle, importBundle, createSampleStore, referencedSampleIds } from '../samplestore.js';
 import { hydrateProjectSamples } from './samples.js';
-import { padHit } from './perform.js';
+import { padHit, djFire } from './perform.js';
 import { helpRows } from '../shortcuts.js';
 const padTrigger=i=>{try{padHit(i)}catch(e){/* engine not booted yet */}};
 function toggleHelp(){const o=$('helpOverlay');if(!o)return;o.style.display=o.style.display==='flex'?'none':'flex'}
@@ -92,6 +92,7 @@ else if(e.code.startsWith('Digit')){const n=+e.code.slice(5);if(n>=1&&n<=8){if(e
 else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();if(!I.p)return;let i=I.p.activeScene;const dir=e.key==='ArrowRight'?1:-1;for(let k=0;k<I.p.scenes.length;k++){i=(i+dir+I.p.scenes.length)%I.p.scenes.length;if(PERF.launch(i).ok)break}}
 else if(e.key==='f')PERF.fill();
 else if(e.key==='v')PERF.variation();
+else if(e.key==='q'||e.key==='w'||e.key==='e'){/* v0.18.0 DJ tools — honest refusal toast via the shared performer helper */djFire(e.key==='q'?'riser':e.key==='w'?'revcym':'impact')}
 else if(e.key==='t')PERF.tap();/* v0.17.0 tap tempo */
 else if(e.key==='['||e.key===']'){if(!I.p)return;pushHist();I.p.bpm=clamp(I.p.bpm+(e.key===']'?1:-1),40,300);after()}/* v0.17.0 live tempo ride */
 else if(e.key==='x')$('bPanic').click();/* v0.17.0 panic */

@@ -1,5 +1,5 @@
 import { $, I, pushHist, after, PERF, recHit, toast } from '../state.js';
-import { SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, LIMITS } from '../model.js';
+import { SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, FILL_NAMES, LIMITS } from '../model.js';
 import { addTrackToProject } from '../presets.js';
 import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, sceneSetTrans, sceneSetMix, captureSceneMix, FOLLOW_MODES } from '../scenes.js';
 
@@ -134,6 +134,9 @@ function renderLayers(){const w=$('layers');w.innerHTML='';[['drums','DRUMS'],['
 function renderMacros(){const w=$('macros');w.innerHTML='';/* v0.17.0 — all EIGHT macros, each resolving to real engine state (see resolveMacros v2).
    Value readout updates on input; double-click resets to the neutral 0.5. */[['ENERGY',M_ENERGY,'cutoff brightness + drum/bass levels — the main dynamics grip'],['DRIVE',M_DRIVE,'insert saturation on the music bus + gentle crush on drum bodies'],['SPACE',M_SPACE,'delay + reverb send levels'],['MOVEMENT',M_MOVE,'stereo spread (pad/arp/hats/perc) + LFO depth on music synths'],['FILTER',M_FILTER,'extra tone tilt over the music bus cutoff — dark ↔ bright'],['TIGHT',M_TIGHT,'drum envelope length — loose ↔ tight'],['HAUNT',M_HAUNT,'pitch destabilizer on lead/arp — the psy alien drift'],['FAZE',M_FAZE,'LFO speed on the music bus — slow wash ↔ fast wobble']].forEach(([nm,idx,tip])=>{const d=document.createElement('div');d.className='macro';d.title=tip;d.innerHTML='<span class="mn">'+nm+'</span><input type="range" min="0" max="100" value="'+Math.round(I.p.macroVals[idx]*100)+'" aria-label="macro '+nm+'"><span class="mv mono" style="font-size:9px;color:var(--dim);min-width:34px;text-align:right">'+Math.round(I.p.macroVals[idx]*100)+'%</span>';const rg=d.querySelector('input'),lb=d.querySelector('.mv');rg.oninput=e=>{PERF.macro(idx,+e.target.value/100);lb.textContent=e.target.value+'%'};d.ondblclick=()=>{PERF.macro(idx,.5);rg.value=50;lb.textContent='50%'};w.appendChild(d)})}
 
-function wirePerform(){$('bFill').onclick=()=>PERF.fill();$('bVar').onclick=()=>PERF.variation();}
+/* v0.18.0 DJ TOOLS — honest-refusal toast: the set lacks a voice of that TYPE → point at the Sound tab fix */
+function djFire(kind){const r=PERF.dj(kind);if(!r.ok){if(r.reason==='offline')toast('ENGINE OFFLINE — boot first');else toast((kind==='revcym'?'SWELL':kind.toUpperCase())+' — no '+kind+' voice in this set. Assign one: Sound tab → drum type '+kind+' → ASSIGN')}return r.ok}
 
-export { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform, padHit };
+function wirePerform(){$('bFill').onclick=()=>{const t=PERF.fillCycle();$('bFill').textContent='⚡ FILL · '+FILL_NAMES[t];PERF.fill()};$('bVar').onclick=()=>PERF.variation();const dj=(id,kind)=>{const b=$(id);if(b)b.onclick=()=>djFire(kind)};dj('bRiser','riser');dj('bSwell','revcym');dj('bImpact','impact');}
+
+export { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform, padHit, djFire };
