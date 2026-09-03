@@ -22,18 +22,24 @@ import { mulberry32 } from '../foundation/foundation.mjs'
 import { buildStyle } from '../js/presets.js'
 
 describe('delay bus — BPM sync', () => {
-  test('exact delay times at 145 BPM for all three divisions', () => {
+  test('exact delay times at 145 BPM for all six divisions (v0.13.1 adds 1/16, 3/8, 1/2)', () => {
     const sd = 60 / 145 / 4 // one 16th @145 = 103.448… ms
     expect(delaySecondsFor('3/16', 145) * 1000).toBeCloseTo(3 * sd * 1000, 6) // 310.3 ms
     expect(delaySecondsFor('3/16', 145) * 1000).toBeCloseTo(310.3, 1)
     expect(delaySecondsFor('1/8', 145) * 1000).toBeCloseTo(206.9, 1)
     expect(delaySecondsFor('1/4', 145) * 1000).toBeCloseTo(413.8, 1)
+    expect(delaySecondsFor('1/16', 145)).toBe(sd)
+    expect(delaySecondsFor('3/8', 145)).toBe(6 * sd)
+    expect(delaySecondsFor('1/2', 145)).toBe(8 * sd)
   })
   test('unknown division falls back to the 3/16 default', () => {
     expect(delaySecondsFor('1/7', 145)).toBe(delaySecondsFor('3/16', 145))
     expect(delayDivClamp('1/8')).toBe('1/8')
     expect(delayDivClamp('3/16')).toBe('3/16')
     expect(delayDivClamp('1/4')).toBe('1/4')
+    expect(delayDivClamp('1/16')).toBe('1/16')
+    expect(delayDivClamp('3/8')).toBe('3/8')
+    expect(delayDivClamp('1/2')).toBe('1/2')
     expect(delayDivClamp('9/16')).toBe('3/16')
     expect(delayDivClamp(undefined)).toBe('3/16')
   })

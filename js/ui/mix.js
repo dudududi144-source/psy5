@@ -1,12 +1,19 @@
 import { $, I, pushHist, after, autoRecMove } from '../state.js';
 import { ensureMaster } from '../params.js';
+import { delayDivClamp } from '../../foundation/dsp/sends.mjs';
 
 /* Mixer strips — volume / mute / solo, sidechain (SC) ducking controls and
    the two per-track FX sends. Sends: DLY (mix.sendA → BPM-synced delay bus)
    and REV (mix.sendB → reverb bus), 0-100, default 0 → zero behavior change.
-   The #fxBar holds the GLOBAL delay controls: division (1/8 | 3/16 | 1/4)
-   and feedback (0-80%). All values live on the project and are persisted.
-   Knob movements call autoRecMove so armed automation lanes capture them. */
+   The #fxBar holds the GLOBAL delay/space controls: division (v0.13.1: six
+   BPM-synced options 1/16 … 1/2), feedback (0-80%), the PING-PONG delay mode
+   toggle (fx.pingPong — cross-fed L/R taps, default OFF = exact mono
+   topology) and the reverb IR variant select (fx.irKind — classic/short/
+   long; classic = the original IR). The #masterBar holds the v0.12.0 master
+   space WIDTH control (master.widthMaster 0..2, 1.00 = neutral = network
+   OUT; bass <300 Hz is protected mono). All values live on the project and
+   are persisted. Knob movements call autoRecMove so armed automation lanes
+   capture them. */
 function scDrawer(t){
 return '<div class="scRow" style="display:none;grid-column:1/-1;border-top:1px solid var(--line);margin-top:6px;padding-top:6px;grid-template-columns:1fr 1fr 1fr;gap:6px">'
 +'<label style="font-size:8px;color:var(--dim);font-family:var(--mono)">ATK ms<input class="scAtk" type="number" min="1" max="200" value="'+(t.scAttackMs!=null?t.scAttackMs:12)+'" style="width:100%"></label>'
@@ -15,12 +22,17 @@ return '<div class="scRow" style="display:none;grid-column:1/-1;border-top:1px s
 +'</div>'}
 
 function renderFxBar(){const bar=$('fxBar');if(!bar)return;const fx=I.p.fx||{delayDiv:'3/16',delayFb:.35};
+const DIVS=['1/16','1/8','3/16','1/4','3/8','1/2'];const cur=delayDivClamp(fx.delayDiv);
 bar.innerHTML='<span class="mono" style="font-size:9px;color:var(--acc2)">DELAY BUS</span>'
-+'<label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dim)">DIV <select id="fxDiv"><option value="1/8"'+(fx.delayDiv==='1/8'?' selected':'')+'>1/8</option><option value="3/16"'+(fx.delayDiv!=='1/8'&&fx.delayDiv!=='1/4'?' selected':'')+'>3/16</option><option value="1/4"'+(fx.delayDiv==='1/4'?' selected':'')+'>1/4</option></select></label>'
++'<label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dim)" title="delay time in 16th-note divisions — v0.13.1 adds 1/16, 3/8 and 1/2 (all BPM-synced)">DIV <select id="fxDiv">'+DIVS.map(d=>'<option value="'+d+'"'+(cur===d?' selected':'')+'>'+d+'</option>').join('')+'</select></label>'
 +'<label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dim)">FB <input id="fbF" type="range" min="0" max="80" value="'+Math.round((fx.delayFb!=null?fx.delayFb:.35)*100)+'" style="width:90px"><span class="mono" id="fbV" style="font-size:9px;width:30px">'+Math.round((fx.delayFb!=null?fx.delayFb:.35)*100)+'%</span></label>'
++'<button id="fxPP" class="'+(fx.pingPong===1?'on':'')+'" title="PING-PONG delay — the feedback alternates hard L/R (cross-fed taps). Mode rewires immediately; OFF = the exact mono topology (default, legacy-neutral)" style="font-size:9px;padding:2px 6px">PP '+(fx.pingPong===1?'ON':'OFF')+'</button>'
++'<label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dim)" title="reverb IR variant — CLASSIC = the original ~1.8 s; SHORT = ~1.2 s bright; LONG = ~3.2 s dark (deterministic 2600 Hz tilt)">IR <select id="fxIr">'+['classic','short','long'].map(k=>'<option value="'+k+'"'+((fx.irKind||'classic')===k?' selected':'')+'>'+k.toUpperCase()+'</option>').join('')+'</select></label>'
 +'<span class="note" style="margin-left:auto">DLY/REV are post-fader sends per strip</span>';
 $('fxDiv').onchange=e=>{pushHist();if(!I.p.fx)I.p.fx={delayDiv:'3/16',delayFb:.35};I.p.fx.delayDiv=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
-$('fbF').oninput=e=>{$('fbV').textContent=e.target.value+'%'};$('fbF').onchange=e=>{pushHist();if(!I.p.fx)I.p.fx={delayDiv:'3/16',delayFb:.35};I.p.fx.delayFb=(+e.target.value)/100;if(I.eng)I.eng.syncMix(I.p);I.dirty=true}}
+$('fbF').oninput=e=>{$('fbV').textContent=e.target.value+'%'};$('fbF').onchange=e=>{pushHist();if(!I.p.fx)I.p.fx={delayDiv:'3/16',delayFb:.35};I.p.fx.delayFb=(+e.target.value)/100;if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
+const ppB=$('fxPP');if(ppB)ppB.onclick=()=>{pushHist();if(!I.p.fx)I.p.fx={delayDiv:'3/16',delayFb:.35};I.p.fx.pingPong=I.p.fx.pingPong===1?0:1;ppB.classList.toggle('on',I.p.fx.pingPong===1);ppB.textContent='PP '+(I.p.fx.pingPong===1?'ON':'OFF');if(I.eng)I.eng.syncMix(I.p);I.dirty=true};
+const irS=$('fxIr');if(irS)irS.onchange=e=>{pushHist();if(!I.p.fx)I.p.fx={delayDiv:'3/16',delayFb:.35};I.p.fx.irKind=e.target.value;if(I.eng)I.eng.syncMix(I.p);I.dirty=true}}
 
 /* ── MASTER panel (v0.8.0): EQ3 + glue comp — the automation-ready master
    section. Every control writes through ensureMaster + autoRecMove(-1, id)
@@ -28,7 +40,8 @@ $('fbF').oninput=e=>{$('fbV').textContent=e.target.value+'%'};$('fbF').onchange=
    GLUE toggle = compOn (bypass removes the node from the chain). ── */
 function renderMasterBar(){const bar=$('masterBar');if(!bar||!I.p)return;const m=ensureMaster(I.p);
 const rows=[['eqLow','LOW','−12..+12 dB low shelf @ 100 Hz',-12,12,.5],['eqMid','MID','−12..+12 dB peak @ 1 kHz (Q 0.8)',-12,12,.5],['eqHigh','HIGH','−12..+12 dB high shelf @ 8 kHz',-12,12,.5],
-['compThresh','THRESH','glue comp threshold −40..0 dB (GLUE ON to hear it)',-40,0,1],['compRatio','RATIO','glue comp ratio 1..20:1',1,20,.5],['compAttack','ATK ms','glue comp attack 1..100 ms',1,100,1],['compRelease','REL ms','glue comp release 20..1000 ms',20,1000,5],['compMakeup','MAKEUP','glue comp makeup gain 0..24 dB',0,24,.5]];
+['compThresh','THRESH','glue comp threshold −40..0 dB (GLUE ON to hear it)',-40,0,1],['compRatio','RATIO','glue comp ratio 1..20:1',1,20,.5],['compAttack','ATK ms','glue comp attack 1..100 ms',1,100,1],['compRelease','REL ms','glue comp release 20..1000 ms',20,1000,5],['compMakeup','MAKEUP','glue comp makeup gain 0..24 dB',0,24,.5],
+['widthMaster','WIDTH','master stereo width 0..200% — 1.00 = neutral (the width network is OUT of the chain, exact legacy path); bass <300 Hz is protected mono',0,2,.01]];
 bar.innerHTML='<span class="mono" style="font-size:9px;color:var(--acc2)">MASTER</span>'
 +'<button id="mCompOn" class="'+(m.compOn?'on':'')+'" title="glue compressor — bypass removes the node from the chain (guaranteed neutral)" style="font-size:9px;padding:2px 6px">GLUE '+(m.compOn?'ON':'OFF')+'</button>'
 +rows.map(([id,lb,tt,mn,mx,st])=>'<label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dim)" title="'+tt+' ('+id+' — automatable)">'+lb+' <input class="mParam" data-p="'+id+'" type="range" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+m[id]+'" style="width:70px"><span class="mVal mono" data-v="'+id+'" style="font-size:8px;width:34px;text-align:right">'+m[id]+'</span></label>').join('')

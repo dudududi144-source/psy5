@@ -39,6 +39,32 @@ describe('shortcut registry', () => {
   })
 })
 
+describe('a11y — label associations (v0.13.1 regression guard)', () => {
+  /* the owner's DevTools audit flagged 5 orphan header labels (BPM/Swing/
+     Velocity/Groove/Seed). Every static label must carry for= matching an
+     existing element id; the dynamic Sound-tab labels are for=/id= pairs. */
+  test('every header form field has an associated label[for]', () => {
+    const html = readFileSync('index.html', 'utf8')
+    for (const id of ['bpm', 'swing', 'padVel', 'grooveSel', 'seedIn', 'cmpStyle']) {
+      expect(html.includes('for="' + id + '"')).toBe(true)
+    }
+  })
+  test('no orphan <label> remains in index.html or the Sound-tab builders', () => {
+    const html = readFileSync('index.html', 'utf8')
+    const soundJs = readFileSync('js/ui/sound.js', 'utf8')
+    /* every full label element either carries for= or NESTS a labelable field */
+    const labels = html.match(/<label\b[^>]*>[\s\S]*?<\/label>/g) || []
+    expect(labels.length).toBeGreaterThan(0)
+    for (const el of labels) {
+      const open = el.slice(0, el.indexOf('>') + 1)
+      const nests = /<(input|select|textarea)\b/.test(el.slice(open.length))
+      expect(/for=/.test(open) || nests).toBe(true)
+    }
+    expect(soundJs.includes('<label>VOICE</label>')).toBe(false)
+    expect(soundJs.includes('for="voiceModeSel"')).toBe(true)
+  })
+})
+
 describe('demo songs', () => {
   const demos = [
     { file: 'data/demos/demo-fullon.json', style: 'FULL-ON', minutes: 3, seed: 424242 },

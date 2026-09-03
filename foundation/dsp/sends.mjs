@@ -14,8 +14,11 @@
 
 import { mulberry32 } from '../foundation.mjs';
 
-/* Delay divisions in 16th-note steps (16ths per beat/4 = step duration). */
-const DIV_STEPS = { '1/8': 2, '3/16': 3, '1/4': 4 };
+/* Delay divisions in 16th-note steps (16ths per beat/4 = step duration).
+   v0.13.1 extends the table ADDITIVELY: '1/16' (1 step), '3/8' (6) and
+   '1/2' (8) join the original three. Unknown divisions still fall back to
+   the default 3/16, so legacy projects are untouched (deterministic). */
+const DIV_STEPS = { '1/16': 1, '1/8': 2, '3/16': 3, '1/4': 4, '3/8': 6, '1/2': 8 };
 
 /* delaySecondsFor — exact delay time in seconds for a division at a BPM.
  *   '3/16' @ 145 BPM → 3 · (60/145/4) = 0.310344… s (310.3 ms)
