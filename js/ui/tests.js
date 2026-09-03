@@ -19,6 +19,8 @@ import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
 import { armCapture, captureStop, armSongRecord, captureState, captureResult } from './capture.js';
+import { renderMixer } from './mix.js';
+import { renderLib } from './sound.js';
 import { startSched } from '../scheduler.js';
 import { canonicalProject, encodeShare, decodeShare } from '../share.js';
 
@@ -1234,6 +1236,37 @@ const end44=eng44.loadSnapshot();
 const dom44=!!document.querySelector('#loadMeter');
 const ok44=eng44.spawnCount===177&&eng44.trackCount[0]===16&&eng44.trackCount[1]===64&&eng44.trackCount[2]===64&&eng44.trackCount[3]===32&&eng44.trackCount[4]===1&&eng44.tier0StealAttempts===0&&(end44.steals>0)&&end44.active===0&&end44.latencyMs>=0&&end44.pools.synth===4&&end44.pools.drum===3&&pk44>.05&&dom44;
 gate('G44','stress: 177 spawns (16k+64b tier0 + 64h+32t+pad), zero tier-0 starvation, steals>0 (lower tiers yield), reaper active===0 post-render, telemetry real (latency>=0, tight pools 4/3), LOAD chip in DOM, peak>.05',ok44,'spawn='+eng44.spawnCount+' k='+eng44.trackCount[0]+' b='+eng44.trackCount[1]+' h='+eng44.trackCount[2]+' t='+eng44.trackCount[3]+' p='+eng44.trackCount[4]+' T0='+eng44.tier0StealAttempts+' steals='+end44.steals+' activeEnd='+end44.active+' lat='+end44.latencyMs+'ms pk='+pk44.toFixed(2)+' dom='+dom44)}catch(e){gate('G44','load/steal stress',false,'ERR '+e.message)}}
+/* G45 — UI OPTIONS EXPOSURE (DOM + offline math — CI-asserted, v0.13.1):
+   v0.12.0/v0.13.0 grew engine capabilities the UI never offered: master
+   WIDTH, ping-pong delay, reverb IR variants and extra delay divisions had
+   NO control, and the composer exposed only 5 of the 8 kit styles. The
+   owner asked for more choices — this gate pins the EXPOSURE contract so
+   the options cannot silently disappear again:
+   • a11y — ZERO orphan <label>s in the live document (the DevTools audit
+     that flagged the 5 header labels is exactly the regression prevented);
+   • Mixer WIDTH slider writes master.widthMaster through ensureMaster and
+     the engine reacts (widthOn true at 1.8, false at exactly 1 = neutral);
+   • PING-PONG toggle writes fx.pingPong and the engine rewires (ppOn);
+   • IR select writes fx.irKind and swaps the convolver (eng._irKind);
+   • the delay bus offers 6 BPM-synced divisions and the send math matches
+     exactly (1/16 = one 16th, 1/2 = eight 16ths, restore 3/16);
+   • the factory search box strictly filters the live preset list;
+   • the composer offers 9 styles — the four new families (PSYTRANCE/GOA/
+     TECHNO/TRANCE) compose deterministically (double run byte-identical). */
+if((window.__psy6GateSkip||[]).includes('G45')){gate('G45','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const orph=Array.from(document.querySelectorAll('label')).filter(l=>!(l.htmlFor&&document.getElementById(l.htmlFor))&&!l.querySelector('input,select,textarea'));
+renderMixer();
+const wIn=document.querySelector('#masterBar input.mParam[data-p="widthMaster"]');
+let wHi=false,wLo=false;
+if(wIn){wIn.value='1.8';wIn.dispatchEvent(new Event('input'));wHi=I.p.master.widthMaster===1.8&&I.eng.widthOn===true;wIn.value='1';wIn.dispatchEvent(new Event('input'));wLo=I.p.master.widthMaster===1&&I.eng.widthOn===false}
+const ppB=$('fxPP');ppB.click();const ppOn=I.p.fx.pingPong===1&&I.eng.ppOn===true;ppB.click();const ppOff=I.p.fx.pingPong!==1&&I.eng.ppOn===false;
+const irS=$('fxIr');irS.value='long';irS.dispatchEvent(new Event('change'));const irL=I.p.fx.irKind==='long'&&I.eng._irKind==='long';irS.value='short';irS.dispatchEvent(new Event('change'));const irS2=I.p.fx.irKind==='short'&&I.eng._irKind==='short';irS.value='classic';irS.dispatchEvent(new Event('change'));const irC=I.p.fx.irKind==='classic'&&I.eng._irKind==='classic';
+const divS=$('fxDiv');const divN=divS.options.length;divS.value='1/16';divS.dispatchEvent(new Event('change'));const d16=I.p.fx.delayDiv==='1/16'&&Math.abs(delaySecondsFor('1/16',I.p.bpm)-60/I.p.bpm/4)<1e-12;divS.value='1/2';divS.dispatchEvent(new Event('change'));const d12=I.p.fx.delayDiv==='1/2'&&Math.abs(delaySecondsFor('1/2',I.p.bpm)-8*60/I.p.bpm/4)<1e-12;divS.value='3/16';divS.dispatchEvent(new Event('change'));const dBack=I.p.fx.delayDiv==='3/16';
+const n0=document.querySelectorAll('#libList .lib').length;$('libQ').value='acid';renderLib();const n1=document.querySelectorAll('#libList .lib').length;$('libQ').value='';renderLib();const n2=document.querySelectorAll('#libList .lib').length;
+const styles=Object.keys(COMPOSER_STYLES);const newSty=['PSYTRANCE','GOA','TECHNO','TRANCE'];let detOk=true,detEv='';
+for(const s of newSty){const a=compose(s,3,555),b=compose(s,3,555);const eq=JSON.stringify(a.project)===JSON.stringify(b.project);const good=a.form.sections.length===7&&a.stats.scenes>7&&a.form.bpm===COMPOSER_STYLES[s].bpm;if(!eq||!good)detOk=false;detEv+=s+':'+a.form.bpm+'/'+a.stats.scenes+(eq&&good?' ok':' BAD')+' '}
+const ok45=orph.length===0&&wHi&&wLo&&ppOn&&ppOff&&irL&&irS2&&irC&&divN===6&&d16&&d12&&dBack&&n1>0&&n1<n0&&n2===n0&&styles.length===9&&detOk;
+gate('G45','UI options exposure: 0 orphan labels in DOM; WIDTH slider 1→1.8→1 writes master.widthMaster and toggles eng.widthOn (1 = exact neutral); PP toggle flips fx.pingPong + eng.ppOn; IR select long/short/classic swaps eng._irKind; 6 delay divisions (1/16 & 1/2 math exact, restore 3/16); library search strictly filters (acid: 0<n<nAll, clear restores); 9 composer styles, the 4 new families compose byte-identical twice',ok45,'orph='+orph.length+' w='+wHi+'/'+wLo+' pp='+ppOn+'/'+ppOff+' ir='+(irL?'L':'')+(irS2?'S':'')+(irC?'C':'')+' div='+divN+' d16='+d16+' d12='+d12+' lib='+n1+'<'+n0+'(='+n2+') styles='+styles.length+' det='+(detOk?detEv:'FAIL '+detEv))}catch(e){gate('G45','UI options exposure',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 

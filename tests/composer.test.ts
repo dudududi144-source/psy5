@@ -18,6 +18,7 @@ import { SCALES } from '../js/model.js'
 import { PROGRESSION_TEMPLATES, pickProgression, chordDegreeAt, chordClasses } from '../foundation/music/progression.mjs'
 import { paramById } from '../js/params.js'
 import { LIMITS } from '../js/limits.js'
+import { loadProjectObj, I } from '../js/state.js'
 
 const SEED = 424242
 
@@ -427,7 +428,7 @@ describe('chord progression engine (v0.9.0 P1)', () => {
     return { notes, violations }
   }
 
-  test('templates: 12 per family × 5 families, 4/8-bar diatonic loops, unique ids', () => {
+  test('templates: 12 per family × 9 families, 4/8-bar diatonic loops, unique ids', () => {
     for (const [fam, list] of Object.entries(PROGRESSION_TEMPLATES)) {
       expect(Object.keys(COMPOSER_STYLES)).toContain(fam)
       expect(list.length).toBe(12)
@@ -438,7 +439,7 @@ describe('chord progression engine (v0.9.0 P1)', () => {
         for (const d of t.degrees) { expect(d).toBeGreaterThanOrEqual(0); expect(d).toBeLessThanOrEqual(6) }
       }
     }
-    expect(Object.keys(PROGRESSION_TEMPLATES).length).toBe(5)
+    expect(Object.keys(PROGRESSION_TEMPLATES).length).toBe(9)
   })
 
   test('pick: deterministic, in-family, seed-sensitive (fnv1a(seed+":prog"))', () => {
@@ -487,7 +488,30 @@ describe('chord progression engine (v0.9.0 P1)', () => {
       counts[styleId] = set.size
       expect(set.size).toBeGreaterThanOrEqual(8)
     }
-    expect(Object.keys(counts).length).toBe(5)
+    expect(Object.keys(counts).length).toBe(9)
+  })
+
+  test('v0.13.1: the four NEW styles compose deterministically with valid form', () => {
+    const NEW_STYLES = ['PSYTRANCE', 'GOA', 'TECHNO', 'TRANCE']
+    expect(Object.keys(COMPOSER_STYLES).length).toBe(9)
+    for (const styleId of NEW_STYLES) {
+      const a = compose(styleId, 3, 555)
+      const b = compose(styleId, 3, 555)
+      expect(JSON.stringify(a.project)).toBe(JSON.stringify(b.project)) /* deterministic */
+      expect(a.form.sections.length).toBe(7)
+      expect(a.stats.scenes).toBeGreaterThan(7)
+      expect(a.form.bpm).toBe(COMPOSER_STYLES[styleId].bpm)
+      expect(a.project.bpm).toBe(COMPOSER_STYLES[styleId].bpm)
+      /* harmony rides its own family — every pick lands in the style's templates */
+      expect(PROGRESSION_TEMPLATES[styleId]).toContain(pickProgression(styleId, 555))
+      /* loads through the project pipeline */
+      loadProjectObj(a.project)
+      expect(I.p.tracks.length).toBe(9)
+      expect(I.p.arranger.steps.length).toBe(a.project.arranger.steps.length)
+    }
+    /* different styles at the same seed give DIFFERENT songs (bpm/form vary) */
+    const bpms = new Set(NEW_STYLES.map(s => compose(s, 3, 555).form.bpm))
+    expect(bpms.size).toBe(4)
   })
 
   test('RHYTHM BYTE-IDENTITY: kick/snare/hat/perc/fx digests == the v0.8.0 pre-P1 pins', () => {

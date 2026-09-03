@@ -116,6 +116,31 @@ export const COMPOSER_STYLES = {
     ],
     recipe: { hatGhostMul: 1.3, bassGrammar: 'roll', percMul: 1.8, percOdd: true, energyVar: 0.10, riserEvery: 16, ops: { hatRot: 0.5, bassOct: 0.55 } },
   },
+  /* ── v0.13.1: four NEW composer styles — the library had 8 kits and 8
+     genres but only 5 selectable styles; the owner asked for more choices.
+     Each rides its OWN KITS row (9 roles) + its own 12-template progression
+     family (foundation/music/progression.mjs). Purely additive: the five
+     legacy styles resolve exactly as before (their pins never move). ── */
+  'PSYTRANCE': {
+    label: 'PSYTRANCE', bpm: 142, scale: 'phrygian',
+    presets: Object.assign({}, KITS['PSYTRANCE'], { kick: 'PS-KICK-TIGHT' }), /* the classic tight kick — same id the legacy FULL-ON pin keeps */
+    recipe: { hatGhostMul: 1.2, bassGrammar: 'roll', percMul: 1.0, energyVar: 0.05, riserEvery: 32, ops: { hatRot: 0.5, bassOct: 0.6 } },
+  },
+  'GOA': {
+    label: 'GOA', bpm: 140, scale: 'harmonicMinor', /* melodic minor-dominant colors */
+    presets: Object.assign({}, KITS['GOA'], { kick: 'GO-KICK-GLOW' }),
+    recipe: { hatGhostMul: 1.1, bassGrammar: 'roll', percMul: 0.9, energyVar: 0, riserEvery: 32, ops: { hatRot: 0.45, bassOct: 0.7 } },
+  },
+  'TECHNO': {
+    label: 'TECHNO', bpm: 132, scale: 'minor',
+    presets: Object.assign({}, KITS['TECHNO'], { kick: 'TE-KICK2-CLUB' }),
+    recipe: { hatGhostMul: 0.9, bassGrammar: 'roll', percMul: 1.2, energyVar: 0.04, riserEvery: 24, ops: { hatRot: 0.4, bassOct: 0.5 } },
+  },
+  'TRANCE': {
+    label: 'TRANCE', bpm: 138, scale: 'minor',
+    presets: Object.assign({}, KITS['TRANCE'], { kick: 'TR-KICK2-UPIFT' }),
+    recipe: { hatGhostMul: 1.0, bassGrammar: 'roll', percMul: 0.85, energyVar: 0, riserEvery: 32, ops: { hatRot: 0.5, bassOct: 0.55 } },
+  },
 };
 
 /* section chain: weights sum to 1; energy arcs [start,end] across the section.
