@@ -223,7 +223,7 @@ hit(tr,when,vel,lock){const p=Object.assign({},tr.sound,lock||{});this.connect(t
    across types never carries a previous layer's tail into the new hit
    (the pool steal semantics stay exactly the v1 ones: reuse happens at
    busyUntil, so this cut lands after the estimated duration). */
-ng.cancelScheduledValues(when);og.cancelScheduledValues(when);og2.cancelScheduledValues(when);ng.setValueAtTime(0,when);og.setValueAtTime(0,when);og2.setValueAtTime(0,when);if(this.metal){const mg=this.metal.g.gain;mg.cancelScheduledValues(when);mg.setValueAtTime(0,when)}if(this.fmod){const f=this.fmod.mg.gain;f.cancelScheduledValues(when);f.setValueAtTime(0,when)}
+ng.cancelScheduledValues(when);og.cancelScheduledValues(when);og2.cancelScheduledValues(when);ng.setValueAtTime(0,when);og.setValueAtTime(0,when);og2.setValueAtTime(0,when);/* v0.15.0: detune joins the zero-anchor — the cowbell's tone-mapped spread must never leak into a pooled reuse of the voice by another type (was always 0 before v0.15.0, so this is bit-neutral for every legacy path) */this.osc.detune.setValueAtTime(0,when);this.osc2.detune.setValueAtTime(0,when);if(this.metal){const mg=this.metal.g.gain;mg.cancelScheduledValues(when);mg.setValueAtTime(0,when)}if(this.fmod){const f=this.fmod.mg.gain;f.cancelScheduledValues(when);f.setValueAtTime(0,when)}
 if(type==='kick'){
 /* v0.14.0 drum v2: `dist` (0..1, default 0 = exact v0.13.1 path) — lazily
    builds a drive gain feeding the EXISTING kick saturation shaper
@@ -264,17 +264,34 @@ this.ensureMetal();const base=40*tune;const br=Math.min(Math.max(p.bright||1,.5)
 /* noise touch keeps a little of the old breath */
 this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(8000,when);ng.setValueAtTime(vel*.14,when);ng.exponentialRampToValueAtTime(.0001,when+dur);
 }else if(type==='tom'){
-/* v0.12.0 P2: resonant sine sweep + strike-noise transient */
-const dur=.22+.35*decay;this.osc.type='sine';this.osc.frequency.setValueAtTime(180*tune,when);this.osc.frequency.exponentialRampToValueAtTime(92*tune,when+dur*.7);og.setValueAtTime(vel*.9,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1800*tune,when);this.nFilter.Q.value=1.2;ng.setValueAtTime(vel*.3,when);ng.exponentialRampToValueAtTime(.0001,when+.008)}else if(type==='rim'){
+/* v0.15.0 P1 MEMBRANE v3: two-stage pitch path (strike bend 1.45×→1 in 28 ms,
+   THEN the existing downward glide — real toms carry both), overtone sine
+   1.6×f0 (the membrane's second mode, decay .35×dur), wider strike noise.
+   durEst UNCHANGED (.22+.35·decay — pool discipline). */
+const dur=.22+.35*decay;const tf=180*tune;this.osc.type='sine';this.osc.frequency.setValueAtTime(tf*1.45,when);this.osc.frequency.exponentialRampToValueAtTime(tf,when+.028);this.osc.frequency.exponentialRampToValueAtTime(tf*.55,when+dur*.7);og.setValueAtTime(vel*.85,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(tf*1.6,when);og2.setValueAtTime(vel*.24,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.35);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1300*tone,when);this.nFilter.Q.value=1;ng.setValueAtTime(vel*.26,when);ng.exponentialRampToValueAtTime(.0001,when+.01)}else if(type==='rim'){
 /* v0.12.0 P2: short FM metallic — lazy modulator pair feeds osc.frequency */
 this.ensureFmod();this.osc.type='sine';const rf=1750*tune;this.osc.frequency.setValueAtTime(rf,when);this.fmod.m.frequency.setValueAtTime(rf*2.76,when);const fmg=this.fmod.mg.gain;fmg.setValueAtTime(rf*1.4,when);fmg.exponentialRampToValueAtTime(1,when+.012);og.setValueAtTime(vel*.75,when);og.exponentialRampToValueAtTime(.0001,when+.045)}else if(type==='conga'){
-/* membrane model: sine + pitch bend + noise touch */
-const dur=.15+.25*decay;const cf=310*tune;this.osc.type='sine';this.osc.frequency.setValueAtTime(cf*1.08,when);this.osc.frequency.exponentialRampToValueAtTime(cf,when+.05);og.setValueAtTime(vel*.85,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(2400,when);this.nFilter.Q.value=1;ng.setValueAtTime(vel*.18,when);ng.exponentialRampToValueAtTime(.0001,when+.004)}else if(type==='bongo'){
-const dur=.1+.15*decay;const cf=440*tune;this.osc.type='sine';this.osc.frequency.setValueAtTime(cf*1.1,when);this.osc.frequency.exponentialRampToValueAtTime(cf,when+.035);og.setValueAtTime(vel*.8,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(3200,when);this.nFilter.Q.value=1;ng.setValueAtTime(vel*.15,when);ng.exponentialRampToValueAtTime(.0001,when+.003)}else if(type==='cowbell'){
-/* two-square metallic (documented ratios: 560 + 845 Hz — ~1.509) */
-const dur=.12+.08*decay;this.osc.type='square';this.osc.frequency.setValueAtTime(560*tune,when);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='square';this.osc2.frequency.setValueAtTime(845*tune,when);og2.setValueAtTime(vel*.5,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.8)}else if(type==='clave'){
-/* wood resonance: two sine modes (1 : 1.5 inharmonic) */
-this.osc.type='sine';this.osc.frequency.setValueAtTime(2500*tune,when);og.setValueAtTime(vel*.7,when);og.exponentialRampToValueAtTime(.0001,when+.012);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(3750*tune,when);og2.setValueAtTime(vel*.25,when);og2.exponentialRampToValueAtTime(.0001,when+.009)}else if(type==='zap'){
+/* v0.15.0 P1 MEMBRANE v3 — the v0.12.0 model was a bare sine with a 1.08×
+   50 ms bend: it read as a beep, and it is the perc lane of EVERY composer
+   kit (the owner's #1 complaint). A conga head is a shell-reinforced
+   membrane: strike pitch-bend (1.25..1.7×→1 over 35 ms, punch maps the
+   depth), a shell partial at 2.6×f0 (fast .3×dur decay, tone maps the
+   level — this is what turns the beep into a drum), and a slap transient
+   (bandpass 2.1 kHz·tone, punch maps the level). durEst UNCHANGED. */
+const dur=.15+.25*decay;const cf=310*tune;const bd=1.25+.45*Math.min(punch,1);this.osc.type='sine';this.osc.frequency.setValueAtTime(cf*bd,when);this.osc.frequency.exponentialRampToValueAtTime(cf,when+.035);og.setValueAtTime(vel*.78,when);og.exponentialRampToValueAtTime(.0001,when+dur*.9);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(cf*2.6*bd,when);this.osc2.frequency.exponentialRampToValueAtTime(cf*2.6,when+.03);og2.setValueAtTime(vel*(.14+.2*Math.min(Math.max(tone,0),1.6)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.3);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(2100*tone,when);this.nFilter.Q.value=1.1;ng.setValueAtTime(vel*(.1+.3*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.007)}else if(type==='bongo'){
+/* v0.15.0 P1 MEMBRANE v3 (same rebuild as conga — the old bongo was the
+   same bare-sine beep at 440 Hz): deeper bend (bongos are slappier),
+   shell partial 2.7×f0, slap band 3.2 kHz·tone. durEst UNCHANGED. */
+const dur=.1+.15*decay;const cf=440*tune;const bd=1.35+.45*Math.min(punch,1);this.osc.type='sine';this.osc.frequency.setValueAtTime(cf*bd,when);this.osc.frequency.exponentialRampToValueAtTime(cf,when+.028);og.setValueAtTime(vel*.72,when);og.exponentialRampToValueAtTime(.0001,when+dur*.9);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(cf*2.7*bd,when);this.osc2.frequency.exponentialRampToValueAtTime(cf*2.7,when+.024);og2.setValueAtTime(vel*(.12+.2*Math.min(Math.max(tone,0),1.6)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.3);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(3200*tone,when);this.nFilter.Q.value=1.1;ng.setValueAtTime(vel*(.1+.34*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.005)}else if(type==='cowbell'){
+/* v0.15.0 P1: two-square metallic (560 + 845 Hz, the documented 1.509
+   pair) + a strike transient on the lower square (1.05×→1, 10 ms — the
+   "ding" attack) + tone maps a detune spread between the pair (the beat
+   that opens/closes the shimmer; tone 1 = 0 cents = the old pair). */
+const dur=.12+.08*decay;this.osc.type='square';this.osc.frequency.setValueAtTime(560*1.05*tune,when);this.osc.frequency.exponentialRampToValueAtTime(560*tune,when+.01);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='square';this.osc2.frequency.setValueAtTime(845*tune,when);this.osc2.detune.setValueAtTime((tone-1)*30,when);og2.setValueAtTime(vel*.5,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.8)}else if(type==='clave'){
+/* v0.15.0 P1: wood resonance (the two sine modes 1 : 1.5 stay) + a
+   broadband KNOCK transient at contact (bandpass 1.1 kHz·tone, punch
+   maps the level) — real claves carry a click under the ring. */
+this.osc.type='sine';this.osc.frequency.setValueAtTime(2500*tune,when);og.setValueAtTime(vel*.7,when);og.exponentialRampToValueAtTime(.0001,when+.012);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(3750*tune,when);og2.setValueAtTime(vel*.25,when);og2.exponentialRampToValueAtTime(.0001,when+.009);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1100*tone,when);this.nFilter.Q.value=1.2;ng.setValueAtTime(vel*(.1+.25*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.004)}else if(type==='zap'){
 /* fast downward sweep (laser): carrier glide + synced bandpass chirp */
 const dur=.2+.1*decay;this.osc.type='sine';this.osc.frequency.setValueAtTime(1600*tune,when);this.osc.frequency.exponentialRampToValueAtTime(Math.max(70*tune,40),when+.14);og.setValueAtTime(vel*.7,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(4000,when);this.nFilter.frequency.exponentialRampToValueAtTime(200,when+.12);this.nFilter.Q.value=3;ng.setValueAtTime(vel*.3,when);ng.exponentialRampToValueAtTime(.0001,when+.1)}else if(type==='boom'){
 /* sub drop with a clean reverb-ready tail */
