@@ -119,18 +119,20 @@ Honest subset classification (v0.4.0):
 | `G45` (UI options exposure) | v0.13.1: 0 orphan labels in the live DOM; WIDTH slider 1→1.8→1 drives master.widthMaster + eng.widthOn (1 = exact neutral); PP toggle flips fx.pingPong + eng.ppOn; IR long/short/classic swaps eng._irKind; 6 delay divisions (1/16 & 1/2 math exact); search filters 310→6 and restores; 9 composer styles — the 4 new families compose byte-identical twice | CI + local |
 | `G46` (new voices) | v0.14.0: darbuka low>snap band (0.506>0.046, dum body); tambourine 5–9k>150–400 (0.405>0.139, jingles); triangle ring RMS(0.8–2.2 s)=.115× early (2-stage sustain); downlifter 100–1k band drains ~1e4× (sweep descends through+below it); peak 0.33; determinism 1.3e-7 | CI + local |
 | `G47` (drum v2 params) | v0.14.0: dist RMS ×2.12 + audible (maxDiff .45); glide sub-centroid 136/111=1.23; bursts mid-span (20–44 ms) ×7.2 vs nb=2 (bursts@25/34 ms vs silence) + audible; bright 9–14k 0.410/0.272; ALL neutral pairs <1e-6 (dist0/glide0/bursts4/bright1 = exact v0.13.1); determinism 0.0 | CI + local |
+| `G48` (percussion v3) | v0.15.0: conga shell-partial(744–920 Hz) share .039 + attack/body ×2.04 (was a bare-sine beep); bongo partial(1080–1280 Hz) .017; tom bend-band ×12.4 glide-band; cowbell tone-spread audible (2.8e-1); clave knock audible (2.2e-2); peak .31; determinism 6.0e-8 | CI + local |
+| `G49` (v0.15 voices) | v0.15.0: crash mid-ring .371× early + 4–12k share .49 (2-stage shimmer); revcym swell ×428 + hard cut 3.5e-18; agogo upper-mode .162 + mid ring .108× early; timbale ping .525 > low .017 + crack .044; peak .34; determinism 1.8e-7 | CI + local |
 | `G41` (master space) | v0.12.0: neutral perturb→restore maxDiff 2.46e-7; width 1.8 HF-side ×1.77 (300 Hz protection by design); ping-pong L−R flips 2→46; long-IR decay 48.7× short | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.14.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **46 MAIN entries**, of
-which **44 are hard** (offline/pure — CI asserts all 44 ids incl. G24 song
+Gate-truth accounting (v0.15.0 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **48 MAIN entries**, of
+which **46 are hard** (offline/pure — CI asserts all 46 ids incl. G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
 voice, G35 insert FX, G36 freeze, G37 editor, G38 slices, G39 drum engine
 v2, G40 percussion + library, G41 master space, G42 synth v2-lite, G43 moog
 insert, G44 load/steal stress, G45 UI options exposure, G46 new voices,
-G47 drum v2 params) and
+G47 drum v2 params, G48 percussion v3, G49 v0.15 voices) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
@@ -254,15 +256,22 @@ CHANGELOG 0.12.0 is the measured proof):
   (sub + body); conga, bongo, cowbell (560+845 Hz squares), clave,
   zap, boom; v0.14.0 adds darbuka (dum+tek goblet drum), tambourine
   (jingle stack + membrane), triangle (2-stage inharmonic ring) and
-  downlifter (the riser's mirror).
+  downlifter (the riser's mirror); v0.15.0 adds crash (2-stage metal
+  wash), revcym (reverse swell with hard cut), agogo (double-bell
+  modes) and timbale (metal-shell ping + rim crack).
+- **Percussion v3 (v0.15.0)** — the five legacy perc voices rebuilt
+  behind the SAME params: conga/bongo are real membrane models now
+  (strike bend + shell partial + slap — the composer-kick perc lane),
+  tom gained the two-stage pitch path, cowbell a strike transient +
+  tone-mapped pair spread, clave a punch-driven knock.
 - **Drum v2 params (v0.14.0, all optional + legacy-neutral)** — kick
   `dist` (drive into the existing shaper) + `glide` (pitch-env start),
   clap `bursts` (2–6, default 4 = the v0.12.0 layout), hat `bright`
   (BP corner √-scaled).
 - **Drum track editor (v0.14.0)** — the Sound tab edits drum tracks
-  directly: TYPE select (all 21 types) + the 4 core params + the 4
+  directly: TYPE select (all 25 types) + the 4 core params + the 4
   v2 params; no preset hunt required.
-- **Library 312 presets / 8 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
+- **Library 345 presets / 8 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
   TECHNO, TRANCE, PROGRESSIVE, HI-TECH) with layered per-genre kits
   (KITS export) — all AUDITION-able in the Sound tab; live search box.
 - **Master space** — stereo width `widthMaster` (0–200 %, mid/side with

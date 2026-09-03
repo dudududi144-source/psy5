@@ -133,12 +133,21 @@ DrumVoice (v0.12.0 — multi-layer; every layer zeroed at the hit anchor,
          4 bursts (~11 ms spacing) + tail burst (long decay)
   SNARE  osc2 (triangle TONE, 0.4-semitone drop, punch -> decay)
          + noise -> BP(1900*tone)  (dual-band)
-  TOM    osc (sine sweep 180->92*tune) + strike noise (BP 1800, 8 ms)
+  TOM    osc (sine) TWO-stage pitch: strike bend 1.45x->1 in 28 ms THEN
+         glide -> 0.55*tune (v0.15.0) + overtone sine 1.6*f0 + strike noise
   RIM    osc (sine) + FM: modulator 2.76x, depth 1.4x -> osc.frequency
   SHAKER noise -> BP(5500*tone) dual-envelope micro-structure
-  CONGA/BONGO  sine + pitch bend + noise touch (membrane model)
-  COWBELL  osc square 560*tune + osc2 square 845*tune (documented 1.509)
-  CLAVE  osc sine 2500*tune + osc2 sine 3750*tune (wood modes 1 : 1.5)
+  CONGA/BONGO  (v0.15.0 MEMBRANE v3) sine strike bend (1.25..1.8x->1, punch
+         maps depth) + shell partial 2.6x/2.7x*f0 with bend (tone maps
+         level) + slap transient BP 2100/3200*tone (punch maps level);
+         was a bare sine — the beep the owner flagged on every composer
+         kit's perc lane
+  COWBELL  (v0.15.0) osc square 560*tune with strike transient (1.05x->1,
+         10 ms) + osc2 square 845*tune, tone-mapped detune spread
+         ((tone-1)*30 cents; tone 1 = 0 = the old pair; detune joins the
+         hit() zero-anchor so a pooled reuse never carries the spread)
+  CLAVE  (v0.15.0) wood modes 1 : 1.5 (2500/3750*tune) + broadband KNOCK
+         transient BP 1100*tone, punch-scaled
   ZAP    osc glide 1600*tune -> 70*tune + BP chirp 4000 -> 200
   BOOM   osc sub drop 70*tune -> 28 + LP 400 touch (reverb-ready tail)
   IMPACT osc sub 60->30 + osc2 triangle body 120->55
@@ -150,6 +159,19 @@ DrumVoice (v0.12.0 — multi-layer; every layer zeroed at the hit anchor,
          TWO-stage decay (fast set-down then long ring; decay maps ring)
   DOWNLIFTER (v0.14.0) noise HP 6.2k -> 180 (exponential descent) +
          osc sine 180*tune -> 42 (the riser's mirror)
+  CRASH (v0.15.0) metal stack at 52 Hz*tune -> BP 8.6k ->
+         HP(4600*sqrt(tone)), TWO-stage shimmer (set-down to .6 level by
+         40% of ring) + noise wash HP 5.2k (punch maps level); durEst
+         1.2+1.8*decay
+  REVCYM (v0.15.0) metal stack at 46 Hz*tune + noise HP 3.8k swell
+         EXPONENTIALLY into the drop, HARD cut at dur (setValueAtTime 0);
+         durEst .8+.8*decay
+  AGOGO (v0.15.0) two inharmonic bell modes 1 : 1.506 (1245*tune) with
+         6% strike bend, tone lifts upper mode, punch click HP 3.6k;
+         durEst .12+.22*decay
+  TIMBALE (v0.15.0) osc sine ping 840*tune (bend 1.18x->1, 22 ms) +
+         osc2 triangle shell mode 1.68x + rim-shot BP 2600*tone (punch
+         maps crack); durEst .1+.2*decay
   v0.14.0 optional params (all legacy-neutral — absent = exact v0.13.1):
     kick dist 0..1 (lazy drive gain 1+5.5*d^2 into the EXISTING shaper,
          node built on first use, rerouted via connect()),
@@ -206,7 +228,7 @@ UI OPTIONS EXPOSURE (v0.13.1) — the v0.12.0/v0.13.0 engine capabilities get
   byte-untouched). A11y: all labels associated (for= / nesting /
   aria-label) — G45 pins the whole exposure contract with numbers.
 
-Library: 312 presets (195 drums + 117 synths), unique ids,
+Library: 345 presets (228 drums + 117 synths), unique ids,
 schema-validated (G40 +
 tests/v2-library.test.ts). KITS: 8 layered per-genre kits mapping the 9
 composer roles {kick, snare, hat, perc, bass, lead, pad, arp, fx} to

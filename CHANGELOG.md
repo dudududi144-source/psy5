@@ -3,6 +3,110 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.15.0] — Run 20e: PERCUSSION v3 (owner-flagged conga fix) + 4 new voices (crash/revcym/agogo/timbale) + library 312→345
+
+> Owner report (verbatim): "יש הרבה בעיות במיוחד עם סאונדים בשם conga הם
+> בעייתיים יש גם עוד קצת פרקשנסן בעייתיים יש לשפר עוד ולהוסיף" — many
+> problems, ESPECIALLY the conga sounds; more problematic percussions;
+> improve further AND add. The complaint was structural: the conga voice
+> is the perc lane of ALL EIGHT composer kits (PS-CONGA-LOW,
+> DR-CONGA-GRAVE, GO-CONGA-RITUAL, FO-CONGA-PUSH, TE-CONGA-WAREHOUSE,
+> TR-CONGA-ISLE, PR-CONGA-EARTH, HT-CONGA-CIRCUIT) — every generated song
+> carried the flawed model. v0.15.0 rebuilds five perc voices, adds four
+> new ones, and grows the library by 33 presets. Commands: `bun test`
+> (451 tests / 40 files), `node tools/verify.mjs`, `bun tools/e2e.mjs`
+> (46/46 HARD — G48/G49 new).
+
+### PERCUSSION v3 — five voices rebuilt inside the SAME pooled nodes
+
+Every rebuild: same DrumVoice topology (no new nodes, no topology change),
+same parameter surface (tune/decay/tone/punch keep their meaning — the
+sound behind them is rebuilt), same drumDurEst windows (pool discipline
+moved ZERO), hot path stays allocation-free.
+
+| voice | was (v0.12.0) | now (v0.15.0) |
+|---|---|---|
+| conga | bare sine, 1.08×→1 bend over 50 ms, 4 ms noise — read as a BEEP | shell-reinforced membrane: strike bend 1.25–1.7×→1 over 35 ms (punch maps depth), shell partial at 2.6×f0 with bend (tone maps level), slap transient 2.1 kHz·tone (punch maps level) |
+| bongo | same bare-sine beep at 440 Hz | same membrane model, deeper bend 1.35–1.8×→1 in 28 ms (slappier family), partial 2.7×f0, slap 3.2 kHz·tone |
+| tom | one sine sweep 180→92 Hz + 8 ms noise | two-stage pitch: bend 1.45×→1 in 28 ms THEN the glide, overtone sine 1.6×f0, wider strike noise |
+| cowbell | static 560+845 squares | strike transient on the lower square (1.05×→1, 10 ms) + tone maps a detune spread between the pair (tone 1 = 0 cents = the old pair) |
+| clave | two sine modes only | modes unchanged + broadband KNOCK transient (1.1 kHz·tone bandpass, punch-scaled) |
+
+G48 evidence (solo hits, fresh offline contexts, the G46 methodology):
+conga shell-partial band (744–920 Hz) share **.039** (the bare sine put ≈0
+there), attack/body RMS **×2.04**; bongo partial share **.017** (diluted by
+the strong fundamental + slap total — still ≈0 on the old beep); tom
+bend-band/glide-band **×12.4**; cowbell tone-spread maxDiff **2.8e-1**;
+clave knock maxDiff **2.2e-2**; min peak **.31**; determinism **6.0e-8**.
+
+Pooled-reuse safety: the hit() zero-anchor now also resets osc/osc2.detune
+— the cowbell spread can never leak into a voice reused by another type.
+Bit-neutral for every legacy path (detune was always 0 before v0.15.0).
+
+### FOUR NEW VOICES — the transition/bell/shell territory was empty
+
+- **crash** — cymbal wash: the EXISTING 6-square inharmonic metal stack
+  (HAT_RATIOS, lazily shared — no new nodes) at a 52 Hz·tune base, BP 8.6k
+  / HP 4.6k·√tone, TWO-stage envelope (set-down to .6 level by 40% of the
+  ring, then the long decay — the shimmer a one-point exponential cannot
+  hold) + a highpassed noise wash (punch maps level, tone maps corner).
+  decay maps the ring up to ~4 s. G49: mid-ring RMS(1.0–2.0 s) **.371×**
+  early (a one-point exp sits far below), 4–12 kHz share **.49**.
+- **revcym** — the reverse-cymbal transition classic: metal stack + noise
+  swell EXPONENTIALLY into the drop, HARD cut at dur (the vacuum the ear
+  wants). Place the hit on the drop; the swell leads INTO it. G49: swell
+  RMS **×428** the early window, post-cut RMS **3.5e-18**.
+- **agogo** — two inharmonic bell modes (1 : 1.506, the double-bell
+  recipe) with a 6% strike bend; tone lifts the upper mode, punch adds a
+  3.6 kHz click. G49: upper-mode share **.162**, mid-ring **.108×** early.
+- **timbale** — the metal-shell drum: pinged 840 Hz fundamental (bend
+  1.18×→1 in 22 ms), shell mode 1.68× (triangle), rim-shot band
+  2.6 kHz·tone (punch maps the crack). G49: ping(700–1000) **.525** vs
+  low(150–300) **.017**, crack share **.044**.
+
+All four: pool-disciplined (exact drumDurEst windows .34–3.0 s at decay 1),
+lazy (metal stack on first hit), deterministic (double render maxDiff
+< 1e-6), non-silent (min peak > .05). Worklet parity: the WORKLET engine
+keeps its documented REDUCED set — the new types map to V_PERC with honest
+drumDur windows (2.2/1.4/.3/.28 s); no worklet code pretends to the new
+models.
+
+### LIBRARY 312 → 345
+
+33 v0.15.0 presets across all 8 genres: 6 crash, 5 revcym, 5 agogo,
+6 timbale, plus 11 v3 showcase variants of the rebuilt membrane family
+(PS-CONGA2-WOODY, PR-CONGA2-DEEP, GO-CONGA2-OPEN, PS-BONGO2-SNAP,
+TE-TOM2-CANNON, TR-TOM2-808, PS-COW2-BEAT, TE-COW2-CLUB, PS-CLAVE2-KNOCK,
+HT-CLAVE2-WOOD, FO-BONGO2-SKIN). Data-layer rules (tests/drum-v15.test.ts):
+the four new durEst windows pinned EXACT; all v0.14 windows re-asserted
+unchanged; engine/worklet/ui-tests source pins cover the new models; every
+new preset inside the engine clamps.
+
+### Performance / load / latency (standing owner brief)
+
+No new nodes anywhere — the five rebuilds and four new voices reuse the
+pooled DrumVoice skeleton (osc/osc2/noise + the lazy metal stack); the hot
+path remains param automation over the shared noise buffer, allocation-free
+per hit (the scratch param object pattern). Voice stealing, tiers, and
+busyUntil windows: UNCHANGED (drumDurEst formulas for existing types moved
+zero; the four new types carry exact windows). detune joins the zero
+anchor: two extra setValueAtTime calls per hit — sub-microsecond, and it
+CLOSES a (theoretical) pooled-reuse leak.
+
+### CI watch
+
+46/46 HARD across two subset runs this cycle (41 light gates + G39/G40/
+G41/G48/G49 heavy offline renders — the sandbox wall-clock split the run;
+CI keeps asserting the full set in one job); the growth (44→46) stays
+inside the explicit `timeout-minutes` headroom the gates job carries.
+Split plan (pure vs offline-render halves) unchanged and ready if a run
+ever approaches it.
+
+### SW
+
+CACHE_VERSION → `psy6-v0.15.0` (network-first SW — clients pick the new
+build on next visit).
+
 ## [0.14.0] — Run 20d: DRUM v2 params + 4 new percussion voices + drum track editor (sounds + options)
 
 > The owner's standing brief: keep adding higher-level sounds ("יש להמשיך
