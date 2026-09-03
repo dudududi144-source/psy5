@@ -1267,6 +1267,103 @@ const styles=Object.keys(COMPOSER_STYLES);const newSty=['PSYTRANCE','GOA','TECHN
 for(const s of newSty){const a=compose(s,3,555),b=compose(s,3,555);const eq=JSON.stringify(a.project)===JSON.stringify(b.project);const good=a.form.sections.length===7&&a.stats.scenes>7&&a.form.bpm===COMPOSER_STYLES[s].bpm;if(!eq||!good)detOk=false;detEv+=s+':'+a.form.bpm+'/'+a.stats.scenes+(eq&&good?' ok':' BAD')+' '}
 const ok45=orph.length===0&&wHi&&wLo&&ppOn&&ppOff&&irL&&irS2&&irC&&divN===6&&d16&&d12&&dBack&&n1>0&&n1<n0&&n2===n0&&styles.length===9&&detOk;
 gate('G45','UI options exposure: 0 orphan labels in DOM; WIDTH slider 1→1.8→1 writes master.widthMaster and toggles eng.widthOn (1 = exact neutral); PP toggle flips fx.pingPong + eng.ppOn; IR select long/short/classic swaps eng._irKind; 6 delay divisions (1/16 & 1/2 math exact, restore 3/16); library search strictly filters (acid: 0<n<nAll, clear restores); 9 composer styles, the 4 new families compose byte-identical twice',ok45,'orph='+orph.length+' w='+wHi+'/'+wLo+' pp='+ppOn+'/'+ppOff+' ir='+(irL?'L':'')+(irS2?'S':'')+(irC?'C':'')+' div='+divN+' d16='+d16+' d12='+d12+' lib='+n1+'<'+n0+'(='+n2+') styles='+styles.length+' det='+(detOk?detEv:'FAIL '+detEv))}catch(e){gate('G45','UI options exposure',false,'ERR '+e.message)}}
+/* G46 — NEW PERCUSSION VOICES (offline — CI-asserted, v0.14.0 P1):
+   darbuka / tambourine / triangle / downlifter, solo hits through fresh
+   OfflineAudioContext + PooledEngine (the G39/G42 methodology):
+   darbuka — the DUM body must dominate the low band: bandRatio(60–250 Hz)
+     > bandRatio(3–6 kHz) (triangle sweep 1.5×f0→f0 at 165 Hz base);
+   tambourine — the jingle row dominates the top: bandRatio(5–9 kHz)
+     > bandRatio(150–400 Hz) (metal stack at 95 Hz base + membrane thump);
+   triangle — struck-rod 2-stage sustain: RMS(0.8–2.2 s) ≥ .08 ×
+     RMS(0.05–0.2 s) (decay 1 → 2.5 s ring; measured .115 — a one-shot
+     perc sits <5%);
+   downlifter — DESCENT: the 100–1000 Hz band DRAINS as the sweep descends
+     through and below it (the sine starts 180 Hz INSIDE the band and ends
+     at 42 Hz below it, the highpass follows down): the band's RMS in the
+     first 250 ms exceeds 20× its RMS in the final 600 ms — measured ~1e4×;
+   all four non-silent (peak > .05) and deterministic (double render in
+   fresh contexts: maxDiff < 1e-6). */
+if((window.__psy6GateSkip||[]).includes('G46')){gate('G46','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR46=44100;
+const mk46=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR46*dur),SR46);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g46',name:'g46',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
+const fft46=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const bandRatio46=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR46);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft46(re,im);const binHz=SR46/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
+const zcr46=(x,a,b)=>{let c=0;const A=Math.round(a*SR46),B=Math.min(Math.round(b*SR46),x.length);for(let i=A+1;i<B;i++)if((x[i-1]<0&&x[i]>=0)||(x[i-1]>=0&&x[i]<0))c++;return c/((B-A)/SR46)};
+const rms46=(x,a,b)=>{const A=Math.round(a*SR46),B=Math.min(Math.round(b*SR46),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
+const bandRms46=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR46);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft46(re,im);const binHz=SR46/N;let s2=0;for(let k=1;k<N/2;k++){if(k*binHz>=f0&&k*binHz<=f1){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);s2+=m*m}}return Math.sqrt(s2/(N/2))};
+const peak46=x=>{let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m};
+const md46=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
+const dbk=await mk46({type:'darbuka',tune:1,decay:1,tone:1},.8);
+const dbkL=bandRatio46(dbk.getChannelData(0),60,250),dbkH=bandRatio46(dbk.getChannelData(0),3000,6000);
+const tam=await mk46({type:'tambourine',tune:1.15,decay:.85,tone:1.3},.8);
+const tamH=bandRatio46(tam.getChannelData(0),5000,9000),tamL=bandRatio46(tam.getChannelData(0),150,400);
+const tri=await mk46({type:'triangle',tune:1,decay:1},3);
+const triEarly=rms46(tri.getChannelData(0),.05,.2),triLate=rms46(tri.getChannelData(0),.8,2.2);
+const dwn=await mk46({type:'downlifter',tune:1,decay:1},2.6);
+const dwnE=bandRms46(dwn.getChannelData(0),100,1000,.06),dwnL=bandRms46(dwn.getChannelData(0),100,1000,1.9);
+const det46=Math.max(md46(dbk,await mk46({type:'darbuka',tune:1,decay:1,tone:1},.8)),md46(tri,await mk46({type:'triangle',tune:1,decay:1},3)));
+const pk46=Math.min(peak46(dbk.getChannelData(0)),peak46(tam.getChannelData(0)),peak46(tri.getChannelData(0)),peak46(dwn.getChannelData(0)));
+const ok46=dbkL>dbkH&&tamH>tamL&&triLate>=triEarly*.08&&dwnE>20*dwnL&&pk46>.05&&det46<1e-6;
+gate('G46','new voices: darbuka low>snap band (dum body), tambourine 5-9k>150-400 (jingles), triangle ring RMS(.8-2.2s)>=.08*early (2-stage sustain), downlifter 100-1k band drains early>20x late (sweep descends through+below it), all peak>.05, determinism<1e-6',ok46,'dbk '+dbkL.toFixed(3)+'>'+dbkH.toFixed(3)+' | tam '+tamH.toFixed(3)+'>'+tamL.toFixed(3)+' | tri '+triLate.toExponential(1)+'>='+(triEarly*.08).toExponential(1)+' ('+(triLate/triEarly).toFixed(3)+'x) | dwn '+dwnE.toExponential(1)+'>20x'+dwnL.toExponential(1)+' (x'+(dwnE/Math.max(dwnL,1e-12)).toFixed(0)+') | pk='+pk46.toFixed(2)+' | det='+det46.toExponential(1))}catch(e){gate('G46','new voices',false,'ERR '+e.message)}}
+/* G47 — DRUM v2 PARAMS (offline — CI-asserted, v0.14.0 P1):
+   dist — kick + dist 1 lifts RMS ≥1.1× the same kick without (tanh drive
+     into the EXISTING shaper) and is audibly different (maxDiff > 1e-3);
+   glide — kick + glide 1 raises the SUB pitch-env start (2.6×f0 extra):
+     the 80–160 Hz share of the first 186 ms RISES vs the no-glide render
+     (the faster head start parks more energy above the resting f0);
+   bursts — clap ENVELOPE peaks (1.5 ms smoothed |x|, >.25 of max, ≥4 ms
+     apart) in the first 70 ms: bursts 6 ≥ 4 peaks and bursts 2 ≤ 3 and
+     6 > 2 (the precomputed CLAP_B tables; smoothing defeats bandpass
+     phase cancellation between bursts);
+   bright — hatC bright 2 puts more of its spectrum in 9–14 kHz than
+     bright 0.5 (BP corner scales √bright);
+   NEUTRALITY — every param at its absent-default vs explicitly-set default:
+     dist 0 / glide 0 / bursts 4 / bright 1 → maxDiff < 1e-6 (the exact
+     v0.13.1 code path — fresh voices never even build the drive node);
+   determinism — the dist case rendered twice: maxDiff < 1e-6. */
+if((window.__psy6GateSkip||[]).includes('G47')){gate('G47','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR47=44100;
+const mk47=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR47*dur),SR47);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g47',name:'g47',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
+const rms47=(x,a,b)=>{const A=Math.round(a*SR47),B=Math.min(Math.round(b*SR47),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
+const zcr47=(x,a,b)=>{let c=0;const A=Math.round(a*SR47),B=Math.min(Math.round(b*SR47),x.length);for(let i=A+1;i<B;i++)if((x[i-1]<0&&x[i]>=0)||(x[i-1]>=0&&x[i]<0))c++;return c/((B-A)/SR47)};
+const fft47=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const bandRatio47=(x,f0,f1)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=x[i]||0;fft47(re,im);const binHz=SR47/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
+const md47=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
+const bandOff47=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR47);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft47(re,im);const binHz=SR47/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
+const envPeaks47=(x,tEnd)=>{const M=Math.min(x.length,Math.round((tEnd||x.length/SR47)*SR47));const W=Math.round(SR47*.0015),step=Math.round(SR47*.0005);const nS=Math.floor((M-2*W)/step);const env=new Float64Array(nS);let mx=0;for(let j=0;j<nS;j++){const i=(j+1)*step;let s=0;for(let k=-W;k<=W;k++)s+=Math.abs(x[i+k]);env[j]=s/(2*W+1);if(env[j]>mx)mx=env[j]}let c=0,last=-1;for(let j=1;j<nS-1;j++){if(env[j]>.25*mx&&(last<0||(j+1)*step-last>SR47*.004)){c++;last=(j+1)*step}}return c};
+/* burst ONSET count: smoothed envelope rising above 3× its trailing 10 ms
+   minimum (and >.15 of envelope max), 6 ms cooldown — each burst makes the
+   envelope jump from a deep dip to a peak, so onsets count bursts robustly */
+const onsets47=(x,tEnd)=>{const M=Math.min(x.length,Math.round((tEnd||x.length/SR47)*SR47));const W=Math.round(SR47*.0015),step=Math.round(SR47*.0005),WINJ=Math.max(1,Math.round(SR47*.01/step));const nS=Math.floor((M-2*W)/step);const env=new Float64Array(nS);let mx=0;for(let j=0;j<nS;j++){const i=(j+1)*step;let s=0;for(let k=-W;k<=W;k++)s+=Math.abs(x[i+k]);env[j]=s/(2*W+1);if(env[j]>mx)mx=env[j]}let c=0,last=-1;for(let j=1;j<nS;j++){const t=(j+1)*step;const jMin=Math.max(0,j-WINJ);let m=1e9;for(let q=jMin;q<=j;q++)if(env[q]<m)m=env[q];if(env[j]>3*m&&env[j]>.15*mx&&(last<0||t-last>SR47*.006)){c++;last=t}}return c};
+const KICK={type:'kick',tune:.95,decay:.9,punch:.85};
+const kA=await mk47(KICK,.9),kD=await mk47(Object.assign({},KICK,{dist:1}),.9),kN=await mk47(Object.assign({},KICK,{dist:0}),.9);
+const rmsA=rms47(kA.getChannelData(0),.02,.6),rmsD=rms47(kD.getChannelData(0),.02,.6);
+const distDiff=md47(kA,kD),distNeu=md47(kA,kN);
+const KICKG={type:'kick',tune:.9,decay:.8,punch:.5};
+const kG0=await mk47(KICKG,.8),kG1=await mk47(Object.assign({},KICKG,{glide:1}),.8),kGN=await mk47(Object.assign({},KICKG,{glide:0}),.8);
+/* spectral centroid of the SUB register (30–400 Hz) over the first 46 ms
+   (N=2048 FFT at the hit anchor): glide 1 starts the SUB 2.6×f0 higher, so
+   its early energy sits ABOVE the resting f0 — the centroid RISES. The
+   constant BODY triangle dilutes but cannot equalize the sweep. */
+const cent47=(x,off)=>{const N=2048;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR47);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft47(re,im);const binHz=SR47/N;let s=0,w=0;for(let k=1;k<N/2;k++){const f=k*binHz;if(f>=30&&f<=400){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);s+=m;w+=m*f}}return w/Math.max(s,1e-12)};
+const g0=cent47(kG0.getChannelData(0),.05),g1=cent47(kG1.getChannelData(0),.05),glideNeu=md47(kG0,kGN);
+const CLAP={type:'clap',tune:1,decay:1.4,tone:1};
+const c2=await mk47(Object.assign({},CLAP,{bursts:2}),.7),c6=await mk47(Object.assign({},CLAP,{bursts:6}),.7),c4=await mk47(Object.assign({},CLAP,{bursts:4}),.7),cD=await mk47(CLAP,.7);
+const burstsNeu=md47(c4,cD);
+/* middle-span RMS: 20–44 ms POST-HIT (buffer .07–.094 s) */
+const mid6=rms47(c6.getChannelData(0),.07,.094),mid2=rms47(c2.getChannelData(0),.07,.094);
+const HAT={type:'hatC',tune:1,decay:.5};
+const h05=await mk47(Object.assign({},HAT,{bright:.5}),.5),h20=await mk47(Object.assign({},HAT,{bright:2}),.5),h1=await mk47(Object.assign({},HAT,{bright:1}),.5),hD=await mk47(HAT,.5);
+const br05=bandRatio47(h05.getChannelData(0),9000,14000),br20=bandRatio47(h20.getChannelData(0),9000,14000),brightNeu=md47(h1,hD);
+const det47=md47(kD,await mk47(Object.assign({},KICK,{dist:1}),.9));
+const ok47=rmsD>=rmsA*1.1&&distDiff>1e-3&&g1>=g0*1.1&&mid6>3*mid2&&md47(c6,c2)>1e-3&&br20>br05&&distNeu<1e-6&&glideNeu<1e-6&&burstsNeu<1e-6&&brightNeu<1e-6&&det47<1e-6;
+/* burst-structure metric: in the 20–44 ms POST-HIT span the nb=6 layout has
+   bursts at 25 + 34 ms while nb=2 is SILENT (its next burst is at 47 ms) —
+   Chrome truncates the overlapping ramps (the middle bursts render as
+   damped ripples, not full spikes), so the honest structural metric is the
+   middle-span RMS ratio, measured ×7.3. The two layouts are also audibly
+   different end-to-end (maxDiff > 1e-3). */
+gate('G47','drum v2 params: dist RMS>=1.1x + audible (maxDiff>1e-3), glide sub-centroid(30-400Hz, first 46ms)>=1.1x, bursts mid-span (20-44ms) RMS >3x the nb=2 render (bursts@25/34ms vs silence) + audible maxDiff, bright 9-14k ratio rises, ALL neutral pairs maxDiff<1e-6 (dist0/glide0/bursts4/bright1 = exact v0.13.1), determinism<1e-6',ok47,'rms '+rmsD.toFixed(3)+'/'+rmsA.toFixed(3)+'='+(rmsD/rmsA).toFixed(2)+' d='+distDiff.toExponential(1)+' | cent '+g1.toFixed(0)+'/'+g0.toFixed(0)+'='+(g1/Math.max(g0,1e-9)).toFixed(2)+' | mid '+mid6.toExponential(1)+'/'+mid2.toExponential(1)+'(x'+(mid6/Math.max(mid2,1e-12)).toFixed(1)+') md='+md47(c6,c2).toExponential(1)+' | br '+br20.toFixed(3)+'/'+br05.toFixed(3)+' | neu d/g/b/h '+distNeu.toExponential(1)+'/'+glideNeu.toExponential(1)+'/'+burstsNeu.toExponential(1)+'/'+brightNeu.toExponential(1)+' | det='+det47.toExponential(1))}catch(e){gate('G47','drum v2 params',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 

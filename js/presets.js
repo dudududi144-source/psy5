@@ -203,6 +203,74 @@ SP('bass','HT-BASS-FRACTURE','Hi-Tech Fracture Bass','HI-TECH',{wave1:'sawtooth'
 SP('lead','HT-LEAD-VIRUS','Hi-Tech Virus Lead','HI-TECH',{wave1:'square',wave2:'square',detune:14,cutoff:2300,res:14,gate:.45,dec:.18,sus:.38,poly:4});
 SP('pad','HT-PAD-STATIC','Hi-Tech Static Pad','HI-TECH',{wave1:'sawtooth',wave2:'square',oct2:-1,detune:22,cutoff:800,atk:.85,rel:1.55,gate:2.8,poly:8});
 SP('arp','HT-ARP-GLITCH','Hi-Tech Glitch Arp','HI-TECH',{wave1:'square',wave2:'square',detune:5,cutoff:1700,res:13,gate:.2,dec:.08,sus:.16,poly:4});
+/* ── v0.14.0 P2: DRUM v2 GENERATION — 4 new voices (darbuka/tambourine/
+   triangle/downlifter) + the 4 optional drum params (dist/glide/bursts/
+   bright). Every value sits inside the engine clamps (DrumVoice.hit;
+   tests/drum-v14.test.ts enforces the data layer: the optional fields are
+   opt-in per preset — absence remains exact v0.13.1 behavior). ── */
+DP('DBK-DUM-GOA','Darbuka Dum Deep','GOA',{type:'darbuka',tune:.72,decay:1.35,tone:.8});
+DP('DBK-TEK-GOA','Darbuka Tek Sharp','GOA',{type:'darbuka',tune:1.45,decay:.55,tone:1.5});
+DP('DBK-MAQ-GOA','Darbuka Maqsoum','GOA',{type:'darbuka',tune:1.05,decay:.9,tone:1.15});
+DP('DBK-DARK-DPSY','Dark Darbuka Skin','DARK-PSY',{type:'darbuka',tune:.85,decay:1.1,tone:.9,punch:.4});
+DP('DBK-TEK-DPSY','Dark Darbuka Snap','DARK-PSY',{type:'darbuka',tune:1.3,decay:.6,tone:1.7,punch:.7});
+DP('DBK-ROLL-FB','Full-On Darbuka Roll','FULL-ON',{type:'darbuka',tune:1.2,decay:.7,tone:1.3,punch:.55});
+DP('DBK-SOLO-FB','Full-On Darbuka Solo','FULL-ON',{type:'darbuka',tune:1,decay:1,tone:1.2});
+DP('DBK-PSY-PISTON','Psy Darbuka Piston','PSYTRANCE',{type:'darbuka',tune:1.1,decay:.62,tone:1.25,punch:.6});
+DP('DBK-PSY-HOLLOW','Psy Darbuka Hollow','PSYTRANCE',{type:'darbuka',tune:.78,decay:1.25,tone:.75});
+DP('TAM-JINGLE-GOA','Goa Tambourine Jingles','GOA',{type:'tambourine',tune:1.15,decay:.85,tone:1.45});
+DP('TAM-DARK-DPSY','Dark Tambourine Dry','DARK-PSY',{type:'tambourine',tune:.9,decay:.5,tone:.65});
+DP('TAM-TR-BRIGHT','Trance Tambourine','TRANCE',{type:'tambourine',tune:1.05,decay:.9,tone:1.3});
+DP('TAM-PR-WARM','Prog Tambourine Warm','PROGRESSIVE',{type:'tambourine',tune:.85,decay:.75,tone:.8});
+DP('TAM-FB-LIFT','Full-On Tambourine Lift','FULL-ON',{type:'tambourine',tune:1.2,decay:1,tone:1.4});
+DP('TAM-TE-MECH','Techno Mech Tambourine','TECHNO',{type:'tambourine',tune:1.3,decay:.45,tone:1.6});
+DP('TRI-DPSY-RING','Dark Triangle Ring','DARK-PSY',{type:'triangle',tune:1.1,decay:1.4});
+DP('TRI-TE-MARKER','Techno Triangle Marker','TECHNO',{type:'triangle',tune:.95,decay:.8});
+DP('TRI-PR-AIR','Prog Triangle Air','PROGRESSIVE',{type:'triangle',tune:.85,decay:1});
+DP('TRI-GOA-SHRILL','Goa Triangle Shrill','GOA',{type:'triangle',tune:1.35,decay:1.2});
+DP('TRI-PSY-TICK','Psy Triangle Tick','PSYTRANCE',{type:'triangle',tune:1.5,decay:.35});
+DP('DOWN-PSY-DIVE','Psy Downlifter Dive','PSYTRANCE',{type:'downlifter',tune:1,decay:1.2});
+DP('DOWN-DPSY-COLLAPSE','Dark Collapse Downlifter','DARK-PSY',{type:'downlifter',tune:.8,decay:1.6});
+DP('DOWN-FB-BREAK','Full-On Break Fall','FULL-ON',{type:'downlifter',tune:1.1,decay:.9});
+DP('DOWN-HT-VACUUM','Hi-Tech Vacuum Fall','HI-TECH',{type:'downlifter',tune:.9,decay:1.5});
+DP('DOWN-TR-LAND','Trance Landing','TRANCE',{type:'downlifter',tune:1.05,decay:1.1});
+DP('DOWN-PR-BREATH','Prog Downlifter Breath','PROGRESSIVE',{type:'downlifter',tune:.85,decay:1.35});
+DP('TE-KICK-DIST','Techno Distorted Kick','TECHNO',{type:'kick',tune:.95,decay:.9,punch:.85,dist:.75});
+DP('TE-KICK-CLIP','Techno Clipped Kick','TECHNO',{type:'kick',tune:1.05,decay:.7,punch:.95,dist:1});
+DP('DPSY-KICK-GNARL','Dark Gnarled Kick','DARK-PSY',{type:'kick',tune:.9,decay:1,punch:.8,dist:.6,glide:.3});
+DP('HT-KICK-SLEDGE','Hi-Tech Sledge Kick','HI-TECH',{type:'kick',tune:1,decay:.85,punch:.9,dist:.85});
+DP('FB-KICK-DRIVE','Full-On Driven Kick','FULL-ON',{type:'kick',tune:.98,decay:.95,punch:.75,dist:.5});
+DP('PS-KICK-BEND','Psy Glide Kick','PSYTRANCE',{type:'kick',tune:.92,decay:.8,punch:.7,glide:.7});
+DP('TE-KICK-DROP','Techno Drop Kick','TECHNO',{type:'kick',tune:.88,decay:1.1,punch:.5,glide:.9});
+DP('DPSY-KICK-SUCK','Dark Suction Kick','DARK-PSY',{type:'kick',tune:.85,decay:1.2,punch:.45,glide:1});
+DP('FB-KICK-SWOOP','Full-On Swoop Kick','FULL-ON',{type:'kick',tune:1.02,decay:.75,punch:.8,glide:.55,dist:.25});
+DP('TR-KICK-WHAMP','Trance Whomp Kick','TRANCE',{type:'kick',tune:.9,decay:1.05,punch:.6,glide:.45});
+DP('TR-CLAP-WIDE6','Trance Wide Clap 6','TRANCE',{type:'clap',tune:1,decay:1.7,tone:.95,bursts:6});
+DP('TR-CLAP-TIGHT2','Trance Tight Clap 2','TRANCE',{type:'clap',tune:1.05,decay:.8,tone:1.1,bursts:2});
+DP('TE-CLAP-STUTTER','Techno Stutter Clap','TECHNO',{type:'clap',tune:.95,decay:.9,tone:1.2,bursts:5});
+DP('PS-CLAP-FLAM','Psy Flam Clap','PSYTRANCE',{type:'clap',tune:1.1,decay:.7,tone:1.15,bursts:3});
+DP('FB-CLAP-STACK','Full-On Stack Clap','FULL-ON',{type:'clap',tune:1,decay:1.4,tone:1,bursts:6});
+DP('GA-CLAP-ECHO','Goa Echo Clap','GOA',{type:'clap',tune:.98,decay:1.9,tone:.85,bursts:5});
+DP('TE-HAT-GLASS','Techno Glass Hat','TECHNO',{type:'hatC',decay:.45,bright:1.7});
+DP('TE-HAT-DUSK','Techno Dusk Hat','TECHNO',{type:'hatC',decay:.6,bright:.6,tone:.8});
+DP('PS-HAT-SIZZLE','Psy Sizzle Hat','PSYTRANCE',{type:'hatC',decay:.35,tone:1.5,bright:1.8});
+DP('GA-HAT-COPPER','Goa Copper Hat','GOA',{type:'hatO',decay:.8,tone:1.2,bright:.7});
+DP('HT-HAT-NEEDLE','Hi-Tech Needle Hat','HI-TECH',{type:'hatC',decay:.3,tone:1.6,bright:2});
+DP('PR-HAT-SOFT2','Prog Soft Hat II','PROGRESSIVE',{type:'hatC',decay:.6,tone:.7,bright:.55});
+DP('PS-ZAP-LASER2','Psy Laser Zap II','PSYTRANCE',{type:'zap',tune:1.4,decay:.9,tone:1.3});
+DP('DPSY-ZIP-SCREAM','Dark Screaming Zip','DARK-PSY',{type:'zap',tune:1.6,decay:1.1,tone:1.5});
+DP('HT-ZAP-RICOCHET','Hi-Tech Ricochet','HI-TECH',{type:'zap',tune:1.25,decay:.7,tone:1.7});
+DP('TE-BOOM-DEPTH','Techno Depth Boom','TECHNO',{type:'boom',tune:.75,decay:1.5});
+DP('DPSY-BOOM-ABYSS','Dark Abyss Boom','DARK-PSY',{type:'boom',tune:.65,decay:1.8});
+DP('FB-IMPACT-SLAM','Full-On Slam Impact','FULL-ON',{type:'impact',tune:1.1,decay:1.2,punch:.8});
+DP('TR-IMPACT-CREST','Trance Crest Impact','TRANCE',{type:'impact',tune:1,decay:1.4});
+DP('GA-TOM-TALK','Goa Talking Tom','GOA',{type:'tom',tune:1.3,decay:.7,tone:1.2});
+DP('PR-TOM-EARTH','Prog Earth Tom','PROGRESSIVE',{type:'tom',tune:.7,decay:1.3,tone:.7});
+DP('HT-CONGA-STRIDE','Hi-Tech Stride Conga','HI-TECH',{type:'conga',tune:1.35,decay:.65,tone:1.3});
+DP('GA-BONGO-FLUTTER','Goa Bongo Flutter','GOA',{type:'bongo',tune:1.25,decay:.8,tone:1.35});
+DP('TE-SHAKER-MECH','Techno Mech Shaker','TECHNO',{type:'shaker',decay:.55,tone:1.4});
+DP('PS-GLITCH-CELL','Psy Cell Glitch','PSYTRANCE',{type:'glitch',tone:1.4,decay:.9});
+DP('DPSY-GLITCH-CANCER','Dark Cancer Glitch','DARK-PSY',{type:'glitch',tone:1.8,decay:1.1});
+
 /* ── v0.13.0 P2: SYNTH v2-lite generation — gen:'v13' marks presets that use
    the new optional engine params (fenv/fdec/penv/pdec/sub). Every value sits
    inside the engine clamps (SynthVoice.noteOn; tests/synth-v2.test.ts enforces

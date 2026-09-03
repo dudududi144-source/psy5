@@ -9,7 +9,7 @@ import { libCount, libFilter, libFind, KITS } from '../js/presets.js'
 const ALL = libFilter('all', 'ALL')
 const DRUMS = ALL.filter(p => p.cat === 'drum')
 const GENRES = ['PSYTRANCE', 'DARK-PSY', 'GOA', 'FULL-ON', 'TECHNO', 'TRANCE', 'PROGRESSIVE', 'HI-TECH']
-const DRUM_TYPES = new Set(['kick', 'snare', 'clap', 'hatC', 'hatO', 'tom', 'rim', 'glitch', 'shaker', 'conga', 'bongo', 'cowbell', 'clave', 'zap', 'boom', 'riser', 'impact'])
+const DRUM_TYPES = new Set(['kick', 'snare', 'clap', 'hatC', 'hatO', 'tom', 'rim', 'glitch', 'shaker', 'conga', 'bongo', 'cowbell', 'clave', 'zap', 'boom', 'riser', 'impact', 'darbuka', 'tambourine', 'triangle', 'downlifter'])
 const clamp = (v: number | undefined, a: number, b: number) => v == null || (v >= a && v <= b)
 
 describe('v2 library breadth (v0.12.0 P2)', () => {
