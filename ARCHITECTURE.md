@@ -161,7 +161,25 @@ Master chain (v0.12.0 P3):
 Genres: TECHNO, PSYTRANCE, TRANCE, PROGRESSIVE, DARK-PSY, GOA, FULL-ON,
 HI-TECH (+ ANY) — 8 musical genres as of v0.12.0
 Categories: drum, bass, lead, pad, pluck, arp, fx
-Library: 178 presets (133 drums), unique ids, schema-validated (G40 +
+SYNTH VOICE (v0.13.0 v2-lite) — osc1+osc2 → mix gains → BiquadFilter (env:
+  start cut·fenv → cut over fdec; fenv legacy 3, fdec legacy atk+dec·0.7)
+  → VCA (ADSR-ish) → chain insert (drive/crush/filter|MOOG) → sends.
+  OPTIONAL preset params, all legacy-neutral: fenv (env amount),
+  fdec (env decay), penv/pdec (pitch env semitones+decay — exponential
+  descent at noteOn), sub (lazy sine sub-osc one octave below; the node is
+  built on first use, absent ⇒ v0.12.0 graph bit-identical). noteOn returns
+  the merged param object (per-voice scratch — no per-hit allocation).
+MOOG INSERT (v0.13.0) — ins.filtOn 4 → AudioWorkletNode 'moog-filter'
+  (worklets/psy-dsp.js MoogFilterProcessor: 4-stage tanh ladder, PSY3 port)
+  in the chain insert slot: cWS → moog → duck. prepInsertDSP(ctx) loads the
+  module once per context (powerOn preloads live; bounce/freeze prep offline
+  when projectUsesMoog). Unloadable → counted biquad-LP fallback.
+LOAD TELEMETRY (v0.13.0) — PooledEngine.loadSnapshot(): active voices,
+  steals, tier-0 starvation attempts, counters, latency; the header LOAD
+  chip paints it at 4 Hz. G44 asserts the discipline under stress.
+
+Library: 250 presets (133 drums + 72 gen:'v13' synths), unique ids,
+schema-validated (G40 +
 tests/v2-library.test.ts). KITS: 8 layered per-genre kits mapping the 9
 composer roles {kick, snare, hat, perc, bass, lead, pad, arp, fx} to
 preset ids; COMPOSER_STYLES ride the kits (kick sacred-consistent per

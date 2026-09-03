@@ -363,7 +363,7 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
     const dPerc = dark.patterns['C3']!.data[3]!.steps.filter(s => s.on).length
     expect(hPerc).toBeGreaterThan(dPerc)          /* glitch density recipe audible */
   })
-  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical per-build (v0.12.0 kit-swap values)', () => {
+  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical per-build (v0.13.0 kit-swap values)', () => {
     /* any intentional change to the recipes (or shared code paths they
        consume) must consciously update these pins — documented contract.
        v0.9.0 REBUILD VALUES: the chord progression engine (P1) re-tones
@@ -375,13 +375,17 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
        CHANGELOG 0.10.0). Determinism re-proven: same seed → byte-identical;
        rhythm tracks byte-identical to v0.8.0 (pinned in the harmony suite). */
     const pins: Record<string, string[]> = {
-      /* v0.12.0 RE-PIN: the composer rides the v0.12.0 layered kits (kick
-         sacred-consistent per style) — whole-project hashes moved; the
-         v0.11.0 values are recorded in CHANGELOG 0.12.0. PATTERN-level
-         form-fp (bb16ce280ff48f88) is UNCHANGED — asserted above. */
-      'FULL-ON': ['a89f76062f5cc2d5', 'a6f74ab733dbb180', 'eca3f96245253bd6'],
-      'DARK-PSY': ['d5a0dd3bc576a0bc', '88ced66a2cdd127f', '1823f63e7b25542c'],
-      'PROGRESSIVE': ['c36e3f979c764693', '39ff990601dc3717', '12e3fb8b026384cb'],
+      /* v0.13.0 RE-PIN: bass/lead/pad/arp roles ride gen:'v13' presets
+         (kick/snare/hat/perc sacred-consistent from v0.12.0) — whole-project
+         hashes moved; the v0.12.0 values (FULL-ON a89f76062f5cc2d5/
+         a6f74ab733dbb180/eca3f96245253bd6, DARK-PSY d5a0dd3bc576a0bc/
+         88ced66a2cdd127f/1823f63e7b25542c, PROGRESSIVE c36e3f979c764693/
+         39ff990601dc3717/12e3fb8b026384cb) are recorded in CHANGELOG 0.13.0.
+         PATTERN-level form-fp (bb16ce280ff48f88) is UNCHANGED — asserted
+         above; determinism re-proven (double run byte-identical). */
+      'FULL-ON': ['83dc9fd03da4dfb4', '8d9f4e650f55ab87', 'b0236a5c7bd79fb6'],
+      'DARK-PSY': ['c5447a30c3f617cd', '5869a01eeb4731be', 'b47472b344feb926'],
+      'PROGRESSIVE': ['d2b3aa8779e19e26', '06b85c7953e71189', 'f892f5610afff47e'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {

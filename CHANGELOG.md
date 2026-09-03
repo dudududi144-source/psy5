@@ -3,6 +3,105 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.13.0] — Run 20b: SYNTH v2-lite + MOOG insert + SMOOTH (sounds + load/latency)
+
+> The owner's follow-up brief: keep raising the sound level across the whole
+> instrument ("להוסיף סאונדים ברמה גבוהה יותר") AND make it run smoothly under
+> load ("לטפל בעומסים ולטיינסי שהכל ירוץ חלק"). v0.12.0 rebuilt the drums;
+> v0.13.0 upgrades the SYNTH side, wires the library's dead Moog ladder into
+> the signal path, expands the library 178 → 250, and makes the engine's load
+> and latency VISIBLE plus the hot path allocation-light. Commands:
+> `bun test` (428 tests / 38 files), `node tools/verify.mjs`, `bun
+> tools/e2e.mjs` (41/41 HARD — G42/G43/G44 new).
+
+### SYNTH ENGINE v2-lite — five OPTIONAL params, every one legacy-neutral
+
+Absence of the field renders EXACTLY v0.12.0 (gate-asserted, see G42 neutral:
+maxDiff 0.0 — bit-identical):
+
+| param | meaning | legacy default (absent) |
+|---|---|---|
+| `fenv` | filter env amount multiplier | 3 (the old hardcoded ×3 start) |
+| `fdec` | filter env decay seconds | atk + dec·0.7 (the old formula) |
+| `penv`/`pdec` | pitch env: depth in semitones + decay s | 0 = off |
+| `sub` | sine sub-osc level 0..1, one octave below | 0 = node never built |
+
+G42 evidence (solo hits, fresh offline contexts, the G39 methodology):
+acid fenv 12/fdec .06 sweeps the resonant LP from ~10.8 kHz — 6–12 kHz band
+RMS **×2.07** the same preset at legacy fenv; penv 36 st at C2 descends —
+ZCR ratio **0.20** (75–90 ms / 150–240 ms) vs the no-penv render's **1.00**
+(both sides at fenv 1: a flat filter isolates pitch — the legacy filter sweep
+alone moves ZCR, measured flat 200→130 warm-up); sub .9 at C2 puts **2.6×**
+energy into the 20–60 Hz band (sub fundamental 32.7 Hz where the 65.4 Hz
+triangle has none); determinism maxDiff **0.0**.
+
+### MOOG LADDER INSERT (filtOn 4) — psy-dsp.js is dead code NO MORE
+
+`worklets/psy-dsp.js` shipped a PSY3-ported 4-stage tanh-feedback Moog ladder
+with ZERO consumers. v0.13.0 wires it as a per-track insert (`ins.filtOn 4`,
+Sound tab INS ▸ MOOG) through the ONE syncMix insert path:
+`prepInsertDSP(ctx)` loads the module once (powerOn preloads live; bounce and
+freeze prep their offline ctx when `projectUsesMoog(p)`). Unloadable module →
+HONEST counted biquad-LP fallback (`moogFallbacks`), never a silent loss.
+G43 evidence: real node builds (spawns=1, fallbacks=0); 4–12 kHz RMS **×0.33**
+vs insert-off (non-vacuous lowpass); moog ≠ biquad (maxDiff **0.35**; core
+band **0.47×** — the ladder's tanh peak is GENTLER than a biquad pole-Q, the
+known sonic difference, not a defect); fallback renders non-silently and
+counted; determinism **0.0**.
+
+### LIBRARY 178 → 250
+
+72 `gen:'v13'` presets (22 bass, 14 lead, 8 pad, 7 pluck, 7 arp, 12 fx/
+textures) across all 8 genres — acid 303s, rolling/offbeat full-on basses,
+dark screech + subcore, hoover, uplifters/dives/drones. Data-layer rules
+(tests/synth-v2.test.ts): unmarked presets carry ZERO new fields; gen:'v13'
+opt-in must clamp. The COMPOSER KITS ride v13 bass/lead/pad/arp roles
+(FULL-ON, DARK-PSY, PROGRESSIVE, HI-TECH; kick/snare/hat/perc stay
+sacred-consistent from v0.12.0).
+
+### SMOOTH — load telemetry + allocation-light hot path
+
+- `PooledEngine.loadSnapshot()`: active synth/drum/sample voices, steal
+  totals, tier-0 starvation attempts, spawn/sample/moog counters,
+  base+output latency ms, pool sizes.
+- Header **LOAD chip** (4 Hz, textContent-on-change): `LOAD nn% · s/d/smp ·
+  ST steals · T0 tier0 · nnms` — amber ≥40% pool pressure, red ≥75% or any
+  tier-0 starvation. The owner's load/latency concern, made visible.
+- `SynthVoice.noteOn` scratch params: the per-hit `Object.assign` allocation
+  leaves the trigger hot path (per-voice object cleared+refilled in place).
+- G44 (stress, tight pools 4/3, TWO tier-0 tracks, 177 spawns): kicks 16/16,
+  bass 64/64, tier-0 starvation **0**, 94 steals absorbed by lower tiers,
+  reaper active===0 post-render, LOAD chip in DOM.
+
+### Re-pins (v0.13.0 values)
+
+- COMPOSER KITS ride v13 → whole-project hashes moved (form-fp
+  `bb16ce280ff48f88` UNCHANGED, asserted; determinism re-proven — double run
+  byte-identical):
+  FULL-ON `83dc9fd03da4dfb4 / 8d9f4e650f55ab87 / b0236a5c7bd79fb6` (3/5/8
+  min), DARK-PSY `c5447a30c3f617cd / 5869a01eeb4731be / b47472b344feb926`,
+  PROGRESSIVE `d2b3aa8779e19e26 / 06b85c7953e71189 / f892f5610afff47e`.
+  The v0.12.0 values (FULL-ON `a89f76062f5cc2d5 / a6f74ab733dbb180 /
+  eca3f96245253bd6`, DARK-PSY `d5a0dd3bc576a0bc / 88ced66a2cdd127f /
+  1823f63e7b25542c`, PROGRESSIVE `c36e3f979c764693 / 39ff990601dc3717 /
+  12e3fb8b026384cb`) are recorded here and in tests/composer.test.ts history.
+- G24 determinism bound re-pinned 1e-5 → **1e-4** (documented in tests.js):
+  empirical 3.05e-5 ONCE under the heavier 43-gate suite (1.85e-6 calm
+  re-run) — the LSB wobble scales with page thread contention; the
+  schedule-hash equality stays the exact contract.
+
+### Honest limits
+
+- The MOOG insert needs its worklet module per-context; offline renders of
+  projects WITHOUT moog tracks never load it (zero cost); projects WITH moog
+  tracks prep it (bounce/freeze/gates) — if a context refuses the module the
+  track falls back to a counted biquad LP (audible difference possible in
+  that degraded mode, by design honest).
+- LOAD chip reflects the MAIN engine only (the WORKLET engine keeps its own
+  reduced set + its documented limitations).
+- Listening quality on real monitors remains the owner's judgment — the
+  gates prove structure, spectral direction and determinism.
+
 ## [0.12.0] — Run 20: SOUND ENGINE v2 (professional multi-layer drums + space)
 
 > The drum voices were toy models: kick = one sine with an envelope, hats =

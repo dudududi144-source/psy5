@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 424 tests across 37 files — 424 pass / 0 fail (357966 expect() calls)
+bun test             # 428 tests across 38 files — 428 pass / 0 fail (359740 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -113,16 +113,20 @@ Honest subset classification (v0.4.0):
 | `G38` (slices) | v0.11.0: detector ≥90% of truths within ±2 hops (measured 100%), sequential slice locks hit every step window in order, per-step lock overrides the track sliceIdx (zero-crossing 43 vs 46) | CI + local |
 | `G39` (drum engine v2) | v0.12.0: kick sub ≥.45 (0.997) + click diff6 ≥.05 (v1 0.0151 → 0.1028) + ZCR pitch descent; hat centroid ≥6 k (12249) + inharmonic gap-cv ≥.2 (0.584 vs degenerate comb 0.009); clap ≥4 bursts (v1 3 → 8); snare dual-band (0.756/0.188); 4 voices deterministic <1e-6 | CI + local |
 | `G40` (percussion v2 + library) | v0.12.0: 178 presets (133 drums) ≥150/≥100, schema 0 bad, genres 8/8, kits 8/8 resolve; tom ZCR monotone descent, cowbell dual-square partials (DFT 560/845 Hz), zap monotone 4/4, boom sub 0.95; determinism 0 | CI + local |
+| `G42` (synth v2-lite) | v0.13.0: acid fenv 6–12k RMS ×2.07 legacy; penv descent z-ratio 0.20 vs no-penv 1.00 (flat-filter isolation); sub 20–60 Hz 0.161 vs 0.062 (2.6×); neutral maxDiff 0.0; determinism 0 | CI + local |
+| `G43` (moog insert) | v0.13.0: real node spawns=1/fallbacks=0; 4–12k ×0.33 vs insert-off; moog≠biquad maxDiff 0.35 (core 0.47× — gentler tanh peak); honest counted fallback; determinism 0 | CI + local |
+| `G44` (load/steal stress) | v0.13.0: 177 spawns, tight pools 4/3, TWO tier-0 tracks: starvation 0, 94 steals absorbed, per-track counts exact, reaper active=0, LOAD chip in DOM | CI + local |
 | `G41` (master space) | v0.12.0: neutral perturb→restore maxDiff 2.46e-7; width 1.8 HF-side ×1.77 (300 Hz protection by design); ping-pong L−R flips 2→46; long-IR decay 48.7× short | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
 Gate-truth accounting (v0.12.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **40 MAIN entries**, of
-which **38 are hard** (offline/pure — CI asserts all 38 ids incl. G24 song
+`runSelfGate()` in js/ui/tests.js): the device runs **43 MAIN entries**, of
+which **41 are hard** (offline/pure — CI asserts all 41 ids incl. G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
 voice, G35 insert FX, G36 freeze, G37 editor, G38 slices, G39 drum engine
-v2, G40 percussion + library, G41 master space) and
+v2, G40 percussion + library, G41 master space, G42 synth v2-lite, G43 moog
+insert, G44 load/steal stress) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
@@ -245,7 +249,7 @@ CHANGELOG 0.12.0 is the measured proof):
   metallic), shaker (bandpass + dual-envelope micro-structure), impact
   (sub + body); NEW: conga, bongo, cowbell (560+845 Hz squares), clave,
   zap, boom.
-- **Library 178 presets / 8 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
+- **Library 250 presets / 8 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
   TECHNO, TRANCE, PROGRESSIVE, HI-TECH) with layered per-genre kits
   (KITS export) — all AUDITION-able in the Sound tab.
 - **Master space** — stereo width `widthMaster` (0–200 %, mid/side with

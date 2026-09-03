@@ -283,15 +283,17 @@ SP('fx','PSTX-SPACE-V13','Psy Space Texture','PSYTRANCE',{gen:'v13',wave1:'sawto
 /* ── v0.12.0 P2: layered kits — full drum-row + role assignments per genre
    (the composer maps roles {kick,snare,hat,perc,bass,lead,pad,arp,fx} →
    preset ids; Phase 4 swaps COMPOSER_STYLES over to these) ── */
+/* v0.13.0 P4: bass/lead/pad/arp roles ride gen:'v13' presets (kick/snare/hat/perc
+   sacred-consistent from v0.12.0 — the drum rows never move in a patch run) */
 const KITS={
 'PSYTRANCE':{kick:'PS-KICK-TIGHT',snare:'PS-SNARE2-CRACK',hat:'PS-HAT2-TICK',perc:'PS-CONGA-LOW',bass:'PS-BASS-ROLL',lead:'PS-LEAD-SQUELCH',pad:'PS-PAD-PSYCH',arp:'PS-ARP-ACID',fx:'FX-PS-RISE'},
-'DARK-PSY':{kick:'DR-KICK-HAMMER',snare:'DR-SNARE-WHIP',hat:'DR-HAT-NEEDLE',perc:'DR-CONGA-GRAVE',bass:'DR-BASS-GRINDER',lead:'DR-LEAD-HOWL',pad:'DR-PAD-ABYSS',arp:'DR-ARP-SPIKE',fx:'FX-PS-RISE'},
+'DARK-PSY':{kick:'DR-KICK-HAMMER',snare:'DR-SNARE-WHIP',hat:'DR-HAT-NEEDLE',perc:'DR-CONGA-GRAVE',bass:'DB-SCREECH-V13',lead:'DB-RAZOR-V13',pad:'DP-BLACK-V13',arp:'DA-ARP-V13',fx:'FX-PS-RISE'},
 'GOA':{kick:'GO-KICK-GLOW',snare:'GO-SNARE-RING',hat:'GO-HAT-SILVER',perc:'GO-CONGA-RITUAL',bass:'GO-BASS-SPIRAL',lead:'GO-LEAD-CRYSTAL',pad:'GO-PAD-SUNRISE',arp:'GO-ARP-LADDER',fx:'FX-PS-RISE'},
-'FULL-ON':{kick:'FO-KICK-DRIVE',snare:'FO-SNARE-SNAP',hat:'FO-HAT-SPARK',perc:'FO-CONGA-PUSH',bass:'FO-BASS-ENGINE',lead:'FO-LEAD-SOAR',pad:'FO-PAD-LIFT',arp:'FO-ARP-SPARK',fx:'FX-PS-RISE'},
+'FULL-ON':{kick:'FO-KICK-DRIVE',snare:'FO-SNARE-SNAP',hat:'FO-HAT-SPARK',perc:'FO-CONGA-PUSH',bass:'FB-ROLL-V13',lead:'FL-ANTHEM-V13',pad:'FP-WARM-V13',arp:'FA-ARP-V13',fx:'FX-PS-RISE'},
 'TECHNO':{kick:'TE-KICK2-CLUB',snare:'TE-SNARE2-RAW',hat:'TE-HAT2-CHATTER',perc:'TE-CONGA-WAREHOUSE',bass:'TE-BASS-RUMBLE',lead:'TE-LEAD-ACID',pad:'TE-PAD-DARK',arp:'TE-ARP-HYPNO',fx:'FX-TE-RISE'},
 'TRANCE':{kick:'TR-KICK2-UPIFT',snare:'TR-CLAP2-WIDE',hat:'TR-HAT2-GLASS',perc:'TR-CONGA-ISLE',bass:'TR-BASS-OFFBEAT',lead:'TR-LEAD-SAW',pad:'TR-PAD-ATMO',arp:'TR-ARP-ROLL',fx:'FX-TR-IMPACT'},
-'PROGRESSIVE':{kick:'PR-KICK2-SILK',snare:'PR-SNARE2-BRUSH',hat:'PR-HAT2-MIST',perc:'PR-CONGA-EARTH',bass:'PR-BASS-WARM',lead:'PR-LEAD-MELODIC',pad:'PR-PAD-EVOLVE',arp:'PR-ARP-MELODIC',fx:'FX-TE-RISE'},
-'HI-TECH':{kick:'HT-KICK-PULSE',snare:'HT-SNARE-RAZOR',hat:'HT-HAT-BLITZ',perc:'HT-CONGA-CIRCUIT',bass:'HT-BASS-FRACTURE',lead:'HT-LEAD-VIRUS',pad:'HT-PAD-STATIC',arp:'HT-ARP-GLITCH',fx:'FX-TE-RISE'},
+'PROGRESSIVE':{kick:'PR-KICK2-SILK',snare:'PR-SNARE2-BRUSH',hat:'PR-HAT2-MIST',perc:'PR-CONGA-EARTH',bass:'PB-DEEP-V13',lead:'PBL-SOFT-V13',pad:'PP-DEEP-V13',arp:'PA-ARP-V13',fx:'FX-TE-RISE'},
+'HI-TECH':{kick:'HT-KICK-PULSE',snare:'HT-SNARE-RAZOR',hat:'HT-HAT-BLITZ',perc:'HT-CONGA-CIRCUIT',bass:'HB-GLITCH-V13',lead:'HB-CHROME-V13',pad:'HP-METAL-V13',arp:'HA-ARP-V13',fx:'FX-TE-RISE'},
 };
 
 function libFind(id){for(const cat in LIB){const f=LIB[cat].find(x=>x.id===id);if(f)return f}return null}
