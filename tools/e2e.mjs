@@ -228,6 +228,17 @@ async function main() {
     if (SKIP.length) await cdp.eval(`window.__psy6GateSkip=${JSON.stringify(SKIP)}; true`);
     // switch to the tests tab and press RUN SELF-GATE
     await cdp.eval(`(()=>{const btn=Array.from(document.querySelectorAll('nav button')).find(x=>x.dataset.t==='tests');btn.click();return true})()`);
+    /* v0.17.0 — stop LIVE playback before the gate. Since the READY SET boot
+       (composed project: 9 tracks + lanes + transitions + arranger RUNNING),
+       the live engine's realtime callback competes with the gate's offline
+       renders for the 2 CI cores and the suite outgrows the CI window. Every
+       asserted gate is pure computation or an OfflineAudioContext render
+       (live-scheduler loop checks are explicitly NOT run in CI — see the
+       header), so stopping the live loop changes no assertion — it only
+       removes CPU competition and render jitter. Boot evidence above is
+       read BEFORE the stop. */
+    await cdp.eval(`(()=>{const s=document.querySelector('#bStop');if(s&&['PLAYING','RECORDING','TRANSITIONING'].includes(window.__psy6.fsm))s.click();return true})()`);
+    await sleep(250);
     await cdp.eval(`document.querySelector('#bGate').click(); true`);
     let timedOut = false;
     try {

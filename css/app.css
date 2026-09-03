@@ -72,6 +72,12 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 #power h1{font-family:var(--mono);letter-spacing:.3em;color:var(--acc);font-size:26px}
 #power .styles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 #power .styles button{padding:16px 24px;font-size:13px;letter-spacing:.08em}
+/* v0.17.0 — READY SET hero: the one-press entrance, visibly primary */
+#power .styles button.heroBtn{padding:20px 34px;font-size:15px;border-color:var(--acc);color:var(--acc);box-shadow:0 0 22px rgba(79,214,192,.18);font-weight:700}
+#power .styles button.heroBtn:hover{box-shadow:0 0 30px rgba(79,214,192,.32)}
+/* v0.17.0 — macro cards: wrap the label+slider+readout on one row */
+.macro{display:flex;align-items:center;gap:6px}
+.macro input[type=range]{flex:1;min-width:60px}
 .app{display:none}
 /* ── v0.5.0 UNLIMIT: 16 tracks / 128 steps / 64 scenes ── */
 #seqScroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:4px}

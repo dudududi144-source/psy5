@@ -21,7 +21,11 @@ const SCALES={
   phrygian: FOUNDATION_SCALES.phrygian,
   harmonicMinor: FOUNDATION_SCALES.harmonicMinor, /* v0.7.0 FOREST — darker bias */
 };
-const M_ENERGY=0,M_DRIVE=1,M_SPACE=2,M_MOVE=3;
+/* v0.17.0 — ALL EIGHT macros are real. The first four shipped earlier;
+   4..7 were dead UI until this run (the owner: "רק כמה פונקציות בודדות"
+   — not just a few single functions). resolveMacros (state.js) is the
+   single resolver; each macro reads its base snapshot deterministically. */
+const M_ENERGY=0,M_DRIVE=1,M_SPACE=2,M_MOVE=3,M_FILTER=4,M_TIGHT=5,M_HAUNT=6,M_FAZE=7;
 function gcd(a,b){while(b){const t=a%b;a=b;b=t}return a}
 function mkStep(on){return {on:on?1:0,vel:0.9,prob:1,micro:0,note:48,lock:{}}}
 function mkPattern(name,nt){const d={};for(let t=0;t<nt;t++)d[t]={len:16,steps:Array.from({length:16},()=>mkStep(false))};return {name,data:d}}
@@ -55,6 +59,12 @@ mpc54:{label:'MPC 54%',off:(t,s,rng,sd,tick)=>(s%2===1)?((0.54+0.04*rng())-0.5)*
 'psy-push':{label:'Psy Push',off:(t,s,rng,sd,tick)=>(t===4&&s%2===1)?(6+2*rng())*tick:0},
 humanize:{label:'Humanize',off:(t,s,rng,sd,tick)=>((rng()+rng()+rng()-1.5)/1.5)*0.03*sd}
 };
+/* ── tap tempo (v0.17.0) — PURE: keep the taps inside the window, average
+   the deltas, clamp to the transport range. Returns {count,bpm} — bpm is
+   null until two taps sit inside the window (the caller decides when to
+   apply). DOM-free so the Bun suite owns the math. */
+function tapTempo(taps,now,windowMs){const w=windowMs||2500;const t=(Array.isArray(taps)?taps:[]).filter(x=>now-x>=0&&now-x<w);t.push(now);if(t.length<2)return{count:t.length,bpm:null};const d=[];for(let i=1;i<t.length;i++)d.push(t[i]-t[i-1]);const avg=d.reduce((a,b)=>a+b,0)/d.length;if(!(avg>0))return{count:t.length,bpm:null};return{count:t.length,bpm:clamp(Math.round(60000/avg),40,300)}}
+
 function stepEvents(p,s){
 const pat=p.patterns[p.currentPattern];if(!pat)return [];
 const evs=[],sd=60/p.bpm/4,tick=sd/64;
@@ -78,4 +88,4 @@ evs.push({track:t,off,vel:clamp(st.vel,0.05,1),note:st.note,lock});
 return evs;
 }
 
-export { clamp, deep, mulberry32, fnv, barSeed, GROOVES, MAX_TRACKS, MAX_STEPS, MAX_SCENES, SYNTH_VOICES, DRUM_VOICES, SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, gcd, mkStep, mkPattern, mkProject, loopLen, laneEval, stepEvents, LIMITS };
+export { clamp, deep, mulberry32, fnv, barSeed, GROOVES, MAX_TRACKS, MAX_STEPS, MAX_SCENES, SYNTH_VOICES, DRUM_VOICES, SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, tapTempo, gcd, mkStep, mkPattern, mkProject, loopLen, laneEval, stepEvents, LIMITS };

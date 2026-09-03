@@ -130,6 +130,26 @@ export function recipeFromProject(p) {
   return { style: p.harmony.family, seed, len, name: p.harmony.family + ' ' + seed + ' · ' + len + 'm' };
 }
 
+/* ── READY ALBUM (v0.17.0) — the "ready to perform, not empty" boot: a
+   composed project arrives with a PRESEEDED song library — the booted song
+   first (active), then one pinned-seed recipe per composer style. Recipes
+   cost ~100 bytes each, so the album rides for free. Pure + deterministic
+   (pinned seeds, content-derived ids) — bun-tested. */
+export const READY_SEEDS = {
+  'FULL-ON': 424242, 'DARK-PSY': 90210, 'PROGRESSIVE': 74747, 'FOREST': 1337,
+  'HI-TECH': 99999, 'PSYTRANCE': 5150, 'GOA': 1994, 'TECHNO': 80808, 'TRANCE': 31337,
+};
+export function readyAlbum(p, style, seed, len) {
+  if (!p || !COMPOSER_STYLES[style]) return null;
+  const cur = libraryAdd(p, { name: style + ' READY SET', style, seed, len });
+  for (const s of Object.keys(COMPOSER_STYLES)) {
+    if (s === style) continue;
+    libraryAdd(p, { name: s + ' · SET', style: s, seed: READY_SEEDS[s] || 1234, len: 3 });
+  }
+  if (cur) librarySetActive(p, cur.id);
+  return libraryOf(p);
+}
+
 /* libraryValid — structural integrity (ids unique, styles/lengths known,
  * no null styles after canonicalization). Non-throwing; used by gates. */
 export function libraryValid(p) {

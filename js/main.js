@@ -1,4 +1,6 @@
 import { $, toast, I, K_MAIN, loadStored, loadProjectObj } from './state.js';
+import { compose, COMPOSER_STYLES } from './composer.js';
+import { readyAlbum } from './library.js';
 import { renderHeader, wireHeader } from './ui/header.js';
 import { renderLibrary, wireLibrary } from './ui/library.js';
 import { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform } from './ui/perform.js';
@@ -46,7 +48,23 @@ try{prepInsertDSP(ctx)}catch(e){}
 try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
 let p=null;if(resume)p=loadStored();if(!p&&I.pendingCompose){p=I.pendingCompose;I.pendingCompose=null}if(!p&&I.pendingShare){p=I.pendingShare;I.pendingShare=null}if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;loadProjectObj(p);/* backfill (midiMap/masterVol/sc/fx) — idempotent, sets I.p to the same object */I.upAt=Date.now();I.eng.syncMix(p);hydrateProjectSamples();if(I.pendingHints){I.pendingHints=false;applyComposerSampleHints({sampleHints:p.sampleHints})}/* v0.10.0: composed-boot sample hints *//* v0.10.0: pull referenced samples into the engine cache (missing → synth fallback + one-shot toast) */$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireLibrary();wireMidi();wireCapture();wireLanes();wireCompose();wireSamples();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();/* composed boot: land on Perform with the arranger running */if(I.composedLoad){try{arrToggle(true)}catch(e){};const f=I.composedLoad;I.composedLoad=null;toast('COMPOSED ✓ '+f.style+' · '+f.totalBars+' bars · '+f.lengthSec.toFixed(0)+'s · seed '+f.seed)}else toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
 
-(function boot(){const sp=$('stylePicker');['TECHNO','PSYTRANCE','TRANCE','PROGRESSIVE'].forEach(st=>{const b=document.createElement('button');b.textContent='⚡ '+st;b.onclick=()=>powerOn(st,false);sp.appendChild(b)});const empty=document.createElement('button');empty.textContent='∅ EMPTY';empty.onclick=()=>powerOn('EMPTY',false);sp.appendChild(empty);
+/* ── READY SET boot (v0.17.0) — the owner: the user must receive the system
+   ORGANIZED and READY TO PERFORM, never empty. Every genre button composes a
+   full deterministic set (scenes + variants + arranger + lanes + transitions
+   + a preseeded READY ALBUM) and lands on Perform with the arranger running.
+   Pinned seeds → the same set every time per style (replayable, testable).
+   ∅ BARE SKETCH keeps the old minimal buildStyle boot for sketching. */
+async function composeBoot(style,minutes,seed){try{toast('COMPOSING '+style+' — '+minutes+' MIN…');
+const r=compose(style,minutes,seed);
+try{readyAlbum(r.project,style,seed,minutes)}catch(e){/* album is enrichment — never blocks the boot */}
+I.pendingCompose=r.project;I.composedLoad=r.form;await powerOn(style,false)}catch(e){toast('COMPOSE FAILED — '+e.message)}}
+
+(function boot(){const sp=$('stylePicker');
+/* HERO — the one-press entrance: a complete arranged set, playing now */
+const hero=document.createElement('button');hero.className='heroBtn';hero.textContent='▶ ENTER — READY SET · FULL-ON · 3:00 ARRANGED';hero.title='Boots a COMPLETE deterministic set: intro→build→drop→break→riser→drop2→outro, scenes + transitions + arranger + a preseeded song album. Press PLAY-grade ready — not empty.';hero.onclick=()=>composeBoot('FULL-ON',3,424242);sp.appendChild(hero);
+const SET_SEEDS={'FULL-ON':424242,'DARK-PSY':90210,'PROGRESSIVE':74747,'FOREST':1337,'HI-TECH':99999,'PSYTRANCE':5150,'GOA':1994,'TECHNO':80808,'TRANCE':31337};
+Object.keys(COMPOSER_STYLES).forEach(st=>{const b=document.createElement('button');b.textContent='⚡ '+st+' SET';b.title='READY SET — a complete arranged '+COMPOSER_STYLES[st].bpm+' BPM '+st+' set (3 min, deterministic seed '+SET_SEEDS[st]+') with scenes, transitions and the arranger pre-built. Not empty — ready to perform.';b.onclick=()=>composeBoot(st,3,SET_SEEDS[st]);sp.appendChild(b)});
+const empty=document.createElement('button');empty.textContent='∅ BARE SKETCH';empty.title='The minimal skeleton (no scenes, no arranger) — for sketching from scratch.';empty.onclick=()=>powerOn('EMPTY',false);sp.appendChild(empty);
 /* engine selector — MAIN is the default (zero behavior change); WORKLET is opt-in */
 const ep=$('enginePicker');I.engineSel='main';
 const mkEng=(id,label,title)=>{const b=document.createElement('button');b.textContent=label;b.title=title;b.dataset.eng=id;b.onclick=()=>{I.engineSel=id;Array.from(ep.children).forEach(x=>x.classList.toggle('on',x.dataset.eng===id));$('engNote').textContent=id==='worklet'?'WORKLET — experimental. Honest limitations: '+WORKLET_LIMITATIONS.join(' · '):'MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (19 checks).'};ep.appendChild(b);return b};
@@ -54,11 +72,10 @@ mkEng('main','⬤ MAIN (default)','Pooled engine — default').classList.add('on
 mkEng('worklet','⚙ WORKLET (experimental)','AudioWorklet engine — reduced feature set, reduced self-gate');
 $('engNote').textContent='MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (19 checks).';
 try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$('resumeBtn').onclick=()=>powerOn(null,true);
-/* DEMOS: recipes recompose deterministically client-side; loads into memory only */
-async function loadDemo(file){try{const doc=await (await fetch(file)).json();const {compose}=await import('./composer.js');const r=compose(doc.style,doc.minutes,doc.seed);I.pendingCompose=r.project;I.composedLoad=r.form;const sb=document.querySelector('#stylePicker button');if(sb)sb.click()}catch(e){toast('DEMO FAILED — '+e.message)}}
-$('bDemoFull').onclick=()=>loadDemo('data/demos/demo-fullon.json');
-$('bDemoDark').onclick=()=>loadDemo('data/demos/demo-darkpsy.json');
-$('bDemoForest').onclick=()=>loadDemo('data/demos/demo-forest.json');wireCompose();/* power-screen COMPOSE row must be live before boot */
+/* DEMOS: the same READY SET path now (recipes recompose deterministically client-side; loads into memory only) */
+$('bDemoFull').onclick=()=>composeBoot('FULL-ON',3,424242);
+$('bDemoDark').onclick=()=>composeBoot('DARK-PSY',5,90210);
+$('bDemoForest').onclick=()=>composeBoot('FOREST',3,1337);wireCompose();/* power-screen COMPOSE row must be live before boot */
 /* help overlay from the shortcut registry (single source of truth) */
 (function(){const hb=$('helpBody');if(!hb)return;hb.innerHTML=helpRows().map(g=>'<div style="margin:6px 0"><div class="mono" style="font-size:9px;color:var(--acc2)">'+g.group.toUpperCase()+'</div>'+g.items.map(it=>'<div style="display:flex;gap:8px;font-size:11px;padding:1px 0"><span class="mono" style="min-width:70px;color:var(--acc)">'+it.key+'</span><span style="color:#fffa">'+it.label+'</span></div>').join('')+'</div>').join('');const b=$('bHelp');if(b)b.onclick=()=>window.__psy6ToggleHelp&&window.__psy6ToggleHelp()})();
 /* share-link consent (v0.4.0): #p= present → banner with LOAD SHARE / DISMISS.

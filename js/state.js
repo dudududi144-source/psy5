@@ -1,4 +1,4 @@
-import { clamp, mulberry32, loopLen, M_ENERGY, M_SPACE } from './model.js';
+import { clamp, mulberry32, loopLen, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, tapTempo } from './model.js';
 import { COMPOSER_STYLES } from './composer.js';
 import { laneModeBackfill, paramApply, paramById, paramDenorm, ensureMaster, ensureIns } from './params.js';
 import { recordPoint, quantStep } from './autorec.js';
@@ -13,7 +13,48 @@ cop:null,barHooks:[],copilotSnapshot:null,copilotReload:null,copilotRender:null,
 autoOn:false,autoQuant:true,autoArm:new Set(),selLane:-1};
 function pushHist(){I.hist.push(JSON.stringify(I.p));if(I.hist.length>60)I.hist.shift();I.redo.length=0;I.dirty=true}
 function after(){if(I.eng)I.eng.syncMix(I.p);if(I.sched.on)I.sched.loop=loopLen(I.p);I.renderDirty=true}
-function resolveMacros(target){const p=target||I.p,mv=p.macroVals,e=mv[M_ENERGY],sp=mv[M_SPACE];p.tracks.forEach((t,i)=>{if(!t.base)return;const b=t.base;if(t.kind==='synth'){t.sound.cutoff=clamp(b.sound.cutoff*(0.35+2.2*e),60,14000);t.mix.sendA=clamp(b.mix.sendA+0.45*sp,0,1);t.mix.sendB=clamp(b.mix.sendB+0.4*sp,0,1);if(i===4)t.mix.vol=clamp(b.mix.vol*(0.4+0.8*e),0,1)}else{if(i<4)t.mix.vol=clamp(b.mix.vol*(0.5+0.7*e),0,1)}});if(I.eng&&p===I.p)I.eng.syncMix(p)}
+/* ── MACRO RESOLVER v2 (v0.17.0) — ALL EIGHT macros resolve to REAL engine
+   state (until this run DRIVE/MOVEMENT were dead UI and 4..7 did not exist).
+   Design contract (unchanged): every call recomputes from the per-track BASE
+   snapshot — idempotent, no accumulation, pure w.r.t. (p, macroVals),
+   deterministic (no RNG, no Date) so the Bun suite and the gates own it.
+   Base backfills (idempotent, captured on first resolve): mix.pan (never
+   snapshotted before v0.17.0) and ins.drive/ins.crush baselines.
+   Sacred zones honored: kick (track 0) and bass (track 4) never get insert
+   FX from macros; the kick never gets ANY macro writes. */
+function resolveMacros(target){const p=target||I.p;if(!p||!p.tracks)return;const mv=p.macroVals;
+const e=mv[M_ENERGY],dr=mv[M_DRIVE],sp=mv[M_SPACE],mo=mv[M_MOVE],fi=mv[M_FILTER],tg=mv[M_TIGHT],ha=mv[M_HAUNT],fz=mv[M_FAZE];
+p.tracks.forEach((t,i)=>{if(!t.base)return;const b=t.base;
+/* base backfills — legacy bases never carried pan/ins baselines */
+if(b.mix.pan==null)b.mix.pan=t.mix.pan;
+if(b.ins==null)b.ins={};if(b.ins.drive==null)b.ins.drive=(t.ins&&t.ins.drive)||0;if(b.ins.crush==null)b.ins.crush=(t.ins&&t.ins.crush)||16;
+if(t.kind==='synth'){
+/* ENERGY — cutoff brightness + bass level (the original v0.1 contract) */
+t.sound.cutoff=clamp(b.sound.cutoff*(0.35+2.2*e),60,14000);
+/* FILTER — extra tone tilt on the music bus, applied OVER the energy cutoff */
+if(i>=5)t.sound.cutoff=clamp(t.sound.cutoff*(0.30+1.35*fi),60,14000);
+/* SPACE — send levels */
+t.mix.sendA=clamp(b.mix.sendA+0.45*sp,0,1);t.mix.sendB=clamp(b.mix.sendB+0.4*sp,0,1);
+if(i===4)t.mix.vol=clamp(b.mix.vol*(0.4+0.8*e),0,1);
+/* DRIVE — insert saturation on the music bus (synths only; drums get the
+   crush side below; kick/bass sacred) */
+if(i>=5){if(!t.ins||typeof t.ins!=='object')t.ins={};t.ins.drive=Math.round(clamp(b.ins.drive+65*dr,0,100))}
+/* MOVEMENT — LFO depth on music synths + stereo spread on pad/arp */
+if(i>=5)t.sound.lfoDepth=clamp((b.sound.lfoDepth||0)*(0.3+1.6*mo)+0.25*mo*(i%2?1:0.6),0,1);
+if(i>=6)t.mix.pan=clamp(b.mix.pan+(i%2?1:-1)*0.55*mo,-1,1);
+/* HAUNT — pitch destabilizer on lead/arp (the psy "alien" drift) */
+if(i===5||i===7)t.sound.detune=clamp((b.sound.detune==null?8:b.sound.detune)*(0.4+2.4*ha),0,48);
+/* FAZE — LFO speed on the music bus */
+if(i>=5)t.sound.lfoRate=clamp((b.sound.lfoRate||0)*(0.25+2.0*fz)+14*fz,0,16);
+}else{
+if(i<4)t.mix.vol=clamp(b.mix.vol*(0.5+0.7*e),0,1);
+/* TIGHT — drum envelope length: 0 = loose/long, 1 = tight/short, 0.5 ≈ base */
+if(i<4){if(b.sound.decay==null)b.sound.decay=(t.sound&&t.sound.decay!=null)?t.sound.decay:0.2;t.sound.decay=clamp(b.sound.decay*(1.55-0.95*tg),0.02,4)}
+/* MOVEMENT — hats/perc stereo spread (track 2 hats left-biased, 3 perc right) */
+if(i===2||i===3)t.mix.pan=clamp(b.mix.pan+(i%2?1:-1)*0.5*mo,-1,1);
+/* DRIVE — gentle bit-crush on the drum body tracks (never the kick) */
+if(i>=1&&i<=3){if(!t.ins||typeof t.ins!=='object')t.ins={};t.ins.crush=Math.round(clamp(b.ins.crush-5*dr,2,16))}
+}});if(I.eng&&p===I.p)I.eng.syncMix(p)}
 /* ── automation recording glue (v0.5.0) — knob-equivalent moves land in the
    armed lane(s) at the quantized playhead step. Sources: mixer/synth knobs,
    macros, and MIDI CC via the existing midiMap paths. */
@@ -45,7 +86,7 @@ else raw=p.master?ensureMaster(p)[map.param]:undefined;
 if(raw==null||!isFinite(raw))return false;
 return autoRecMove(map.track,map.param,raw)}
 
-const PERF={toggleLayer(which){const p=I.p;pushHist();if(which==='drums')for(let t=0;t<4;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='bass')p.tracks[4].mix.mute=!p.tracks[4].mix.mute;else if(which==='music')for(let t=5;t<p.tracks.length;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='fx')for(let t=4;t<p.tracks.length;t++)p.tracks[t].mix.sendA=p.tracks[t].mix.sendA>0?0:.35;after()},macro(idx,val){I.p.macroVals[idx]=clamp(val,0,1);resolveMacros();I.dirty=true;autoRecMove(-1,'macro.'+idx,I.p.macroVals[idx])},launch(i,instant){const p=I.p,sc=p.scenes[i];if(!sc||sc.pattern==null)return{ok:false};if(instant||!I.sched.on){pushHist();p.activeScene=i;p.currentPattern=sc.pattern;I.pending=null;/* v0.8.0 mix snapshot: applied on the instant path too (after() glides at currentTime below) */applySceneMix(p,i);after();/* per-scene auto-FILL: instant launch fires the FILL op right away (quantized launches fire it at the bar boundary — see scheduler) */if(sc.fill&&I.eng)PERF.fill()}else{I.pending=i;if(I.fsm==='PLAYING'||I.fsm==='RECORDING')I.fsm='TRANSITIONING';I.renderDirty=true}return{ok:true}},assign(i){pushHist();I.p.scenes[i].pattern=I.p.currentPattern;after()},fill(){const p=I.p;if(!I.eng||!I.ctx)return;const sd=60/p.bpm/4;for(let k=0;k<8;k++)I.eng.trigger(p.tracks[3],I.ctx.currentTime+k*sd/2,{vel:.5+.05*k,note:48,lock:{}},sd)},variation(){const p=I.p;pushHist();const rng=mulberry32((Date.now()%100000)|0);const pat=p.patterns[p.currentPattern];[2,3].forEach(t=>{const d=pat.data[t];if(!d)return;for(let i=0;i<d.len;i++){const s=d.steps[i];if(s.on&&rng()<.15)s.on=0;else if(!s.on&&rng()<.12){s.on=1;s.vel=.45+rng()*.35}}});const d7=pat.data[7];if(d7)for(let i=0;i<d7.len;i++){const s=d7.steps[i];if(s.on)s.prob=rng()<.1?.6:1}after()}};
+const PERF={toggleLayer(which){const p=I.p;pushHist();if(which==='drums')for(let t=0;t<4;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='bass')p.tracks[4].mix.mute=!p.tracks[4].mix.mute;else if(which==='music')for(let t=5;t<p.tracks.length;t++)p.tracks[t].mix.mute=!p.tracks[t].mix.mute;else if(which==='fx')for(let t=4;t<p.tracks.length;t++)p.tracks[t].mix.sendA=p.tracks[t].mix.sendA>0?0:.35;after()},macro(idx,val){I.p.macroVals[idx]=clamp(val,0,1);resolveMacros();I.dirty=true;autoRecMove(-1,'macro.'+idx,I.p.macroVals[idx])},launch(i,instant){const p=I.p,sc=p.scenes[i];if(!sc||sc.pattern==null)return{ok:false};if(instant||!I.sched.on){pushHist();p.activeScene=i;p.currentPattern=sc.pattern;I.pending=null;/* v0.8.0 mix snapshot: applied on the instant path too (after() glides at currentTime below) */applySceneMix(p,i);after();/* per-scene auto-FILL: instant launch fires the FILL op right away (quantized launches fire it at the bar boundary — see scheduler) */if(sc.fill&&I.eng)PERF.fill()}else{I.pending=i;if(I.fsm==='PLAYING'||I.fsm==='RECORDING')I.fsm='TRANSITIONING';I.renderDirty=true}return{ok:true}},assign(i){pushHist();I.p.scenes[i].pattern=I.p.currentPattern;after()},fill(){const p=I.p;if(!I.eng||!I.ctx)return;const sd=60/p.bpm/4;for(let k=0;k<8;k++)I.eng.trigger(p.tracks[3],I.ctx.currentTime+k*sd/2,{vel:.5+.05*k,note:48,lock:{}},sd)},tap(){const p=I.p;if(!p)return 0;const r=tapTempo(I.taps||[],Date.now());I.taps=(I.taps||[]).filter(x=>Date.now()-x<2500);I.taps.push(Date.now());if(r.bpm!=null){pushHist();p.bpm=r.bpm;after();toast('TAP TEMPO → '+r.bpm+' BPM')}return I.taps.length},variation(){const p=I.p;pushHist();const rng=mulberry32((Date.now()%100000)|0);const pat=p.patterns[p.currentPattern];[2,3].forEach(t=>{const d=pat.data[t];if(!d)return;for(let i=0;i<d.len;i++){const s=d.steps[i];if(s.on&&rng()<.15)s.on=0;else if(!s.on&&rng()<.12){s.on=1;s.vel=.45+rng()*.35}}});const d7=pat.data[7];if(d7)for(let i=0;i<d7.len;i++){const s=d7.steps[i];if(s.on)s.prob=rng()<.1?.6:1}after()}};
 
 const K_MAIN='psy6.main.v1',K_TMP='psy6.tmp.v1';
 function saveProject(){try{if(I.copilotSnapshot&&I.p)I.copilotSnapshot();const j=JSON.stringify(I.p);localStorage.setItem(K_TMP,j);localStorage.setItem(K_MAIN,j);localStorage.removeItem(K_TMP);I.dirty=false;return{ok:true}}catch(e){return{ok:false,err:String(e)}}}
