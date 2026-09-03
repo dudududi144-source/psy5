@@ -50,8 +50,16 @@ export interface SoundPreset {
   fType?: FilterType;
   cutoff?: number;
   res?: number;
-  fEnvAmt?: number;    // filter envelope amount
-  fDecay?: number;     // filter envelope decay
+  fEnvAmt?: number;    // filter envelope amount (DECLARATION ONLY — never consumed by the engine; superseded by fenv below)
+  fDecay?: number;     // filter envelope decay (DECLARATION ONLY — never consumed; superseded by fdec below)
+
+  // v0.13.0 SYNTH v2-lite — engine-consumed optional params (all legacy-neutral:
+  // absent ⇒ the exact v0.12.0 rendering — see js/engine.js SynthVoice.noteOn)
+  fenv?: number;       // filter env amount multiplier (legacy default 3 = the old hardcoded ×3)
+  fdec?: number;       // filter env decay seconds (legacy default = atk+dec*0.7)
+  penv?: number;       // pitch env depth in semitones (0/absent = off — legacy)
+  pdec?: number;       // pitch env decay seconds (default .08)
+  sub?: number;        // sine sub-osc level 0..1, one octave below (0/absent = off — legacy)
 
   // Amp envelope (ADSR)
   atk?: number;

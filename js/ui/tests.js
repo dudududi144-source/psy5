@@ -1117,6 +1117,55 @@ gate('G40','percussion v2 + library: >=150 presets (>=100 drums), unique ids, ge
    louder than the short bright IR's tail — both logged, ratio > 1.3.
    All three render through the ONE renderer (renderBounce) — no fork. */
 if((window.__psy6GateSkip||[]).includes('G41')){gate('G41','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{const r41=await window.__psy6G41Run();gate('G41','master space: neutral contract (width/pingPong/IR perturb→restore maxDiff<1e-6), width 1.8 raises HF-side energy >1.3x (300 Hz protection excludes low side by design), ping-pong L-R envelope alternates (flips>=2, >mono), long-IR tail louder than short (>1.3x)',r41.ok,r41.ev)}catch(e){gate('G41','master space',false,'ERR '+e.message)}}
+/* G42 — SYNTH ENGINE v2-lite (offline — CI-asserted, v0.13.0 P1):
+   Five OPTIONAL preset params behind the SAME pooled SynthVoice, each one
+   legacy-neutral (absent ⇒ the exact v0.12.0 scheduling). Solo synth hits,
+   fresh OfflineAudioContext + PooledEngine per render (the G39 methodology):
+   acid/FENV — an acid preset (fenv 12, res 14, fdec .06, cutoff 900) sweeps
+     the resonant lowpass from ~10.8 kHz; the ABSOLUTE 6–12 kHz band RMS must
+     be ≥1.5× the SAME preset at the legacy fenv 3 (sweep starts at 2.7 kHz —
+     it never reaches that band; total-normalized ratios dilute here);
+   slide/PENV — penv 36 st at C2 descends: ZCR(75–90 ms) / ZCR(150–240 ms)
+     < .45, both sides at fenv 1 (flat filter — the legacy filter sweep alone
+     moves ZCR, which would fake a descent; the first ~15 ms also warm up —
+     measured flat ZCR 200→130 — so both windows sit post-settle); the
+     no-penv render stays flat (> .8; measured ≈ 1.0);
+   sub/SUB — sub .9 at C2: the 20–60 Hz band (sub fundamental f/2 = 32.7 Hz —
+     the legacy triangle fundamental 65.4 Hz has no energy there) holds
+     ratio ≥ .15 AND ≥2× the legacy render's;
+   neutral — explicit legacy defaults ({fenv:3} only) vs fully-absent fields:
+     maxDiff < 1e-6 (the through-graph standard, G39 note);
+   determinism — the acid preset rendered twice in fresh contexts: maxDiff
+     < 1e-6. */
+if((window.__psy6GateSkip||[]).includes('G42')){gate('G42','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR42=44100;
+const mk42=async(sound,note)=>{const oc=new OfflineAudioContext(1,SR42,SR42);const eng=new PooledEngine(oc);const tr={idx:0,kind:'synth',type:'synth',presetId:'g42',name:'g42',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:note||36,lock:{}},60/145/4);return await oc.startRendering()};
+const zcr42=(x,a,b)=>{let c=0;const A=Math.round(a*SR42),B=Math.min(Math.round(b*SR42),x.length);for(let i=A+1;i<B;i++)if((x[i-1]<0&&x[i]>=0)||(x[i-1]>=0&&x[i]<0))c++;return c/((B-A)/SR42)};
+const fft42=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const bandRms42=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR42);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft42(re,im);const binHz=SR42/N;let s2=0;for(let k=1;k<N/2;k++){if(k*binHz>=f0&&k*binHz<=f1){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);s2+=m*m}}return Math.sqrt(s2/(N/2))};
+const bandRatio42=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR42);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft42(re,im);const binHz=SR42/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
+const maxDiff42=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
+const BASE42={wave1:'sawtooth',wave2:'sawtooth',cutoff:900,res:14,atk:.003,dec:.12,sus:0,rel:.08,gate:.5};
+const acid42=Object.assign({},BASE42,{fenv:12,fdec:.06});
+const acidBuf=await mk42(acid42,48),legacyBuf=await mk42(BASE42,48);
+/* ABSOLUTE band RMS (not total-normalized — the acid sweep's energy above 6 kHz
+   would otherwise dilute the ratio): the fenv-12 sweep reaches 6–12 kHz, the
+   legacy fenv-3 sweep never starts above 2.7 kHz. */
+const acidHF=bandRms42(acidBuf.getChannelData(0),6000,12000,.06),legacyHF=bandRms42(legacyBuf.getChannelData(0),6000,12000,.06);
+const SBASE={wave1:'triangle',wave2:'sine',cutoff:400,res:1,atk:.003,dec:.3,sus:.4,rel:.1,gate:.9};
+const SLIDE=Object.assign({},SBASE,{fenv:1});/* fenv 1 = flat filter — isolates PITCH from the legacy filter sweep (the sweep alone moves ZCR) */
+const slideBuf=await mk42(Object.assign({},SLIDE,{penv:36,pdec:.1}),36),slideLegacy=await mk42(SLIDE,36);
+const z1=zcr42(slideBuf.getChannelData(0),.075,.09),z2=zcr42(slideBuf.getChannelData(0),.15,.24);
+const z1L=zcr42(slideLegacy.getChannelData(0),.075,.09),z2L=zcr42(slideLegacy.getChannelData(0),.15,.24);
+const subBuf=await mk42(Object.assign({},SBASE,{sub:.9}),36),subLegacy=await mk42(SBASE,36);
+/* sub-osc fundamental at f/2 = 32.7 Hz for C2 — the 20–60 Hz band is where ONLY
+   the sub lives (the legacy triangle fundamental is 65.4 Hz). */
+const subR=bandRatio42(subBuf.getChannelData(0),20,60,.05),subL=bandRatio42(subLegacy.getChannelData(0),20,60,.05);
+const neuA=await mk42(SBASE,48),neuB=await mk42(Object.assign({},SBASE,{fenv:3}),48);
+const neuDiff=maxDiff42(neuA,neuB);
+const det42=maxDiff42(acidBuf,await mk42(acid42,48));
+const ok42=acidHF>=legacyHF*1.5&&(z2/z1)<.45&&(z2L/z1L)>.8&&subR>=.15&&subR>subL*2&&neuDiff<1e-6&&det42<1e-6;
+gate('G42','synth v2-lite: acid fenv 6-12k RMS >=1.5x legacy, penv descent (flat-filter isolation) z-ratio <.45 (no-penv >.8), sub 20-60Hz ratio >=.15 & >2x legacy, neutral maxDiff<1e-6, determinism<1e-6',ok42,'acidHF='+acidHF.toExponential(2)+' legacyHF='+legacyHF.toExponential(2)+'(x'+(acidHF/Math.max(legacyHF,1e-12)).toFixed(2)+') | slide z '+z1.toFixed(0)+'>'+z2.toFixed(0)+' r='+(z2/z1).toFixed(2)+' no-penv r='+(z2L/z1L).toFixed(2)+' | sub '+subR.toFixed(3)+'>'+subL.toFixed(3)+' | neutral '+neuDiff.toExponential(1)+' | det '+det42.toExponential(1))}catch(e){gate('G42','synth v2-lite',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
