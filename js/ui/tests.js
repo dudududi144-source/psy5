@@ -1069,7 +1069,7 @@ const ids40=new Set(all40.map(x=>x.id));
 const uniq40=ids40.size===all40.length;
 const GEN40=['PSYTRANCE','DARK-PSY','GOA','FULL-ON','TECHNO','TRANCE','PROGRESSIVE','HI-TECH'];
 const genMissing=GEN40.filter(g=>!all40.some(x=>x.genre===g));
-const TYPES40=new Set(['kick','snare','clap','hatC','hatO','tom','rim','glitch','shaker','conga','bongo','cowbell','clave','zap','boom','riser','impact']);
+const TYPES40=new Set(['kick','snare','clap','hatC','hatO','tom','rim','glitch','shaker','conga','bongo','cowbell','clave','zap','boom','riser','impact','darbuka','tambourine','triangle','downlifter']);
 const cl2=(v,a,b)=>v>=a&&v<=b;
 const bad40=all40.filter(x=>!x.id||!x.name||!x.genre||!x.cat||(x.engine!=='DRUM'&&x.engine!=='SYNTH')||(x.cat==='drum'&&(!TYPES40.has(x.type)||!cl2(x.tune??.1,.3,2)||!cl2(x.decay??.5,.1,4)||!cl2(x.tone??1,.3,2.5)||!cl2(x.punch??0,0,1))));
 const kits40=Object.keys(KITS||{});

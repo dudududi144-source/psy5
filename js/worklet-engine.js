@@ -47,7 +47,7 @@ case 'riser':return V_RISER;case 'impact':return V_IMPACT;default:return V_PERC}
 const cat=(tr.sound&&tr.sound.cat)||(tr.type||'lead');
 switch(cat){case 'bass':return V_BASS;case 'lead':return V_LEAD;case 'arp':return V_ACID;
 case 'pluck':return V_FM;case 'pad':return V_PAD;case 'fx':return V_TEXTURE;default:return V_LEAD}}
-function drumDur(type){switch(type){case 'kick':return .5;case 'snare':return .25;case 'clap':return .4;case 'hatO':return .6;case 'hatC':return .06;case 'tom':return .45;case 'rim':return .045;case 'glitch':return .2;case 'shaker':return .09;case 'riser':return 1.6;case 'impact':return 1.2;default:return .4}}
+function drumDur(type){switch(type){case 'kick':return .5;case 'snare':return .25;case 'clap':return .4;case 'hatO':return .6;case 'hatC':return .06;case 'tom':return .45;case 'rim':return .045;case 'glitch':return .2;case 'shaker':return .09;case 'riser':return 1.6;case 'impact':return 1.2;case 'darbuka':return .35;case 'tambourine':return .3;case 'triangle':return 2;case 'downlifter':return 1.8;default:return .4}}
 const midiToHz=n=>440*Math.pow(2,(n-69)/12);
 /* BUSES: drum 0-3 · bass 4 · music 5,7 · atmos 6 · fx — matches the worklet's 5-bus mixer */
 const BUS_OF=[0,0,0,0,1,2,3,2];

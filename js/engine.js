@@ -124,7 +124,7 @@ Only setValueAtTime + linearRampToValueAtTime are used. Overlapping kicks
 envelope → value-continuous, click-free, always recovers to 1.0. */
 sidechain(when,srcIdx){for(let i=0;i<MAX_TRACKS;i++){if(i===srcIdx)continue;const sc=this.scCache[i];if(!sc)continue;const st=this.duckState[i],g=this.chains[i].duck.gain;const plan=planDuck(st,when,1-sc.amount/100,sc.attack,sc.hold,sc.release,this._plan);g.setValueAtTime(plan.v0,when);g.linearRampToValueAtTime(plan.dip,plan.t1);if(plan.holdT>=0)g.setValueAtTime(plan.dip,plan.holdT);g.linearRampToValueAtTime(1,plan.end);nextState(plan,when,sc.attack,st);this.duckEvents++}}
 tierOfTrack(tr){if(tr.idx!=null&&tr.idx>=0&&tr.idx<8&&(tr.kind==='drum'?tr.idx<4:tr.idx>=4)&&tr.sound&&tr.presetId!==undefined){if(tr.kind==='drum'&&tr.sound.type==='kick')return 0;return TRACK_TIERS[tr.idx]}const pr=tr.sound||{};if(tr.kind==='drum')return (pr.type||tr.type)==='kick'?0:1;if(pr.cat==='bass')return 0;if(pr.cat==='pad'||pr.cat==='fx')return 3;return 2}
-drumDurEst(type,decay){const d=decay||1;switch(type){case 'kick':return .12+.5*d;case 'snare':return .1+.16*d;case 'clap':return .25+.15*d;case 'hatO':return .26+.5*d;case 'hatC':return .03+.05*d;case 'tom':return .22+.35*d;case 'rim':return .045;case 'glitch':return .08+.14*d;case 'shaker':return .04+.07*d;case 'conga':return .15+.25*d;case 'bongo':return .1+.15*d;case 'cowbell':return .12+.08*d;case 'clave':return .05;case 'zap':return .2+.1*d;case 'boom':return .9+.6*d;case 'riser':return 1.65;case 'impact':return 1.1*d+.3;default:return .5}}
+drumDurEst(type,decay){const d=decay||1;switch(type){case 'kick':return .12+.5*d;case 'snare':return .1+.16*d;case 'clap':return .25+.15*d;case 'hatO':return .26+.5*d;case 'hatC':return .03+.05*d;case 'tom':return .22+.35*d;case 'rim':return .045;case 'glitch':return .08+.14*d;case 'shaker':return .04+.07*d;case 'conga':return .15+.25*d;case 'bongo':return .1+.15*d;case 'cowbell':return .12+.08*d;case 'clave':return .05;case 'zap':return .2+.1*d;case 'boom':return .9+.6*d;case 'riser':return 1.65;case 'impact':return 1.1*d+.3;case 'darbuka':return .14+.28*d;case 'tambourine':return .12+.24*d;case 'triangle':return .9+1.6*d;case 'downlifter':return .9+1.1*d;default:return .5}}
 synthDurEst(p,stepDur){const gate=p.gate||.6;const rel=Math.max(p.rel||.15,.02);return stepDur*gate*2+rel}
 nextVoice(tr,tier,when){const pool=tr.kind==='drum'?this.drumPool:this.synthPool;let i,v;for(i=0;i<pool.length;i++){v=pool[i];if(!v.tier0&&(!v.busyUntil||v.busyUntil<=when)){v.lastTrigger=++this._voiceSeq;return v}}if(tier===0){const key=tr.idx+'|'+tr.kind;v=this.dedicated[key];if(!v){for(i=0;i<pool.length;i++)if(!pool[i].tier0){v=pool[i];break}if(!v){v=this.stealOldest(pool,3,when)||this.stealOldest(pool,2,when)||this.stealOldest(pool,1,when)}if(!v)v=pool[0];v.tier0=true;this.dedicated[key]=v}v.lastTrigger=++this._voiceSeq;return v}v=this.stealOldest(pool,3,when)||this.stealOldest(pool,2,when)||this.stealOldest(pool,1,when);if(!v){v=pool[0];if(v.tier0&&tier!==0)this.tier0StealAttempts++}v.lastTrigger=++this._voiceSeq;return v}
 stealOldest(pool,victimTier,when){let victim=null;for(let i=0;i<pool.length;i++){const v=pool[i];if(v.tier0||!v.busyUntil||v.busyUntil<=when||v.tier!==victimTier)continue;if(victim===null||v.lastTrigger<victim.lastTrigger)victim=v}if(victim)this.stealCount[victimTier]++;return victim}
@@ -204,6 +204,11 @@ panic(){try{this.vca.gain.cancelScheduledValues(0);this.vca.gain.setValueAtTime(
    zero. Old presets keep triggering sensibly: unknown/neutral params fall
    back to the same defaults as v1. */
 const HAT_RATIOS=[2.0,3.0,4.16,5.43,6.79,8.21];
+/* v0.14.0 drum v2 params — burst-position/dynamics tables for the clap
+   `bursts` param (2..6). Precomputed at module level: the hit path stays
+   allocation-free. nb=4 is the v0.12.0 layout EXACTLY (same arrays). */
+const CLAP_B={2:[0,.047],3:[0,.0235,.047],4:[0,.011,.023,.036],5:[0,.009,.019,.029,.043],6:[0,.008,.017,.025,.034,.047]};
+const CLAP_D={2:[1,1.1],3:[1,.94,1.1],4:[1,1.07,.94,1.1],5:[1,.92,1.08,.96,1.1],6:[1,.93,1.09,.91,1.07,1.1]};
 function mkSatCurve(){const n=1024,c=new Float32Array(n);for(let i=0;i<n;i++){const x=i/(n-1)*6-3;c[i]=Math.tanh(1.5*x)*.95}return c}
 class DrumVoice{constructor(ctx,eng){this.ctx=ctx;this.eng=eng;this.bus=null;this.wiredWS=false;this.noise=ctx.createBufferSource();this.noise.buffer=eng.noise;this.noise.loop=true;this.noiseGain=ctx.createGain();this.noiseGain.gain.value=0;this.nFilter=ctx.createBiquadFilter();this.nFilter.type='bandpass';this.noise.connect(this.nFilter);this.nFilter.connect(this.noiseGain);this.osc=ctx.createOscillator();this.osc.type='sine';this.oscGain=ctx.createGain();this.oscGain.gain.value=0;this.osc.connect(this.oscGain);this.out=ctx.createGain();this.noiseGain.connect(this.out);this.oscGain.connect(this.out);
 /* v2 layers: BODY osc (triangle — kick body / snare tone) + shared
@@ -212,7 +217,7 @@ class DrumVoice{constructor(ctx,eng){this.ctx=ctx;this.eng=eng;this.bus=null;thi
 this.osc2=ctx.createOscillator();this.osc2.type='triangle';this.osc2Gain=ctx.createGain();this.osc2Gain.gain.value=0;this.osc2.connect(this.osc2Gain);this.osc2Gain.connect(this.out);this.outWS=ctx.createWaveShaper();this.outWS.curve=eng._satC||(eng._satC=mkSatCurve());this.osc2.start();this.noise.start();this.osc.start();this.metal=null;this.fmod=null}
 ensureMetal(){if(this.metal)return;const c=this.ctx;const oscs=HAT_RATIOS.map(()=>{const o=c.createOscillator();o.type='square';o.frequency.value=80;o.start();return o});const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=10000;bp.Q.value=.9;const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=7200;const g=c.createGain();g.gain.value=0;oscs.forEach(o=>o.connect(bp));bp.connect(hp);hp.connect(g);g.connect(this.out);this.metal={oscs,bp,hp,g}}
 ensureFmod(){if(this.fmod)return;const c=this.ctx;const m=c.createOscillator();m.type='sine';m.frequency.value=4900;const mg=c.createGain();mg.gain.value=0;m.connect(mg);mg.connect(this.osc.frequency);m.start();this.fmod={m,mg}}
-connect(bus,useWS){const w=!!useWS;if(this.bus!==bus||this.wiredWS!==w){this.out.disconnect();if(w){this.outWS.disconnect();this.out.connect(this.outWS);this.outWS.connect(bus.input)}else{this.out.disconnect();this.out.connect(bus.input)}if(this.bus!==bus&&this.metal){/* metal stack feeds this.out — already re-routed with out */}this.bus=bus;this.wiredWS=w}}
+connect(bus,useWS){const w=!!useWS;const viaDrive=w&&!!this.wsDrive;if(this.bus!==bus||this.wiredWS!==w||this.wiredDrive!==viaDrive){this.out.disconnect();this.outWS.disconnect();if(w){if(viaDrive){this.out.connect(this.wsDrive);this.wsDrive.connect(this.outWS)}else this.out.connect(this.outWS);this.outWS.connect(bus.input)}else{this.out.connect(bus.input)}this.bus=bus;this.wiredWS=w;this.wiredDrive=viaDrive}}
 hit(tr,when,vel,lock){const p=Object.assign({},tr.sound,lock||{});this.connect(this.eng.chains[tr.idx],(p.type||tr.type||'kick')==='kick');const tune=p.tune||1,decay=p.decay||1,tone=p.tone||1,punch=p.punch||0;const type=p.type||tr.type||'kick';const ng=this.noiseGain.gain,og=this.oscGain.gain,og2=this.osc2Gain.gain;
 /* v0.12.0 P1: zero EVERY layer at the hit anchor first — a voice reused
    across types never carries a previous layer's tail into the new hit
@@ -220,8 +225,16 @@ hit(tr,when,vel,lock){const p=Object.assign({},tr.sound,lock||{});this.connect(t
    busyUntil, so this cut lands after the estimated duration). */
 ng.cancelScheduledValues(when);og.cancelScheduledValues(when);og2.cancelScheduledValues(when);ng.setValueAtTime(0,when);og.setValueAtTime(0,when);og2.setValueAtTime(0,when);if(this.metal){const mg=this.metal.g.gain;mg.cancelScheduledValues(when);mg.setValueAtTime(0,when)}if(this.fmod){const f=this.fmod.mg.gain;f.cancelScheduledValues(when);f.setValueAtTime(0,when)}
 if(type==='kick'){
-/* SUB — sine, exponential pitch envelope start→f0 (depth = punch) */
-const dur=.12+.5*decay;const f0=Math.max(24,45*tune);const start=f0*(2.2+2.2*Math.min(punch,1));
+/* v0.14.0 drum v2: `dist` (0..1, default 0 = exact v0.13.1 path) — lazily
+   builds a drive gain feeding the EXISTING kick saturation shaper
+   (quadratic law, drive 1 → 6.5); `glide` (0..1, default 0) extends the
+   SUB pitch-envelope start multiplier (2.6×f0 extra at 1). Absent/neutral
+   values keep every scheduled value bit-identical. */
+const dv=Math.min(Math.max(p.dist||0,0),1);
+if(dv>0){if(!this.wsDrive){this.wsDrive=this.ctx.createGain();this.wsDrive.gain.value=1;this.connect(this.eng.chains[tr.idx],true)}this.wsDrive.gain.cancelScheduledValues(when);this.wsDrive.gain.setValueAtTime(1+5.5*dv*dv,when)}else if(this.wsDrive){this.wsDrive.gain.cancelScheduledValues(when);this.wsDrive.gain.setValueAtTime(1,when)}
+const gl=Math.min(Math.max(p.glide||0,0),1);
+/* SUB — sine, exponential pitch envelope start→f0 (depth = punch, + glide) */
+const dur=.12+.5*decay;const f0=Math.max(24,45*tune);const start=f0*(2.2+2.2*Math.min(punch,1)+2.6*gl);
 this.osc.type='sine';this.osc.frequency.setValueAtTime(start,when);this.osc.frequency.exponentialRampToValueAtTime(f0,when+.032);
 og.setValueAtTime(vel*(.8-.15*Math.min(Math.max(tone,0),1.6)),when);og.exponentialRampToValueAtTime(.0001,when+dur);
 /* BODY — triangle at f0, tone maps body/sub balance */
@@ -236,15 +249,18 @@ this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(f0,when);this.osc2.
 this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1900*tone,when);this.nFilter.Q.value=.9;ng.setValueAtTime(vel*.85,when);ng.exponentialRampToValueAtTime(.0001,when+dur);
 }else if(type==='clap'){
 const dur=.25+.15*decay;this.nFilter.type='bandpass';this.nFilter.Q.value=1.1;
-/* 4 bursts, exponential ~11 ms spacing + tail burst; per-burst bandpass
+/* `bursts` (2..6, default 4 = the v0.12.0 layout EXACTLY — same tables).
+   Exponential ~11 ms spacing + tail burst; per-burst bandpass
    offsets = deterministic spectral decorrelation (mono-voice reality:
    true L/R decorrelation is the worklet path — limitations list) */
-const B=[0,.011,.023,.036],DEC=[1,1.07,.94,1.1];B.forEach((t2,i)=>{ng.setValueAtTime(0,when+t2);ng.linearRampToValueAtTime(vel*(.8+.04*i),when+t2+.001);ng.exponentialRampToValueAtTime(.03,when+t2+.011);this.nFilter.frequency.setValueAtTime(1150*tone*DEC[i],when+t2)});
+const nb=Math.round(Math.min(Math.max(p.bursts||4,2),6));const B=CLAP_B[nb],DEC=CLAP_D[nb];B.forEach((t2,i)=>{ng.setValueAtTime(0,when+t2);ng.linearRampToValueAtTime(vel*(.8+.04*i),when+t2+.001);ng.exponentialRampToValueAtTime(.03,when+t2+.011);this.nFilter.frequency.setValueAtTime(1150*tone*DEC[i],when+t2)});
 ng.setValueAtTime(vel*.5,when+.05);ng.exponentialRampToValueAtTime(.0001,when+dur);
 }else if(type==='hatC'||type==='hatO'){
 const open=type==='hatO';const dur=open?.26+.5*decay:.03+.05*decay;
-/* metallic stack: 6 inharmonic squares → BP 10k → HP (tone = brightness) */
-this.ensureMetal();const base=40*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(10000,when);M.hp.frequency.setValueAtTime(7200*Math.sqrt(tone),when);const mg=M.g.gain;mg.setValueAtTime(vel*(open?.46:.42),when);mg.exponentialRampToValueAtTime(.0001,when+dur);
+/* metallic stack: 6 inharmonic squares → BP 10k → HP (tone = brightness).
+   v0.14.0: `bright` (0.5..2, default 1 = exact v0.13.1) scales the BP
+   corner — brighter hats sweep the stack resonance up, darker down */
+this.ensureMetal();const base=40*tune;const br=Math.min(Math.max(p.bright||1,.5),2);const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(10000*Math.sqrt(br),when);M.hp.frequency.setValueAtTime(7200*Math.sqrt(tone),when);const mg=M.g.gain;mg.setValueAtTime(vel*(open?.46:.42),when);mg.exponentialRampToValueAtTime(.0001,when+dur);
 /* noise touch keeps a little of the old breath */
 this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(8000,when);ng.setValueAtTime(vel*.14,when);ng.exponentialRampToValueAtTime(.0001,when+dur);
 }else if(type==='tom'){
@@ -269,7 +285,25 @@ const dur=.08+.14*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setV
 const dur=.04+.07*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(5500*tone,when);this.nFilter.Q.value=1.4;ng.setValueAtTime(0,when);ng.linearRampToValueAtTime(vel*.5,when+.002);ng.exponentialRampToValueAtTime(vel*.18,when+.011);ng.linearRampToValueAtTime(vel*.34,when+.015);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='riser'){
 const dur=1.6;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(300,when);this.nFilter.frequency.exponentialRampToValueAtTime(6000,when+dur);ng.setValueAtTime(.0001,when);ng.exponentialRampToValueAtTime(vel*.6,when+dur);ng.exponentialRampToValueAtTime(.0001,when+dur+.05)}else if(type==='impact'){
 /* v0.12.0 P2: sub drop + triangle body octave for definition */
-const dur=1.1*decay+.3;this.osc.type='sine';this.osc.frequency.setValueAtTime(60*tune,when);this.osc.frequency.exponentialRampToValueAtTime(30,when+.5);og.setValueAtTime(vel*1.05,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(120*tune,when);this.osc2.frequency.exponentialRampToValueAtTime(55,when+.4);og2.setValueAtTime(vel*.3,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.5)}}
+const dur=1.1*decay+.3;this.osc.type='sine';this.osc.frequency.setValueAtTime(60*tune,when);this.osc.frequency.exponentialRampToValueAtTime(30,when+.5);og.setValueAtTime(vel*1.05,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(120*tune,when);this.osc2.frequency.exponentialRampToValueAtTime(55,when+.4);og2.setValueAtTime(vel*.3,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.5)}else if(type==='darbuka'){
+/* v0.14.0: goblet drum (doumbek family — the goa/psy lineage instrument).
+   DUM body: triangle sweep 1.5×f0 → f0 (~45 ms bend) = the low stroke;
+   TEK: sine ping 690→560 Hz + bandpass snap 4.2 kHz = the high stroke.
+   tone maps the snap band. Deterministic param automation, no allocation. */
+const dur=.14+.28*decay;const df=165*tune;this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(df*1.5,when);this.osc2.frequency.exponentialRampToValueAtTime(df,when+.045);og2.setValueAtTime(vel*.85,when);og2.exponentialRampToValueAtTime(.0001,when+dur);this.osc.type='sine';this.osc.frequency.setValueAtTime(690*tune,when);this.osc.frequency.exponentialRampToValueAtTime(560*tune,when+.02);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+.03);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(4200*tone,when);this.nFilter.Q.value=1.1;ng.setValueAtTime(vel*.32,when);ng.exponentialRampToValueAtTime(.0001,when+.014)}else if(type==='tambourine'){
+/* v0.14.0: jingle row — metal stack at 95 Hz base (ratios 2..8.21 →
+   190 Hz..780 Hz partials, the shell resonance band) + membrane thump;
+   tone leans jingle (bright) vs thump (dark). */
+const dur=.12+.24*decay;this.ensureMetal();const base=95*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(8200,when);M.hp.frequency.setValueAtTime(5600*Math.sqrt(tone),when);const mg=M.g.gain;mg.setValueAtTime(vel*.4,when);mg.exponentialRampToValueAtTime(.0001,when+dur);this.osc.type='sine';this.osc.frequency.setValueAtTime(195*tune,when);og.setValueAtTime(vel*(.45-.12*Math.min(tone,1)),when);og.exponentialRampToValueAtTime(.0001,when+dur*.6)}else if(type==='triangle'){
+/* v0.14.0: long inharmonic ring — metal stack at 205 Hz base through
+   BP 10.5k / HP 3.2k, TWO-stage decay (fast set-down then long ring;
+   decay maps the ring). 2-stage envelope = the struck-rod sustain shape. */
+const dur=.9+1.6*decay;this.ensureMetal();const base=205*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(10500,when);M.hp.frequency.setValueAtTime(3200,when);const mg=M.g.gain;mg.setValueAtTime(vel*.34,when);mg.exponentialRampToValueAtTime(vel*.16,when+dur*.25);mg.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='downlifter'){
+/* v0.14.0: the riser's mirror — closes sections instead of opening them
+   (declared in soundBank DrumType since v0.10, implemented here at last).
+   Highpassed noise descends 6.2k → 180 Hz while a sine drops 180 → 42 Hz;
+   decay maps the length (up to 2 s). */
+const dur=.9+1.1*decay;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(6200,when);this.nFilter.frequency.exponentialRampToValueAtTime(180,when+dur);ng.setValueAtTime(vel*.55,when);ng.exponentialRampToValueAtTime(.0001,when+dur);this.osc.type='sine';this.osc.frequency.setValueAtTime(180*tune,when);this.osc.frequency.exponentialRampToValueAtTime(42,when+dur*.8);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+dur)}}
 panic(){try{this.noiseGain.gain.cancelScheduledValues(0);this.noiseGain.gain.setValueAtTime(0,this.ctx.currentTime);this.oscGain.gain.cancelScheduledValues(0);this.oscGain.gain.setValueAtTime(0,this.ctx.currentTime);this.osc2Gain.gain.cancelScheduledValues(0);this.osc2Gain.gain.setValueAtTime(0,this.ctx.currentTime);if(this.metal)this.metal.g.gain.cancelScheduledValues(0),this.metal.g.gain.setValueAtTime(0,this.ctx.currentTime);if(this.fmod)this.fmod.mg.gain.cancelScheduledValues(0),this.fmod.mg.gain.setValueAtTime(0,this.ctx.currentTime)}catch(e){}}
 }
 
