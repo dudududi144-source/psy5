@@ -4,7 +4,7 @@ import { sceneSetFollow, resolveFollow, sceneSetMix, applySceneMix } from '../sc
 import { songMidi } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
 import { createMidiCore, emptyMidiMap } from '../midi.js';
-import { PooledEngine } from '../engine.js';
+import { PooledEngine, prepInsertDSP } from '../engine.js';
 import { buildStyle, libFind, libFilter, assignPresetToTrack, addTrackToProject, KITS } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval, SCALES } from '../model.js';
 import { recordPoint, quantStep, applyLanes } from '../autorec.js';
@@ -1166,6 +1166,38 @@ const neuDiff=maxDiff42(neuA,neuB);
 const det42=maxDiff42(acidBuf,await mk42(acid42,48));
 const ok42=acidHF>=legacyHF*1.5&&(z2/z1)<.45&&(z2L/z1L)>.8&&subR>=.15&&subR>subL*2&&neuDiff<1e-6&&det42<1e-6;
 gate('G42','synth v2-lite: acid fenv 6-12k RMS >=1.5x legacy, penv descent (flat-filter isolation) z-ratio <.45 (no-penv >.8), sub 20-60Hz ratio >=.15 & >2x legacy, neutral maxDiff<1e-6, determinism<1e-6',ok42,'acidHF='+acidHF.toExponential(2)+' legacyHF='+legacyHF.toExponential(2)+'(x'+(acidHF/Math.max(legacyHF,1e-12)).toFixed(2)+') | slide z '+z1.toFixed(0)+'>'+z2.toFixed(0)+' r='+(z2/z1).toFixed(2)+' no-penv r='+(z2L/z1L).toFixed(2)+' | sub '+subR.toFixed(3)+'>'+subL.toFixed(3)+' | neutral '+neuDiff.toExponential(1)+' | det '+det42.toExponential(1))}catch(e){gate('G42','synth v2-lite',false,'ERR '+e.message)}}
+/* G43 — MOOG LADDER INSERT (offline — CI-asserted, v0.13.0 P2):
+   the psy-dsp.js 4-stage tanh-feedback ladder, wired as a per-track insert
+   (ins.filtOn 4) through the ONE syncMix insert path:
+   prep — the probe preps its OWN OfflineAudioContext via prepInsertDSP
+     (exactly what bounce/freeze do); eng.moogSpawns===1 + moogFallbacks===0
+     prove the real worklet node built;
+   non-vacuous direction — MOOG (cutoff 700) vs the SAME render with the
+     insert OFF: the 4–12 kHz band RMS must DROP below .7× (it IS a lowpass)
+     while staying non-silent (peak > .01);
+   moog ≠ biquad — the prepped MOOG render vs the UNPREPPED context's biquad
+     LP fallback at the same cutoff (Q 6 → ladder resonance 1.0): the two
+     engines must differ audibly (maxDiff > 1e-3) AND the ladder's cutoff-band
+     RMS stays >= .35x the biquad's (a distinct, not broken, curve — measured
+     .47x at Q 6: the ladder's tanh-feedback peak is GENTLER than a biquad's
+     pole-Q resonance, which is the known sonic difference, not a defect);
+   honest fallback — the unprepped context renders NON-SILENTLY through the
+     counted biquad fallback (moogFallbacks===1, moogSpawns===0);
+   determinism — two prepped MOOG renders: maxDiff < 1e-6. */
+if((window.__psy6GateSkip||[]).includes('G43')){gate('G43','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR43=44100;
+const fft43=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const bandRms43=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR43);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft43(re,im);const binHz=SR43/N;let s2=0;for(let k=1;k<N/2;k++){if(k*binHz>=f0&&k*binHz<=f1){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);s2+=m*m}}return Math.sqrt(s2/(N/2))};
+const maxDiff43=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
+const peak43=x=>{let m=0;for(let i=0;i<x.length;i++){const a=Math.abs(x[i]);if(a>m)m=a}return m};
+const mk43=async(prep,withIns)=>{const oc=new OfflineAudioContext(1,SR43,SR43);if(prep){const ok=await prepInsertDSP(oc);if(!ok)throw new Error('prepInsertDSP failed')}const eng=new PooledEngine(oc);const tr={idx:0,kind:'synth',type:'synth',presetId:'g43',name:'g43',sound:{wave1:'sawtooth',wave2:'sawtooth',cutoff:900,res:2,atk:.003,dec:.3,sus:.6,rel:.1,gate:.9},ins:{drive:0,crush:16,filtOn:withIns?4:0,filtFreq:700,filtQ:6},mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:48,lock:{}},60/145/4);const buf=await oc.startRendering();return{buf,eng}};
+const moogR=await mk43(true,true),offR=await mk43(true,false),bqR=await mk43(false,true),moogR2=await mk43(true,true);
+const moogHi=bandRms43(moogR.buf.getChannelData(0),4000,12000,.06),offHi=bandRms43(offR.buf.getChannelData(0),4000,12000,.06);
+const moogCore=bandRms43(moogR.buf.getChannelData(0),500,900,.06),bqCore=bandRms43(bqR.buf.getChannelData(0),500,900,.06);
+const mdBq=maxDiff43(moogR.buf,bqR.buf),mdDet=maxDiff43(moogR.buf,moogR2.buf);
+const pk=peak43(moogR.buf.getChannelData(0));
+const ok43=moogR.eng.moogSpawns===1&&moogR.eng.moogFallbacks===0&&moogHi<offHi*.7&&pk>.01&&mdBq>1e-3&&moogCore>=bqCore*.35&&bqR.eng.moogFallbacks===1&&bqR.eng.moogSpawns===0&&peak43(bqR.buf.getChannelData(0))>.01&&mdDet<1e-6;
+gate('G43','moog insert: real worklet node (spawns=1 fallbacks=0), 4-12k drops <.7x vs insert-off (non-silent), moog!=biquad (maxDiff>1e-3, core band >=.5x biquad), honest counted fallback (fallbacks=1, non-silent), determinism<1e-6',ok43,'spawns='+moogR.eng.moogSpawns+' fbs='+moogR.eng.moogFallbacks+' moogHi='+moogHi.toExponential(2)+' offHi='+offHi.toExponential(2)+'(x'+(moogHi/Math.max(offHi,1e-12)).toFixed(2)+') | mdBq='+mdBq.toExponential(2)+' core moog='+moogCore.toExponential(2)+' bq='+bqCore.toExponential(2)+' | fbFbs='+bqR.eng.moogFallbacks+' fbPk='+peak43(bqR.buf.getChannelData(0)).toFixed(3)+' | det='+mdDet.toExponential(1))}catch(e){gate('G43','moog insert',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 

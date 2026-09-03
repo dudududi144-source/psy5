@@ -4,10 +4,10 @@
  * The five new optional preset params (fenv/fdec/penv/pdec/sub) are consumed
  * by js/engine.js SynthVoice.noteOn. Their audio-level behavior is asserted
  * on-device by gate G42 (offline renders); THIS file pins the DATA layer:
- *   1. NEUTRALITY at the data layer: NO runtime-library preset may define the
- *      new fields — absence is what makes the v0.13.0 engine render every
- *      legacy preset exactly like v0.12.0. (New presets may opt in; when they
- *      do, their values must sit inside the engine clamps.)
+ *   1. NEUTRALITY at the data layer: presets WITHOUT the gen:'v13' marker may
+ *      not define the new fields — absence is what makes the v0.13.0 engine
+ *      render legacy presets exactly like v0.12.0. Marked (gen:'v13') presets
+ *      MAY opt in, but every present field must sit inside the engine clamps.
  *   2. soundBank.ts declares the five engine-consumed optional fields.
  *   3. The runtime library stays healthy: unique ids, 178+ presets, all
  *      categories present (the v0.12.0 floor).
@@ -27,12 +27,29 @@ const CLAMPS: Record<string, [number, number]> = {
 const CATS = ['drum', 'bass', 'lead', 'pad', 'pluck', 'arp', 'fx', 'synth', 'texture']
 
 describe('synth v2-lite data layer (v0.13.0 P1)', () => {
-  test('every runtime preset: new fields ABSENT (legacy neutrality) — v0.13.0 P1 freeze', () => {
+  test('legacy (unmarked) presets carry ZERO new fields — legacy neutrality', () => {
     const all = libFilter('all', 'ALL')
     expect(all.length).toBeGreaterThanOrEqual(178) // the v0.12.0 floor
+    let marked = 0
     for (const p of all) {
+      if ((p as any).gen === 'v13') { marked++; continue }
       for (const f of NEW_FIELDS) {
         expect((p as any)[f]).toBeUndefined()
+      }
+    }
+    expect(marked).toBeGreaterThanOrEqual(60) // the v0.13.0 v2-lite generation
+  })
+
+  test("gen:'v13' presets opt in ONLY through the engine clamps", () => {
+    for (const p of libFilter('all', 'ALL')) {
+      if ((p as any).gen !== 'v13') continue
+      for (const f of NEW_FIELDS) {
+        const v = (p as any)[f]
+        if (v !== undefined) {
+          const [lo, hi] = CLAMPS[f]
+          expect(v).toBeGreaterThanOrEqual(lo)
+          expect(v).toBeLessThanOrEqual(hi)
+        }
       }
     }
   })

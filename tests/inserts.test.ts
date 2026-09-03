@@ -60,12 +60,12 @@ describe('ensureIns (canonical model)', () => {
     ensureIns(t)
     expect(JSON.stringify(t)).toBe(before)
   })
-  test('clamps: drive 200→100, crush 1→2, filtOn 9→3, freq 5→20, Q 99→18', () => {
+  test('clamps: drive 200→100, crush 1→2, filtOn 9→4 (MOOG), freq 5→20, Q 99→18', () => {
     const t: any = { ins: { drive: 200, crush: 1, filtOn: 9, filtFreq: 5, filtQ: 99 } }
     ensureIns(t)
     expect(t.ins.drive).toBe(100)
     expect(t.ins.crush).toBe(2)
-    expect(t.ins.filtOn).toBe(3)
+    expect(t.ins.filtOn).toBe(4) /* v0.13.0: 4 = MOOG added to the insert range (0..4) */
     expect(t.ins.filtFreq).toBe(20)
     expect(t.ins.filtQ).toBe(18)
   })

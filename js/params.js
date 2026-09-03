@@ -20,7 +20,7 @@ import { ensureVoice } from './samplestore.js';
    ensureMaster pattern. Defaults are EXACT bypass: drive 0 (dry path),
    crush 16 (dry path), filtOn 0 (node removed). ── */
 const INS_DEFAULTS = { drive: 0, crush: 16, filtOn: 0, filtFreq: 20000, filtQ: 1 };
-const INS_RANGES = { drive: [0, 100], crush: [2, 16], filtOn: [0, 3], filtFreq: [20, 20000], filtQ: [0.1, 18] };
+const INS_RANGES = { drive: [0, 100], crush: [2, 16], filtOn: [0, 4], filtFreq: [20, 20000], filtQ: [0.1, 18] };
 function ensureIns(t) {
   if (!t || typeof t !== 'object') return t;
   if (!t.ins || typeof t.ins !== 'object' || Array.isArray(t.ins)) t.ins = {};
