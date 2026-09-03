@@ -3,6 +3,73 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.17.0] — Run 20g: READY SET boot (never empty) + MACROS 8/8 REAL + playability layer
+
+> Owner report (verbatim): "עוד לא סיימנו בחן שוב ותמשיך גם כהמשתמש יקבל
+> את המערכת מסודרת ומאורגנת יותר כבר מוכנה לביצוע ולא ריקה וגם לשפר
+> משחקיות למשתמש ולוודא תקינות של הכל להריץ הכל ולראות שהכל מגיב ועובד
+> נכון ומדיוק ... ותמלא עוד דברים שיהיה מבחר עשיר ולא רק כמה פונקציות
+> בודדות לכל דבר" — test everything again; the user must receive the
+> system organized, arranged and READY TO PERFORM — not empty; improve
+> playability; verify everything runs, responds and is precise; fill in
+> more so every surface carries rich variety, not a few single functions.
+
+### READY SET — the device boots ARRANGED, not empty
+- The power screen now leads with a primary hero: "▶ ENTER — READY SET ·
+  FULL-ON · 3:00 ARRANGED". One press composes a COMPLETE deterministic
+  set (intro→build→drop→break→riser→drop2→outro: scenes, variant scenes,
+  mix snapshots, automation lanes, transitions, the arranger chain) and
+  lands on Perform with the arranger RUNNING. The old experience (a bare
+  skeleton) remains as the explicitly-labeled "∅ BARE SKETCH" escape hatch.
+- All NINE composer styles became one-press READY SETs on the power screen
+  (FULL-ON / DARK-PSY / PROGRESSIVE / FOREST / HI-TECH / PSYTRANCE / GOA /
+  TECHNO / TRANCE) — pinned seeds per style, so the same set every time
+  (replayable, deterministic). The three demo buttons ride the same path.
+- READY ALBUM: every composed boot preseeds the SONG LIBRARY with the
+  booted song (active) plus one pinned-recipe per style — 9 songs, ~1 KB,
+  deterministic ids (`readyAlbum` in js/library.js). The album UI is rich
+  from the first second; recipes stay byte-reproducible.
+- Power-screen copy updated to say exactly what ENTER does.
+
+### MACROS 8/8 REAL — no more dead controls
+- Owner truth found in code: DRIVE and MOVEMENT were RENDERED in the UI
+  but `resolveMacros` only read ENERGY and SPACE — two dead knobs; 4..7
+  did not exist. All eight now resolve to real engine state, recomputed
+  idempotently from the per-track base snapshot (no accumulation, pure,
+  deterministic — the same contract ENERGY always had):
+  - ENERGY (0): cutoff brightness + drum/bass levels (legacy, unchanged)
+  - DRIVE (1): insert saturation on the music bus + gentle bit-crush on
+    drum bodies 1–3. Kick and bass stay SACRED (zero macro writes).
+  - SPACE (2): delay + reverb sends (legacy, unchanged)
+  - MOVEMENT (3): stereo spread (pad/arp left-right, hats/perc opposite)
+    + LFO depth on music synths
+  - FILTER (4): extra tone tilt over the music-bus cutoff (dark ↔ bright)
+  - TIGHT (5): drum envelope length (loose ↔ tight, clamped 0.02..4 s)
+  - HAUNT (6): pitch destabilizer on lead/arp (detune 0..48 cents-bias)
+  - FAZE (7): LFO speed on the music bus (0..16 Hz)
+- Macro cards show a live % readout; double-click resets to neutral 0.5;
+  every card carries a tooltip describing exactly what it resolves to.
+
+### PLAYABILITY — the performer gets more hands-on controls
+- Keyboard (registry-tested, collision-free, help overlay auto-updates):
+  `t` tap tempo (pure `tapTempo` math, 2.5 s window, clamped 40..300) ·
+  `[` / `]` live BPM ride ±1 · `x` PANIC · `c` chain toggle · `s` save ·
+  `Alt+1..8` INSTANT-launch scene N (the live jump that quantized
+  launches and arrows did not cover).
+- Macro/scene/pad surfaces remain the performance core; all new bindings
+  are documented in the in-app help (?).
+
+### Verification (every claim reproducible)
+- `bun test` → 486 pass / 0 fail (17 new in tests/macros8.test.ts: all
+  eight macros move real clamped state; idempotent recompute; ENERGY
+  legacy contract; determinism; tapTempo window/average/clamp;
+  readyAlbum validity + byte-determinism; all 9 pinned sets compose).
+- `node tools/verify.mjs` → GREEN. `bun tools/e2e.mjs` → GREEN 47/47
+  (the CI subset boots through the NEW hero path: click #stylePicker
+  button #1 = READY SET compose boot → all gates pass on top of it).
+- Hero boot = the deterministic FULL-ON 424242 set: 9 tracks, 12+
+  scenes, arranger on, library preseeded — organized and playing.
+
 ## [0.16.0] — Run 20f: TRANSITIONS v1 (smooth section hand-offs) + the LOAD/CRASH fix + UI precision & layout overhaul
 
 > Owner report (verbatim): "כרגע המערכת עם מלא לאגים ובעיות וחוסר דיוק היה
