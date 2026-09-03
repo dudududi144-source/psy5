@@ -27,6 +27,10 @@ window.__psy6=I; /* debug/verification handle (headless CI reads engine state) *
 
 function renderLoop(){requestAnimationFrame(renderLoop);if(I.p&&I.sched.on){renderPos();drawPlayhead()}if(I.renderDirty)renderAll()}
 
+/* v0.13.0 P3 — LOAD chip: engine telemetry + output latency, painted at 4 Hz
+   (textContent only on change — no layout churn). Red on pool pressure or a
+   growing tier-0 starvation counter. */
+setInterval(()=>{const el=$('loadMeter');if(!el)return;if(!I.eng||I.engine!=='main'||!I.eng.loadSnapshot){el.textContent='LOAD —';return}const l=I.eng.loadSnapshot();const cap=l.pools.synth+l.pools.drum;const load=cap?l.active/cap:0;const txt='LOAD '+(load*100).toFixed(0)+'% · '+l.synth+'/'+l.drum+'/'+l.samples+' · ST'+l.steals+' · T0'+l.tier0StealAttempts+' · '+l.latencyMs+'ms';if(el.textContent!==txt)el.textContent=txt;el.style.color=(load>=.75||l.tier0StealAttempts>0)?'#ff5d5d':(load>=.4?'#ffb84f':'')},250);
 setInterval(()=>{if(!I.eng||!I.eng.analyser)return;const an=I.eng.analyser;if(!I._md)I._md=new Uint8Array(an.frequencyBinCount);an.getByteTimeDomainData(I._md);let pk=0;for(const v of I._md){const a=Math.abs(v-128)/128;if(a>pk)pk=a}const cv=$('meter'),g=cv.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,cv.width,cv.height);g.fillStyle=pk>.9?'#ff5d5d':'#4fd6c0';g.fillRect(0,8,pk*cv.width,10)},150);
 
 async function powerOn(style,resume){const AC=window.AudioContext||window.webkitAudioContext;const ctx=new AC({latencyHint:'interactive'});I.ctx=ctx;try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
