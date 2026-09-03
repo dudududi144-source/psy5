@@ -3,6 +3,75 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.13.1] — Run 20c: OPTIONS+ (more choices, exposed engine power) + a11y fix pass
+
+> The owner's bug report from the field: DevTools flagged a CSP `eval` block
+> and 5 form fields with no label association ("תראה אם יש תקלות"), plus
+> "חסרים הרבה אופציות לבחירה" — the UI offers far fewer choices than the
+> engine actually has. v0.13.1 fixes the real defect, explains the phantom
+> one, and EXPOSES the hidden capabilities. Commands: `bun test` (431 tests /
+> 38 files), `node tools/verify.mjs`, `bun tools/e2e.mjs` (42/42 HARD — G45
+> new).
+
+### A11Y FIX — the 5 flagged labels
+
+The header BPM / Swing / Velocity / Groove / Seed labels were not associated
+with their fields (no `for=`, no nesting) — the exact "5 violating nodes" the
+owner's DevTools audit showed. All five now carry `label[for]`; the dynamic
+Sound-tab labels (VOICE, INS, sample/synth fields, wave selects) and the
+composer modal labels got the same treatment; the two selects that had no
+label at all (`#smpSel`, `#insFiltSel`) got `aria-label`s. Regression guard:
+usability tests parse `index.html`/`sound.js` (orphan labels must stay at
+zero) and Self-Gate **G45** counts orphan labels in the LIVE document.
+
+### CSP `eval` — diagnosed, not ours
+
+The live site sends NO Content-Security-Policy (GitHub Pages: verified via
+`curl -I`, no CSP header) and ships NO CSP `<meta>` (index/sw/manifest +
+runtime injection all checked: absent), and the app code contains zero
+`eval`/`new Function`/string-timers (grep-verified; the only hits are the
+Node-side e2e CDP driver and the Bun test harness). The warning the owner
+saw comes from the embedding chat-preview wrapper's own injected CSP +
+scripts, not from PSY6. Opening https://dudududi144-source.github.io/psy5/
+directly in a tab shows no such error.
+
+### OPTIONS+ — engine capabilities the UI never offered, now exposed
+
+- **Master WIDTH slider** (Mixer ▸ MASTER): `master.widthMaster` 0..200%,
+  registered/automatable since v0.12.0 but with NO control. 1.00 = exact
+  neutral (network OUT); bass <300 Hz stays mono by design.
+- **PING-PONG delay toggle** (Mixer ▸ DELAY BUS ▸ PP): `fx.pingPong`, the
+  v0.12.0 cross-fed L/R mode, default OFF = exact mono topology.
+- **Reverb IR variant select** (Mixer ▸ DELAY BUS ▸ IR): `fx.irKind` —
+  CLASSIC (~1.8 s, the original) / SHORT (~1.2 s bright) / LONG (~3.2 s dark).
+- **6 BPM-synced delay divisions**: 1/16 and 3/8 and 1/2 join 1/8 / 3/16 /
+  1/4 (`foundation/dsp/sends.mjs` DIV_STEPS — additive; unknown values still
+  fall back to 3/16, legacy projects untouched).
+- **Factory library search box**: live substring filter over the 250 presets
+  (name/id/genre) beside the category/genre selects.
+- **4 NEW composer styles — 5 → 9**: PSYTRANCE (142), GOA (140,
+  harmonic-minor), TECHNO (132), TRANCE (138) — the library had 8 kits and
+  8 genres but only 5 selectable styles. Each rides its own KITS row and its
+  own 12-template progression family (`PROGRESSION_TEMPLATES` 5 → 9
+  families, same 12-template/degree contract, module-load validation covers
+  the new ones). Both style selects (power screen + COMPOSE modal) offer all
+  9. The four new styles compose deterministically (double run
+  byte-identical, asserted) — the five legacy styles resolve EXACTLY as
+  before (RHYTHM BYTE-IDENTITY pins untouched).
+
+G45 (HARD, Self-Gate + e2e) pins the whole exposure contract with numbers:
+0 orphan labels; WIDTH 1→1.8→1 drives `master.widthMaster` + `eng.widthOn`
+(true/false — 1 is exact neutral); PP toggle flips `fx.pingPong` +
+`eng.ppOn`; IR long/short/classic swaps `eng._irKind`; 6 divisions with
+`delaySecondsFor('1/16',bpm)` === one 16th and `'1/2'` === eight; search
+"acid" strictly filters the live list and clearing restores it; 9 styles,
+the 4 new families byte-identical on double compose.
+
+### SW
+
+CACHE_VERSION → `psy6-v0.13.1` (network-first SW — clients pick the new
+build on next visit).
+
 ## [0.13.0] — Run 20b: SYNTH v2-lite + MOOG insert + SMOOTH (sounds + load/latency)
 
 > The owner's follow-up brief: keep raising the sound level across the whole

@@ -177,6 +177,18 @@ MOOG INSERT (v0.13.0) — ins.filtOn 4 → AudioWorkletNode 'moog-filter'
 LOAD TELEMETRY (v0.13.0) — PooledEngine.loadSnapshot(): active voices,
   steals, tier-0 starvation attempts, counters, latency; the header LOAD
   chip paints it at 4 Hz. G44 asserts the discipline under stress.
+UI OPTIONS EXPOSURE (v0.13.1) — the v0.12.0/v0.13.0 engine capabilities get
+  their controls: master WIDTH slider (master.widthMaster 0..2, registered
+  in params.js since v0.12.0), PING-PONG toggle (fx.pingPong), IR variant
+  select (fx.irKind classic/short/long), 6 BPM-synced delay divisions
+  (sends.mjs DIV_STEPS adds 1/16, 3/8, 1/2 — additive, unknown falls back
+  to 3/16), factory-library search box (#libQ substring filter over
+  name/id/genre). Composer styles 5 → 9: PSYTRANCE 142 / GOA 140
+  harmonicMinor / TECHNO 132 / TRANCE 138 ride their own KITS rows and
+  their own 12-template PROGRESSION_TEMPLATES families (9 families; the
+  module-load validator covers them; the 5 legacy families are
+  byte-untouched). A11y: all labels associated (for= / nesting /
+  aria-label) — G45 pins the whole exposure contract with numbers.
 
 Library: 250 presets (133 drums + 72 gen:'v13' synths), unique ids,
 schema-validated (G40 +

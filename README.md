@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 428 tests across 38 files — 428 pass / 0 fail (359740 expect() calls)
+bun test             # 431 tests across 38 files — 431 pass / 0 fail (501220 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 ```
@@ -116,17 +116,18 @@ Honest subset classification (v0.4.0):
 | `G42` (synth v2-lite) | v0.13.0: acid fenv 6–12k RMS ×2.07 legacy; penv descent z-ratio 0.20 vs no-penv 1.00 (flat-filter isolation); sub 20–60 Hz 0.161 vs 0.062 (2.6×); neutral maxDiff 0.0; determinism 0 | CI + local |
 | `G43` (moog insert) | v0.13.0: real node spawns=1/fallbacks=0; 4–12k ×0.33 vs insert-off; moog≠biquad maxDiff 0.35 (core 0.47× — gentler tanh peak); honest counted fallback; determinism 0 | CI + local |
 | `G44` (load/steal stress) | v0.13.0: 177 spawns, tight pools 4/3, TWO tier-0 tracks: starvation 0, 94 steals absorbed, per-track counts exact, reaper active=0, LOAD chip in DOM | CI + local |
+| `G45` (UI options exposure) | v0.13.1: 0 orphan labels in the live DOM; WIDTH slider 1→1.8→1 drives master.widthMaster + eng.widthOn (1 = exact neutral); PP toggle flips fx.pingPong + eng.ppOn; IR long/short/classic swaps eng._irKind; 6 delay divisions (1/16 & 1/2 math exact); search filters 250→6 and restores; 9 composer styles — the 4 new families compose byte-identical twice | CI + local |
 | `G41` (master space) | v0.12.0: neutral perturb→restore maxDiff 2.46e-7; width 1.8 HF-side ×1.77 (300 Hz protection by design); ping-pong L−R flips 2→46; long-IR decay 48.7× short | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.12.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **43 MAIN entries**, of
-which **41 are hard** (offline/pure — CI asserts all 41 ids incl. G24 song
+Gate-truth accounting (v0.13.1 — canonical inventory lives as a comment above
+`runSelfGate()` in js/ui/tests.js): the device runs **44 MAIN entries**, of
+which **42 are hard** (offline/pure — CI asserts all 42 ids incl. G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
 voice, G35 insert FX, G36 freeze, G37 editor, G38 slices, G39 drum engine
 v2, G40 percussion + library, G41 master space, G42 synth v2-lite, G43 moog
-insert, G44 load/steal stress) and
+insert, G44 load/steal stress, G45 UI options exposure) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
@@ -258,6 +259,15 @@ CHANGELOG 0.12.0 is the measured proof):
   classic 1.8 s / long dark 3.2 s — seeded, deterministic).
 - **Composer kits** — the composer rides the per-style kits (kick stays
   sacred-consistent per style); pattern data unchanged (form-fp asserted).
+- **9 composer styles (v0.13.1)** — FULL-ON, DARK-PSY, PROGRESSIVE, FOREST,
+  HI-TECH + NEW PSYTRANCE (142), GOA (140, harmonic-minor), TECHNO (132),
+  TRANCE (138), each with its own 12-template progression family (9
+  families total).
+- **Mixer options exposed (v0.13.1)** — master WIDTH slider, PING-PONG
+  delay toggle, reverb IR variant select (CLASSIC/SHORT/LONG), 6
+  BPM-synced delay divisions (1/16 … 1/2), factory-library search box.
+- **A11y (v0.13.1)** — every form label is associated (`for=`/nesting/
+  `aria-label`); zero orphan labels, guarded by tests + G45.
 - Honest DSP notes: main-thread voices are mono pre-pan (true L/R
   decorrelation is the worklet path); the hat metallic stack initializes
   lazily on a voice's first hat hit (documented hot-path exception); the
