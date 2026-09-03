@@ -1364,6 +1364,87 @@ const ok47=rmsD>=rmsA*1.1&&distDiff>1e-3&&g1>=g0*1.1&&mid6>3*mid2&&md47(c6,c2)>1
    middle-span RMS ratio, measured ×7.3. The two layouts are also audibly
    different end-to-end (maxDiff > 1e-3). */
 gate('G47','drum v2 params: dist RMS>=1.1x + audible (maxDiff>1e-3), glide sub-centroid(30-400Hz, first 46ms)>=1.1x, bursts mid-span (20-44ms) RMS >3x the nb=2 render (bursts@25/34ms vs silence) + audible maxDiff, bright 9-14k ratio rises, ALL neutral pairs maxDiff<1e-6 (dist0/glide0/bursts4/bright1 = exact v0.13.1), determinism<1e-6',ok47,'rms '+rmsD.toFixed(3)+'/'+rmsA.toFixed(3)+'='+(rmsD/rmsA).toFixed(2)+' d='+distDiff.toExponential(1)+' | cent '+g1.toFixed(0)+'/'+g0.toFixed(0)+'='+(g1/Math.max(g0,1e-9)).toFixed(2)+' | mid '+mid6.toExponential(1)+'/'+mid2.toExponential(1)+'(x'+(mid6/Math.max(mid2,1e-12)).toFixed(1)+') md='+md47(c6,c2).toExponential(1)+' | br '+br20.toFixed(3)+'/'+br05.toFixed(3)+' | neu d/g/b/h '+distNeu.toExponential(1)+'/'+glideNeu.toExponential(1)+'/'+burstsNeu.toExponential(1)+'/'+brightNeu.toExponential(1)+' | det='+det47.toExponential(1))}catch(e){gate('G47','drum v2 params',false,'ERR '+e.message)}}
+/* G48 — PERCUSSION v3 (offline — CI-asserted, v0.15.0 P1):
+   the owner flagged conga (the perc lane of EVERY composer kit) and other
+   perc as low-grade. P1 rebuilt five voices inside the same DrumVoice
+   nodes. Solo hits through fresh OfflineAudioContext + PooledEngine:
+   conga — the shell partial (2.6×f0 = 744–920 Hz at tune 1) is PRESENT:
+     its band share ≥ .03 (the v0.12.0 bare sine put ≈0 there; measured
+     .039), and the strike leads the body: RMS(0–12 ms) > RMS(50–80 ms)
+     (measured ×2.04);
+   bongo — same family: the 2.7×f0 shell partial band (1080–1280 Hz)
+     share ≥ .012 (measured .017 — the share is diluted by the strong
+     fundamental + slap total, but the bare sine put ≈0 there);
+   tom — the two-stage pitch path: bend-start band (200–320 Hz) outweighs
+     the landed-glide band (80–130 Hz) ≥ 1.4× (measured ×12.4);
+   cowbell — tone maps the pair spread: tone 1.4 vs tone 1 render
+     audibly different (maxDiff > 1e-3);
+   clave — the knock is punch-driven: punch .8 vs punch 0 differs
+     audibly (maxDiff > 1e-3);
+   all non-silent (peak > .05), deterministic (conga + tom double render
+   in fresh contexts: maxDiff < 1e-6). */
+if((window.__psy6GateSkip||[]).includes('G48')){gate('G48','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR48=44100;
+const mk48=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR48*dur),SR48);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g48',name:'g48',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
+const rms48=(x,a,b)=>{const A=Math.round(a*SR48),B=Math.min(Math.round(b*SR48),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
+const fft48=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const bandShare48=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR48);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft48(re,im);const binHz=SR48/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
+const bandAbs48=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR48);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft48(re,im);const binHz=SR48/N;let s2=0;for(let k=1;k<N/2;k++){if(k*binHz>=f0&&k*binHz<=f1){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);s2+=m*m}}return Math.sqrt(s2/(N/2))};
+const peak48=x=>{let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m};
+const md48=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
+const CON={type:'conga',tune:1,decay:1,tone:1,punch:.5};
+const con=await mk48(CON,.8),con2=await mk48(CON,.8);const cdx=con.getChannelData(0);
+const cOver=bandShare48(cdx,744,920,.02),cAtk=rms48(cdx,.05,.062),cBody=rms48(cdx,.10,.13);
+const bon=await mk48({type:'bongo',tune:1,decay:1,tone:1,punch:.5},.5);
+const bOver=bandShare48(bon.getChannelData(0),1080,1280,.02);
+const tom=await mk48({type:'tom',tune:1,decay:1},.8),tom2=await mk48({type:'tom',tune:1,decay:1},.8);const tdx=tom.getChannelData(0);
+const tEarly=bandAbs48(tdx,200,320,.05),tLate=bandAbs48(tdx,80,130,.15);
+const w1=await mk48({type:'cowbell',tune:1,decay:1,tone:1},.5),w2=await mk48({type:'cowbell',tune:1,decay:1,tone:1.4},.5);
+const wDiff=md48(w2,w1);
+const k1=await mk48({type:'clave',tune:1,tone:1,punch:.8},.2),k0=await mk48({type:'clave',tune:1,tone:1,punch:0},.2);
+const kDiff=md48(k1,k0);
+const pk48=Math.min(peak48(cdx),peak48(bon.getChannelData(0)),peak48(tdx),peak48(w1.getChannelData(0)),peak48(k1.getChannelData(0)));
+const det48=Math.max(md48(con,con2),md48(tom,tom2));
+const ok48=cOver>=.03&&cAtk>cBody&&bOver>=.012&&tEarly>1.4*tLate&&wDiff>1e-3&&kDiff>1e-3&&pk48>.05&&det48<1e-6;
+gate('G48','percussion v3: conga shell-partial(744-920Hz) share>=.03 + attack>body, bongo partial(1080-1280Hz) share>=.012, tom bend-band(200-320)>1.4x glide-band(80-130), cowbell tone-spread audible md>1e-3, clave knock audible md>1e-3, all peak>.05, determinism<1e-6',ok48,'cOver '+cOver.toFixed(3)+' | atk/body '+(cAtk/Math.max(cBody,1e-12)).toFixed(2)+' | bOver '+bOver.toFixed(3)+' | tom '+tEarly.toExponential(1)+'/'+tLate.toExponential(1)+'='+(tEarly/Math.max(tLate,1e-12)).toFixed(2)+' | w '+wDiff.toExponential(1)+' | k '+kDiff.toExponential(1)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','percussion v3',false,'ERR '+e.message)}}
+/* G49 — FOUR NEW VOICES (offline — CI-asserted, v0.15.0 P2):
+   crash — TWO-stage shimmer: mid-ring RMS(1.0–2.0 s) ≥ .06 × the early
+     RMS(0.05–0.3 s) (a one-point exponential would sit far below — the
+     set-down stage holds the wash; measured ×.371), and the metal
+     lattice dominates the top: band share(4–12 kHz) ≥ .45 (measured .49);
+   revcym — the swell RISES: RMS(t .95–1.4) > 3× RMS(t 0–0.25) (exponential
+     climb into the drop), then the HARD cut: RMS after the cut (t ≥ 1.62)
+     < 1e-3 (vacuum);
+   agogo — the upper mode (1.506×f0 = 1750–1950 Hz at tune 1) is present:
+     band share ≥ .03 (measured .162), and the ring sustains: RMS(.14–.24)
+     ≥ .08 × early RMS(.05–.09) (measured ×.108);
+   timbale — the ping dominates the low register: band share(700–1000 Hz)
+     > band share(150–300 Hz) (measured .525 > .017), and the rim-shot
+     crack (2000–3200 Hz) is audible: share ≥ .03 (measured .044);
+   all non-silent (peak > .05), deterministic (crash + agogo double
+   render in fresh contexts: maxDiff < 1e-6). */
+if((window.__psy6GateSkip||[]).includes('G49')){gate('G49','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR49=44100;
+const mk49=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR49*dur),SR49);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g49',name:'g49',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
+const rms49=(x,a,b)=>{const A=Math.round(a*SR49),B=Math.min(Math.round(b*SR49),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
+const fft49=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const bandShare49=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR49);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft49(re,im);const binHz=SR49/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
+const peak49=x=>{let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m};
+const md49=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
+const CRS={type:'crash',tune:1,decay:1,tone:1,punch:.5};
+const cr=await mk49(CRS,3.4),cr2=await mk49(CRS,3.4);const crx=cr.getChannelData(0);
+const crEarly=rms49(crx,.05,.3),crMid=rms49(crx,1.0,2.0),crTop=bandShare49(crx,4000,12000,0);
+const rv=await mk49({type:'revcym',tune:1,decay:1,tone:1,punch:.6},2.2);const rvx=rv.getChannelData(0);
+const rvLo=rms49(rvx,.05,.3),rvHi=rms49(rvx,1.0,1.45),rvCut=rms49(rvx,1.66,1.96);
+const AGS={type:'agogo',tune:1,decay:1,tone:1.2,punch:.4};
+const ag=await mk49(AGS,.6),ag2=await mk49(AGS,.6);const agx=ag.getChannelData(0);
+const agUp=bandShare49(agx,1750,1950,0),agEarly=rms49(agx,.05,.09),agMid=rms49(agx,.14,.24);
+const tb=await mk49({type:'timbale',tune:1,decay:1,tone:1.1,punch:.6},.5);const tbx=tb.getChannelData(0);
+const tbPing=bandShare49(tbx,700,1000,0),tbLow=bandShare49(tbx,150,300,0),tbCrack=bandShare49(tbx,2000,3200,0);
+const pk49=Math.min(peak49(crx),peak49(rvx),peak49(agx),peak49(tbx));
+const det49=Math.max(md49(cr,cr2),md49(ag,ag2));
+const ok49=crMid>=.06*crEarly&&crTop>=.45&&rvHi>3*rvLo&&rvCut<1e-3&&agUp>=.03&&agMid>=.08*agEarly&&tbPing>tbLow&&tbCrack>=.03&&pk49>.05&&det49<1e-6;
+gate('G49','new voices v0.15: crash mid-ring>=.06*early + 4-12k share>=.45, revcym swell>3x low + hard cut(<1e-3 after), agogo upper-mode share>=.03 + mid ring>=.08*early, timbale ping>low + crack share>=.03, all peak>.05, determinism<1e-6',ok49,'cr '+crMid.toExponential(1)+'/'+crEarly.toExponential(1)+'='+(crMid/Math.max(crEarly,1e-12)).toFixed(3)+' top='+crTop.toFixed(2)+' | rv '+rvHi.toExponential(1)+'/'+rvLo.toExponential(1)+'='+(rvHi/Math.max(rvLo,1e-12)).toFixed(1)+' cut='+rvCut.toExponential(1)+' | ag '+agUp.toFixed(3)+' mid='+(agMid/Math.max(agEarly,1e-12)).toFixed(3)+' | tb '+tbPing.toFixed(3)+'>'+tbLow.toFixed(3)+' crack='+tbCrack.toFixed(3)+' | pk='+pk49.toFixed(2)+' | det='+det49.toExponential(1))}catch(e){gate('G49','new voices v0.15',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
