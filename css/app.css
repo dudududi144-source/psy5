@@ -23,12 +23,16 @@ header{display:flex;align-items:center;gap:6px;padding:7px 10px;background:linea
 .chip.st{color:var(--acc2);border-color:#2a4a44}
 nav{display:flex;gap:2px;background:#0d1015;border-bottom:1px solid var(--line);padding:0 8px;flex-wrap:wrap}
 nav button{border:none;border-radius:0;background:transparent;color:var(--dim);padding:8px 12px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid transparent}
-nav button.on{color:var(--acc);border-bottom-color:var(--acc)}
+nav button:hover{background:#161b24}
+/* v0.16.1 FIX — the global button.on (orange bg, specificity 0-1-1) beat nav button's transparent bg (0-0-2): the ACTIVE TAB rendered as a solid orange block with invisible orange-on-orange text. Explicit overrides. */
+nav button.on{background:transparent;color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
 main{padding:10px}.tab{display:none}.tab.on{display:block}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
 .cols{display:grid;grid-template-columns:minmax(430px,1.4fr) 380px;gap:10px}
 @media(max-width:980px){.cols{grid-template-columns:1fr}}
 #pads{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+/* v0.16.1 LAYOUT — 8-wide pad grid on desktop: the 4×4 wall of ~110px pads pushed every panel below ~1900px down; 2 compact rows keep the whole Perform tab near one screen */
+@media(min-width:981px){#pads{grid-template-columns:repeat(8,1fr)}.pad .lb{font-size:8px}.pad .tg2{font-size:7px}}
 .pad{aspect-ratio:1/.72;border-radius:8px;background:linear-gradient(160deg,#222836,#171c25);border:1px solid #2c3442;position:relative;touch-action:none}
 .pad.hit{background:linear-gradient(160deg,var(--acc),#9c6212);border-color:var(--acc)}
 .pad .lb{position:absolute;top:3px;left:5px;font-size:9px;color:#fffa;font-family:var(--mono)}
@@ -86,14 +90,17 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 #scenes{display:flex;flex-wrap:wrap;gap:5px;max-height:340px;overflow-y:auto;align-content:flex-start;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
 #scenes::-webkit-scrollbar{width:8px}
 #scenes::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
-.scene{display:flex;flex-direction:column;gap:3px;min-width:118px;text-align:left;padding:6px 8px;border-radius:8px;background:#171c25;border:1px solid #2c3442;cursor:pointer}
+/* v0.16.1 LAYOUT — the card grew a 4th control row (TRANS); 3-up at ~230px
+   overlapped its rows. Two comfortable cards per row (one on narrow phones):
+   every row fits on ONE line — ops, follow, trans — no wrapping, no overlap. */
+.scene{display:flex;flex-direction:column;gap:4px;flex:1 1 340px;max-width:420px;min-width:220px;text-align:left;padding:7px 9px;border-radius:8px;background:#171c25;border:1px solid #2c3442;cursor:pointer}
 .scene:hover{border-color:#3d485c}
-.scene .scTop{display:flex;align-items:center;gap:5px}
+.scene .scTop{display:flex;align-items:center;gap:5px;min-width:0}
 .scene .dot{width:9px;height:9px;border-radius:50%;border:1px solid #3d485c;flex:none;cursor:pointer}
-.scene .nm{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:86px}
+.scene .nm{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto;max-width:150px}
 .scene .nm:hover{color:var(--acc2)}
-.scene .pn{font-size:8px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px}
-.scene .scOps{display:flex;gap:3px;align-items:center}
+.scene .pn{font-size:8px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto;text-align:right}
+.scene .scOps{display:flex;gap:3px;align-items:center;flex-wrap:wrap;row-gap:3px}
 .scene .scOps button,.scene .scOps .bars{font-size:8px;padding:1px 4px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer;min-width:0}
 .scene .scOps .bars{width:30px;text-align:center}
 .scene .scOps button:hover{color:#fff;border-color:#3d485c}
@@ -104,6 +111,16 @@ main{padding:10px}.tab{display:none}.tab.on{display:block}
 /* ── v0.8.0 scene mix snapshots ── */
 .scene .mixtag{font-size:7px;font-weight:700;letter-spacing:.08em;color:var(--acc);border:1px solid var(--acc);border-radius:3px;padding:0 3px;flex:none}
 .scene .scOps .smix{color:var(--acc2)}
+/* v0.16.1 LAYOUT — the follow row was UNSTYLED (raw 13px selects/inputs broke the 8px card grid); same compact chip look as ops/trans */
+.scene .scFollow{display:flex;gap:3px;align-items:center;flex-wrap:wrap;row-gap:3px}
+.scene .scFollow select,.scene .scFollow input{font-size:8px;padding:1px 4px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer;min-width:0;max-width:120px}
+.scene .scFollow input{width:40px;text-align:center}
+.scene .scFollow select:hover,.scene .scFollow input:hover{color:#fff;border-color:#3d485c}
+/* ── v0.16.0 scene transitions (TRANS row) ── */
+.scene .scTrans{display:flex;gap:3px;align-items:center;flex-wrap:wrap}
+.scene .scTrans button,.scene .scTrans select{font-size:8px;padding:1px 4px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer;min-width:0}
+.scene .scTrans button:hover,.scene .scTrans select:hover{color:#fff;border-color:#3d485c}
+.scene .scTrans button.on{color:var(--acc);border-color:var(--acc)}
 /* ── v0.5.0 automation editor ── */
 #laneWrap{position:relative;margin-top:6px;width:100%;max-width:900px;height:96px;border:1px solid #2c3442;border-radius:6px;overflow:hidden}
 #laneWrap canvas{position:absolute;inset:0;width:100%;height:100%}

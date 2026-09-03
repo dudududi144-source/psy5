@@ -38,6 +38,7 @@
 import { LIMITS } from './limits.js';
 import { deep, fnv, mulberry32 } from './model.js';
 import { paramApply, ensureIns } from './params.js';
+import { normalizeTrans } from './transition.js';
 
 function sceneAdd(p) {
   if (!p || p.scenes.length >= LIMITS.MAX_SCENES) return -1;
@@ -222,6 +223,20 @@ function applySceneMix(p, i) {
   return true;
 }
 
+/* sceneSetTrans — v0.16.0 TRANSITIONS: write the optional transition config
+   (elements INTO this scene — riser bars/revcym/impact/cut + this scene's
+   own xfade glide beats) as CANONICAL data; null clears. The scheduler,
+   the offline song renderer and the UI all read the same normalized shape
+   (see js/transition.js for the full contract). Legacy scenes without a
+   trans field behave EXACTLY as before. */
+function sceneSetTrans(p, i, trans) {
+  if (!p || !p.scenes[i]) return false;
+  const n = normalizeTrans(trans);
+  if (!n) delete p.scenes[i].trans;
+  else p.scenes[i].trans = n;
+  return true;
+}
+
 /* ── FOLLOW ACTIONS (v0.7.0) — seeded performance evolution ── */
 const FOLLOW_MODES = ['none', 'next', 'prev', 'random', 'scene'];
 
@@ -278,7 +293,7 @@ function resolveFollow(p, from, transitionCounter) {
   return null;
 }
 
-export { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, chainNext, resolveFollow, followBars, FOLLOW_MODES, normalizeSceneMix, sceneSetMix, captureSceneMix, applySceneMix, MIX_TRACK_FIELDS, MIX_MASTER_FIELDS };
+export { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, sceneSetTrans, chainNext, resolveFollow, followBars, FOLLOW_MODES, normalizeSceneMix, sceneSetMix, captureSceneMix, applySceneMix, MIX_TRACK_FIELDS, MIX_MASTER_FIELDS };
 
 /* scene mix model (v0.8.0) appended to the scene schema comment above:
    mix — null | { tracks, master?, note? } — see SCENE MIX SNAPSHOTS. */

@@ -89,12 +89,17 @@ function drawPlayhead() {
   g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, H); g.stroke();
 }
 
+/* v0.16.1 PERF — sig-gated: rebuild the option list only when the track/kind changed */
+let lpSig = '';
 function populateParamSelect() {
   const sel = $('laneParam'); if (!sel || !I.p) return;
   const tr = I.p.tracks[I.selTrack];
   const ids = paramsForTrack(tr ? tr.kind : 'synth');
   const proj = PARAMS.filter(p => p.target === 'project').map(p => p.id);
   const all = ids.concat(proj);
+  const sig = (tr ? tr.kind : 'synth') + '#' + ids.length;
+  if (sig === lpSig && sel.children.length === all.length) return;
+  lpSig = sig;
   const cur = sel.value;
   sel.innerHTML = all.map(id => { const pd = paramById(id); return '<option value="' + id + '"' + (id === 'mix.vol' ? ' selected' : '') + '>' + (pd.target === 'project' ? 'MASTER · ' : '') + pd.label + '</option>' }).join('');
   if (all.includes(cur)) sel.value = cur;

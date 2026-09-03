@@ -123,6 +123,7 @@ Frame-count formula (documented, asserted in tests + G24):
 import { applyLanes } from './autorec.js';
 import { resolveMacros } from './state.js';
 import { applySceneMix } from './scenes.js';
+import { transEvents, cutSpan, xfadeTc, findTransTrack } from './transition.js';
 
 export const SONG_LEAD = .05;       /* s — attack headroom, matches loop bounce t0 */
 export const SONG_TAIL_STEPS = 32;  /* 2 bars of 16 steps — FX release tail */
@@ -162,16 +163,50 @@ for(let k=0;k<st.bars*16;k++){yield{abs,phase,scene:st.scene,sectionStart:abs===
 }
 }
 
+/* songTransPlan — v0.16.0 TRANSITIONS: the offline transition plan for an
+   arrangement (single source of truth for BOTH the songSchedule oracle and
+   the renderSong walk — no parallel implementation). Pre-collects section
+   starts, then for EVERY pattern-carrying section whose scene has a trans
+   config computes the hand-off INTO that section at ITS OWN landing
+   boundary — INCLUDING the last section (a riser into the final drop is a
+   real hand-off; the song END itself is never a boundary, so nothing fires
+   after the last section's landing). Computes:
+     - FX events (riser/revcym/impact) mapped to EXISTING drum tracks by
+       TYPE (missing type → element honestly skipped)
+     - the bass-cut step window [S-2, S)
+   The FIRST section's boundary is the song downbeat — its events fire
+   there too (clamped starts = shorter sweeps; documented in
+   js/transition.js). Projects without any trans config return EMPTY
+   structures → the legacy schedule byte-identical (asserted in tests). */
+function songTransPlan(p,sd){
+const byStep=new Map(),cut=new Set();
+if(!p||!p.arranger||!Array.isArray(p.arranger.steps))return{byStep,cut};
+const starts=[];
+for(const y of songSteps(p))if(y.sectionStart)starts.push({abs:y.abs,scene:y.scene});
+for(let i=0;i<starts.length;i++){
+const scn=p.scenes[starts[i].scene];
+if(!scn||scn.pattern==null||!scn.trans)continue;
+const S=starts[i].abs;
+const evs=transEvents(scn.trans,S,sd,t=>findTransTrack(p,t));
+for(const e of evs){if(!byStep.has(e.absStep))byStep.set(e.absStep,[]);byStep.get(e.absStep).push(e)}
+if(scn.trans.cut){const[a,b]=cutSpan(S);for(let s=a;s<b;s++)cut.add(s)}
+}
+return{byStep,cut};
+}
+
 /* songSchedule — the pure event list of the whole song (bun-testable oracle).
  * Same shape as bounceSchedule: {evs, stepDur, sections, totalSteps, total}. */
 export function songSchedule(p,t0){
 t0=t0==null?SONG_LEAD:t0;
 const sd=60/p.bpm/4,evs=[],marks=[];
+const tp=songTransPlan(p,sd); /* v0.16.0: transition events + bass-cut windows */
 for(const y of songSteps(p)){
 if(y.fill&&y.sectionStart){const scn=p.scenes[y.scene];
 if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)evs.push({s:y.abs,t:t0+y.abs*sd+k*sd/2,track:3,vel:.5+.05*k,note:48,lock:{},fill:true})}
+const te=tp.byStep.get(y.abs);
+if(te)for(const e of te)evs.push({s:y.abs,t:t0+y.abs*sd,track:e.track,vel:e.vel,note:e.note,lock:{},trans:true});
 const list=evolvedSongEvents(p,y.abs,y.phase); /* v0.9.0: evolution-aware expansion — OFF returns stepEvents unchanged (byte-identical contract) */
-for(const e of list)evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock});
+for(const e of list){if(e.track===4&&tp.cut.has(y.abs))continue;evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock})}
 if(y.sectionStart)marks.push({scene:y.scene,startStep:y.abs});
 }
 const totalSteps=(p.arranger&&Array.isArray(p.arranger.steps))?p.arranger.steps.reduce((a,s)=>a+(s.bars|0)*16,0):0;
@@ -369,6 +404,7 @@ const oc=new OfflineAudioContext(2,N,sr);
 if(projectUsesMoog(cp))await prepInsertDSP(oc);/* v0.13.0: same MOOG prep for the song renderer */
 const eng=new PooledEngine(oc,{samples:opts.samples});
 eng.syncMix(cp);
+const tp=songTransPlan(cp,sd); /* v0.16.0: the SAME transition plan the schedule oracle used */
 /* progress: suspend at section boundaries (thinned to ≤64 marks so very
    long chains stay cheap). Chrome quantizes suspend times to the render
    quantum — progress is informational, never load-bearing. */
@@ -382,18 +418,20 @@ if(!ctrl.cancelled)oc.resume().catch(()=>{/* gone */});
 }).catch(()=>{/* suspend refused (time passed / limit) — skip point */})}catch(e){/* skip point */}
 }
 /* the walk — events + automation in the SAME per-step order as schedTick */
-const evs=[];
+const evs=[];let glideTc=0,glideUntil=0;/* v0.16.1: the in-flight xfade (τ + settle deadline) — lane syncMix inside the span reuses it */
 for(const y of songSteps(cp)){
 if(ctrl.cancelled){if(ctrl._onCancelled)try{ctrl._onCancelled()}catch(e){/* noop */}return{cancelled:true}}
-if(y.sectionStart){const scn0=cp.scenes[y.scene];/* v0.8.0: scene mix snapshot at the section launch — same primitive as the live quantized launch; applied on EVERY section start (also outside bounds: state continuity) */if(scn0&&scn0.pattern!=null&&applySceneMix(cp,y.scene))eng.syncMix(cp,t0+y.abs*sd)}
+if(y.sectionStart){const scn0=cp.scenes[y.scene];/* v0.8.0: scene mix snapshot at the section launch — same primitive as the live quantized launch; applied on EVERY section start (also outside bounds: state continuity); v0.16.0: the launch glides over the scene's own xfade span when it carries one (legacy 20 ms otherwise) */if(scn0&&scn0.pattern!=null&&applySceneMix(cp,y.scene)){const tc0=xfadeTc(scn0.trans,sd);eng.syncMix(cp,t0+y.abs*sd,tc0);/* v0.16.1 PRECISION: the glide survives lane automation — lane-driven syncMix inside the glide span reuses THIS scene's τ instead of re-anchoring with the legacy 20 ms (which audibly snapped the xfade shut). 3τ ≈ 95 % settled. */glideTc=tc0>0.0201?tc0:0;glideUntil=t0+y.abs*sd+3*glideTc}}
 if(y.fill&&y.sectionStart&&(tf==null||tf===3)){const scn=cp.scenes[y.scene];
 if(scn&&scn.pattern!=null)for(let k=0;k<8;k++)eng.trigger(cp.tracks[3],t0+y.abs*sd+k*sd/2,{track:3,off:0,vel:.5+.05*k,note:48,lock:{}},sd)}
+const te=tp.byStep.get(y.abs); /* v0.16.0: transition FX events (riser/revcym/impact) land on the same step grid */
+if(te)for(const e of te){if(tf!=null&&e.track!==tf)continue;if(!cp.tracks[e.track])continue;eng.trigger(cp.tracks[e.track],t0+y.abs*sd,{track:e.track,off:0,vel:e.vel,note:e.note,lock:{}},sd);evs.push({s:y.abs,t:t0+y.abs*sd,track:e.track,vel:e.vel,note:e.note,lock:{}})}
 const list=evolvedSongEvents(cp,y.abs,y.phase); /* v0.9.0: evolution-aware (OFF → stepEvents unchanged) */
-for(const e of list){if(tf!=null&&e.track!==tf)continue;eng.trigger(cp.tracks[e.track],t0+y.abs*sd+e.off,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sd);evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock})}
+for(const e of list){if(tf!=null&&e.track!==tf)continue;if(e.track===4&&tp.cut.has(y.abs))continue;eng.trigger(cp.tracks[e.track],t0+y.abs*sd+e.off,{track:e.track,off:0,vel:e.vel,note:e.note,lock:e.lock||{}},sd);evs.push({s:y.abs,t:t0+y.abs*sd+e.off,track:e.track,vel:e.vel,note:e.note,lock:e.lock})}
 const auto=applyLanes(cp,y.phase);
 if(auto.mixed||auto.macroed){
 if(auto.macroed)resolveMacros(cp);
-eng.syncMix(cp,t0+y.abs*sd);
+eng.syncMix(cp,t0+y.abs*sd,(t0+y.abs*sd<glideUntil&&glideTc>0)?glideTc:null);
 }
 }
 const buf=await oc.startRendering();

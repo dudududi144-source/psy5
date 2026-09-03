@@ -38,10 +38,15 @@ const irS=$('fxIr');if(irS)irS.onchange=e=>{pushHist();if(!I.p.fx)I.p.fx={delayD
    section. Every control writes through ensureMaster + autoRecMove(-1, id)
    (ARM-AUTO recordable, MIDI-learnable, lane-automatable, snapshot-able).
    GLUE toggle = compOn (bypass removes the node from the chain). ── */
+/* v0.16.1 PERF — value-synced master bar: rebuilds only when a master param changed; unchanged calls just refresh values (drag-guarded). */
+let mbSig='';
 function renderMasterBar(){const bar=$('masterBar');if(!bar||!I.p)return;const m=ensureMaster(I.p);
 const rows=[['eqLow','LOW','−12..+12 dB low shelf @ 100 Hz',-12,12,.5],['eqMid','MID','−12..+12 dB peak @ 1 kHz (Q 0.8)',-12,12,.5],['eqHigh','HIGH','−12..+12 dB high shelf @ 8 kHz',-12,12,.5],
 ['compThresh','THRESH','glue comp threshold −40..0 dB (GLUE ON to hear it)',-40,0,1],['compRatio','RATIO','glue comp ratio 1..20:1',1,20,.5],['compAttack','ATK ms','glue comp attack 1..100 ms',1,100,1],['compRelease','REL ms','glue comp release 20..1000 ms',20,1000,5],['compMakeup','MAKEUP','glue comp makeup gain 0..24 dB',0,24,.5],
 ['widthMaster','WIDTH','master stereo width 0..200% — 1.00 = neutral (the width network is OUT of the chain, exact legacy path); bass <300 Hz is protected mono',0,2,.01]];
+const sig=rows.map(r=>m[r[0]]).join('~')+'#'+(m.compOn?1:0);
+if(sig===mbSig&&bar.querySelectorAll('input.mParam').length===rows.length){bar.querySelectorAll('input.mParam').forEach(inp=>{const pid=inp.dataset.p;if(inp!==document.activeElement&&+inp.value!==m[pid])inp.value=m[pid];const val=bar.querySelector('.mVal[data-v="'+pid+'"]');if(val&&val.textContent!==String(m[pid]))val.textContent=m[pid]});return}
+mbSig=sig;
 bar.innerHTML='<span class="mono" style="font-size:9px;color:var(--acc2)">MASTER</span>'
 +'<button id="mCompOn" class="'+(m.compOn?'on':'')+'" title="glue compressor — bypass removes the node from the chain (guaranteed neutral)" style="font-size:9px;padding:2px 6px">GLUE '+(m.compOn?'ON':'OFF')+'</button>'
 +rows.map(([id,lb,tt,mn,mx,st])=>'<label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dim)" title="'+tt+' ('+id+' — automatable)">'+lb+' <input class="mParam" data-p="'+id+'" type="range" min="'+mn+'" max="'+mx+'" step="'+st+'" value="'+m[id]+'" style="width:70px"><span class="mVal mono" data-v="'+id+'" style="font-size:8px;width:34px;text-align:right">'+m[id]+'</span></label>').join('')
@@ -54,7 +59,25 @@ inp.onchange=()=>pushHist();
 const cog=$('mCompOn');if(cog)cog.onclick=()=>{pushHist();const mm=ensureMaster(I.p);mm.compOn=mm.compOn?0:1;cog.classList.toggle('on',!!mm.compOn);cog.textContent='GLUE '+(mm.compOn?'ON':'OFF');if(I.eng)I.eng.syncMix(I.p);I.dirty=true;autoRecMove(-1,'compOn',mm.compOn)};
 }
 
-function renderMixer(){const w=$('strips');w.innerHTML='';renderMasterBar();renderFxBar();I.p.tracks.forEach((t,i)=>{const d=document.createElement('div');d.style.cssText='background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px';
+/* v0.16.1 PERF — two-tier strips: value-sync when only mix values moved (the automation case, ≤1/bar); full rebuild on structure changes. A strip drag is never yanked: a focused input defers the rebuild AND keeps its value. */
+let mxSig='';
+function renderMixer(){const w=$('strips');if(!I.p)return;
+const sig=I.p.tracks.map(t=>[t.name,Math.round(Math.sqrt(t.mix.vol)*100),Math.round((t.mix.sendA||0)*100),Math.round((t.mix.sendB||0)*100),t.mix.mute?1:0,t.mix.solo?1:0,t.scAmount||0].join('~')).join('|')+'#'+I.p.tracks.length;
+const dragging=w.contains(document.activeElement)&&document.activeElement.tagName==='INPUT';
+if(sig===mxSig&&w.children.length===I.p.tracks.length||dragging){
+I.p.tracks.forEach((t,i)=>{const d=w.children[i];if(!d)return;
+const v=Math.round(Math.sqrt(t.mix.vol)*100),sa=Math.round((t.mix.sendA||0)*100),sb=Math.round((t.mix.sendB||0)*100);
+const vi=d.querySelector('.vol');if(vi&&vi!==document.activeElement&&+vi.value!==v)vi.value=v;
+const sA=d.querySelector('.sendA');if(sA&&sA!==document.activeElement&&+sA.value!==sa)sA.value=sa;
+const sAv=d.querySelector('.sendAv');if(sAv&&sAv.textContent!==String(sa))sAv.textContent=sa;
+const sB=d.querySelector('.sendB');if(sB&&sB!==document.activeElement&&+sB.value!==sb)sB.value=sb;
+const sBv=d.querySelector('.sendBv');if(sBv&&sBv.textContent!==String(sb))sBv.textContent=sb;
+const scI=d.querySelector('.sc');if(scI&&scI!==document.activeElement&&+scI.value!==(t.scAmount||0))scI.value=t.scAmount||0;
+const scV=d.querySelector('.scV');if(scV&&scV.textContent!==String(t.scAmount||0))scV.textContent=t.scAmount||0;
+const mB=d.querySelector('.mute');if(mB)mB.classList.toggle('on',!!t.mix.mute);
+const sBt=d.querySelector('.solo');if(sBt)sBt.classList.toggle('on',!!t.mix.solo)});
+renderMasterBar();renderFxBar();return}
+mxSig=sig;w.innerHTML='';renderMasterBar();renderFxBar();I.p.tracks.forEach((t,i)=>{const d=document.createElement('div');d.style.cssText='background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px';
 d.innerHTML='<div class="nm" style="font-size:10px">'+t.name.split(' ')[0]+'</div>'
 +'<input class="vol" type="range" min="0" max="100" value="'+Math.round(Math.sqrt(t.mix.vol)*100)+'" style="width:100%;margin:6px 0">'
 +'<div class="sendLine" style="display:flex;align-items:center;gap:4px"><span class="mono" style="font-size:8px;color:var(--dim)">DLY</span><input class="sendA" type="range" min="0" max="100" value="'+Math.round((t.mix.sendA||0)*100)+'" style="flex:1" title="Delay send (post-fader)"><span class="sendAv mono" style="font-size:8px;width:20px;text-align:right">'+Math.round((t.mix.sendA||0)*100)+'</span></div>'

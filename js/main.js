@@ -22,7 +22,13 @@ import { buildStyle } from './presets.js';
 import { parseShareHash, decodeShare } from './share.js';
 import { SYNTH_VOICES, DRUM_VOICES } from './model.js';
 
-function renderAll(){if(!I.p)return;renderHeader();renderScenes();renderPads();renderTracks();renderLayers();renderMacros();renderSeq();renderLib();renderSynthEd();renderMixer();renderMidi();renderLanes();populateParamSelect();renderLibrary();I.renderDirty=false}
+function renderAll(){if(!I.p)return;renderHeader();/* v0.16.1 PERF — per-tab rendering: hidden tabs used to rebuild on EVERY render (the 345-row preset list, the whole mixer, the seq grid — all display:none!). Hidden-tab content renders on switch (wireHeader forces a full render) and stays live while visible. */
+const tabOn=t=>{const el=$('tab-'+t);return !!(el&&el.classList.contains('on'))};
+renderScenes();renderPads();renderMacros();renderTracks();renderLayers();renderMidi();renderLibrary();
+if(tabOn('seq')){renderSeq();renderLanes();populateParamSelect()}
+if(tabOn('sound')){renderLib();renderSynthEd()}
+if(tabOn('mix'))renderMixer();
+I.renderDirty=false}
 window.__psy6=I; /* debug/verification handle (headless CI reads engine state) */
 
 function renderLoop(){requestAnimationFrame(renderLoop);if(I.p&&I.sched.on){renderPos();drawPlayhead()}if(I.renderDirty)renderAll()}

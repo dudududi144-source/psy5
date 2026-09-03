@@ -1,7 +1,7 @@
 import { $, I, pushHist, after, PERF, recHit, toast } from '../state.js';
 import { SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, LIMITS } from '../model.js';
 import { addTrackToProject } from '../presets.js';
-import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, sceneSetMix, captureSceneMix, FOLLOW_MODES } from '../scenes.js';
+import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, sceneSetTrans, sceneSetMix, captureSceneMix, FOLLOW_MODES } from '../scenes.js';
 
 /* ── SCENE BANK (v0.5.0) — scrollable list up to 64 scenes ──
    Existing snapshot model extended with color/bars/fill (see js/scenes.js
@@ -15,8 +15,22 @@ import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetC
    instant, shift+click = assign. Current (.active) and queued (.pending)
    indicators are the original classes. */
 const SCENE_COLORS = ['#e05656', '#e0a456', '#d4c95a', '#5ad46e', '#5ac8d4', '#5a8fd4', '#a05ad4', '#d45a9e'];
+/* v0.16.1 PERF — signature-cached scene bank. Every renderAll used to wipe
+   and rebuild ALL scene cards (innerHTML × ~45 nodes × up to 64 scenes) even
+   when nothing here changed — pure GC/layout churn on top of the scheduler
+   storm. Now a cheap content signature gates the rebuild; unchanged content
+   only refreshes the .active/.pending classes. */
+let sceneSig = '';
 function renderScenes() {
-  const w = $('scenes'); w.innerHTML = ''; if (!I.p) return;
+  const w = $('scenes'); if (!I.p) { w.innerHTML = ''; sceneSig = ''; return; }
+  const sig = I.p.scenes.map(sc => (sc.name + '~' + sc.pattern + '~' + sc.bars + '~' + (sc.fill ? 1 : 0) + '~' + sc.color + '~' + (sc.mix ? 1 : 0) + '~' + (sc.trans ? JSON.stringify(sc.trans) : 0) + '~' + (sc.follow ? JSON.stringify(sc.follow) : 0))).join('|')
+    + '#' + I.p.scenes.length + '#' + Object.keys(I.p.patterns || {}).map(k => I.p.patterns[k].name).join(',') + '#' + w.children.length;
+  if (sig === sceneSig) {
+    [...w.children].forEach((b, i) => { b.classList.toggle('active', i === I.p.activeScene); b.classList.toggle('pending', I.pending === i); });
+    return;
+  }
+  sceneSig = sig;
+  w.innerHTML = '';
   I.p.scenes.forEach((sc, i) => {
     const b = document.createElement('div');
     b.className = 'scene' + (i === I.p.activeScene ? ' active' : '') + (I.pending === i ? ' pending' : '');
@@ -25,6 +39,7 @@ function renderScenes() {
     b.innerHTML = '<div class="scTop"><span class="dot" title="color tag (click cycles)"></span>'
       + '<span class="nm" title="click to rename">' + sc.name + '</span>'
       + (sc.mix ? '<span class="mixtag" title="carries a mix snapshot — applied at every launch">MIX</span>' : '')
+      + (sc.trans ? '<span class="mixtag" title="carries a TRANSITION config — riser/revcym/impact/cut fire INTO the next section">T</span>' : '')
       + '<span class="pn mono">' + pn + '</span></div>'
       + '<div class="scOps">'
       + '<input class="bars" type="number" min="1" max="64" placeholder="—" value="' + (sc.bars != null ? sc.bars : '') + '" title="bars override — pre-fills the arranger section length">'
@@ -43,6 +58,16 @@ function renderScenes() {
       + '</select>'
       + '<input class="fprob" type="number" min="0" max="100" placeholder="prob" value="' + (sc.follow && sc.follow.prob != null ? sc.follow.prob : 100) + '" title="probability % — a miss falls back to next">'
       + '<input class="fbars" type="number" min="1" max="64" placeholder="bars" value="' + (sc.follow && sc.follow.afterBars != null ? sc.follow.afterBars : '') + '" title="afterBars — overrides the section length in bars">'
+      + '</div>'
+      /* v0.16.0 TRANSITIONS — elements INTO the NEXT section (arranger/chain/follow give the scheduler lookahead; manual quantized launches land impact-only) + xfade (THIS scene's own mix-snapshot glide at launch) */
+      + '<div class="scTrans" title="TRANSITIONS — fire INTO the next section: R riser (cycles off/1bar/2bar), REV reverse-cymbal swell (last bar), IMP impact on the boundary, CUT bass vacuum (last 2 steps). xfade = glide span of THIS scene\u2019s mix snapshot at launch. Needs a lookahead source (arranger/chain/follow) for R/REV/CUT; IMP + xfade always work.">'
+      + '<button class="tris' + (sc.trans && sc.trans.riser ? ' on' : '') + '" title="riser INTO the next section — click cycles off / 1 bar / 2 bars (stacked)">R' + (sc.trans && sc.trans.riser ? '\u00d7' + sc.trans.riser : '') + '</button>'
+      + '<button class="trev' + (sc.trans && sc.trans.revcym ? ' on' : '') + '" title="reverse-cymbal swell across the last bar INTO the next section">REV</button>'
+      + '<button class="timp' + (sc.trans && sc.trans.impact ? ' on' : '') + '" title="impact exactly on the boundary">IMP</button>'
+      + '<button class="tcut' + (sc.trans && sc.trans.cut ? ' on' : '') + '" title="bass vacuum — the last 2 steps before the boundary are silent">CUT</button>'
+      + '<select class="txf" title="xfade — glide span (beats) of THIS scene\u2019s mix snapshot when IT launches (needs a mix snapshot: M\u2192S)">'
+      + [0, 1, 2, 4, 8].map(x => '<option value="' + x + '"' + ((sc.trans && sc.trans.xfade || 0) === x ? ' selected' : '') + '>' + (x ? 'xf' + x + 'b' : 'xf\u2014') + '</option>').join('')
+      + '</select>'
       + '</div>';
     const dot = b.querySelector('.dot');
     if (sc.color != null) dot.style.background = dotC;
@@ -80,6 +105,18 @@ function renderScenes() {
     b.querySelector('.ftarget').onchange = function () { pushHist(); sceneSetFollow(I.p, i, fwRead()); I.renderDirty = true };
     b.querySelector('.fprob').onchange = function () { pushHist(); sceneSetFollow(I.p, i, fwRead()); I.renderDirty = true };
     b.querySelector('.fbars').onchange = function () { pushHist(); sceneSetFollow(I.p, i, fwRead()); I.renderDirty = true };
+    /* v0.16.0 TRANS row — every control reads the CURRENT config and writes
+       the whole normalized payload through sceneSetTrans (one primitive, the
+       same validation the loader/scheduler/renderer see) */
+    const tRead = () => sc.trans || {};
+    const tWrite = t => { pushHist(); sceneSetTrans(I.p, i, t); I.renderDirty = true };
+    const tBox = b.querySelector('.scTrans');
+    tBox.querySelectorAll('button,select').forEach(el => { el.onpointerdown = e => e.stopPropagation(); el.onclick = e => e.stopPropagation(); el.onchange = function (e) { e.stopPropagation() } });
+    b.querySelector('.tris').onclick = e => { e.stopPropagation(); const t = tRead(); t.riser = ((t.riser || 0) + 1) % 3; tWrite(t) };
+    b.querySelector('.trev').onclick = e => { e.stopPropagation(); const t = tRead(); t.revcym = t.revcym ? 0 : 1; tWrite(t) };
+    b.querySelector('.timp').onclick = e => { e.stopPropagation(); const t = tRead(); t.impact = t.impact ? 0 : 1; tWrite(t) };
+    b.querySelector('.tcut').onclick = e => { e.stopPropagation(); const t = tRead(); t.cut = t.cut ? 0 : 1; tWrite(t) };
+    b.querySelector('.txf').onchange = function (e) { e.stopPropagation(); const t = tRead(); t.xfade = +this.value; tWrite(t) };
     b.onclick = e => { if (e.shiftKey) PERF.assign(i); else PERF.launch(i, e.altKey) };
     w.appendChild(b);
   });

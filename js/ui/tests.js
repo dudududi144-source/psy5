@@ -1,6 +1,6 @@
 import { $, I, PERF, saveProject, loadStored, loadProjectObj, resolveMidiParam, K_MAIN } from '../state.js';
 import { ensureVoice } from '../samplestore.js';
-import { sceneSetFollow, resolveFollow, sceneSetMix, applySceneMix } from '../scenes.js';
+import { sceneSetFollow, resolveFollow, sceneSetMix, sceneSetTrans, applySceneMix } from '../scenes.js';
 import { songMidi } from '../bounce.js';
 import { writeMidi } from '../midifile.js';
 import { createMidiCore, emptyMidiMap } from '../midi.js';
@@ -1262,7 +1262,7 @@ if(wIn){wIn.value='1.8';wIn.dispatchEvent(new Event('input'));wHi=I.p.master.wid
 const ppB=$('fxPP');ppB.click();const ppOn=I.p.fx.pingPong===1&&I.eng.ppOn===true;ppB.click();const ppOff=I.p.fx.pingPong!==1&&I.eng.ppOn===false;
 const irS=$('fxIr');irS.value='long';irS.dispatchEvent(new Event('change'));const irL=I.p.fx.irKind==='long'&&I.eng._irKind==='long';irS.value='short';irS.dispatchEvent(new Event('change'));const irS2=I.p.fx.irKind==='short'&&I.eng._irKind==='short';irS.value='classic';irS.dispatchEvent(new Event('change'));const irC=I.p.fx.irKind==='classic'&&I.eng._irKind==='classic';
 const divS=$('fxDiv');const divN=divS.options.length;divS.value='1/16';divS.dispatchEvent(new Event('change'));const d16=I.p.fx.delayDiv==='1/16'&&Math.abs(delaySecondsFor('1/16',I.p.bpm)-60/I.p.bpm/4)<1e-12;divS.value='1/2';divS.dispatchEvent(new Event('change'));const d12=I.p.fx.delayDiv==='1/2'&&Math.abs(delaySecondsFor('1/2',I.p.bpm)-8*60/I.p.bpm/4)<1e-12;divS.value='3/16';divS.dispatchEvent(new Event('change'));const dBack=I.p.fx.delayDiv==='3/16';
-const n0=document.querySelectorAll('#libList .lib').length;$('libQ').value='acid';renderLib();const n1=document.querySelectorAll('#libList .lib').length;$('libQ').value='';renderLib();const n2=document.querySelectorAll('#libList .lib').length;
+renderLib();/* v0.16.1: force-build the list first — hidden tabs render on demand now (mirrors the renderMixer() call above) */const n0=document.querySelectorAll('#libList .lib').length;$('libQ').value='acid';renderLib();const n1=document.querySelectorAll('#libList .lib').length;$('libQ').value='';renderLib();const n2=document.querySelectorAll('#libList .lib').length;
 const styles=Object.keys(COMPOSER_STYLES);const newSty=['PSYTRANCE','GOA','TECHNO','TRANCE'];let detOk=true,detEv='';
 for(const s of newSty){const a=compose(s,3,555),b=compose(s,3,555);const eq=JSON.stringify(a.project)===JSON.stringify(b.project);const good=a.form.sections.length===7&&a.stats.scenes>7&&a.form.bpm===COMPOSER_STYLES[s].bpm;if(!eq||!good)detOk=false;detEv+=s+':'+a.form.bpm+'/'+a.stats.scenes+(eq&&good?' ok':' BAD')+' '}
 const ok45=orph.length===0&&wHi&&wLo&&ppOn&&ppOff&&irL&&irS2&&irC&&divN===6&&d16&&d12&&dBack&&n1>0&&n1<n0&&n2===n0&&styles.length===9&&detOk;
@@ -1445,6 +1445,72 @@ const pk49=Math.min(peak49(crx),peak49(rvx),peak49(agx),peak49(tbx));
 const det49=Math.max(md49(cr,cr2),md49(ag,ag2));
 const ok49=crMid>=.06*crEarly&&crTop>=.45&&rvHi>3*rvLo&&rvCut<1e-3&&agUp>=.03&&agMid>=.08*agEarly&&tbPing>tbLow&&tbCrack>=.03&&pk49>.05&&det49<1e-6;
 gate('G49','new voices v0.15: crash mid-ring>=.06*early + 4-12k share>=.45, revcym swell>3x low + hard cut(<1e-3 after), agogo upper-mode share>=.03 + mid ring>=.08*early, timbale ping>low + crack share>=.03, all peak>.05, determinism<1e-6',ok49,'cr '+crMid.toExponential(1)+'/'+crEarly.toExponential(1)+'='+(crMid/Math.max(crEarly,1e-12)).toFixed(3)+' top='+crTop.toFixed(2)+' | rv '+rvHi.toExponential(1)+'/'+rvLo.toExponential(1)+'='+(rvHi/Math.max(rvLo,1e-12)).toFixed(1)+' cut='+rvCut.toExponential(1)+' | ag '+agUp.toFixed(3)+' mid='+(agMid/Math.max(agEarly,1e-12)).toFixed(3)+' | tb '+tbPing.toFixed(3)+'>'+tbLow.toFixed(3)+' crack='+tbCrack.toFixed(3)+' | pk='+pk49.toFixed(2)+' | det='+det49.toExponential(1))}catch(e){gate('G49','new voices v0.15',false,'ERR '+e.message)}}
+/* G50 — TRANSITIONS v1 (offline — CI-asserted, v0.16.0 P1):
+   the owner's field report: transitions between built sections "don't go
+   smoothly from one to the next". scene.trans (riser/revcym/impact/cut +
+   xfade beats) turns the bare pattern swap into a produced hand-off. ALL
+   evidence through the REAL song renderer (renderSong — the single
+   renderer, no parallel implementation) on a 2×4-bar composed project
+   whose landing scene carries the full trans config + a mix snapshot
+   (bass vol 1 → .25):
+     cut    — the bass stem's RMS in the last 2 steps before the boundary
+              collapses vs the trans-free control (forced bass notes in the
+              window on BOTH sides — deterministic, not pattern-dependent):
+              ratio < .05 (exact suppression);
+     swell  — the full-mix HF (2 kHz+) band rises INTO the boundary:
+              rms[B-.35,B-.05] / rms[B-1.5,B-1.2] ≥ 2 (the revcym swell +
+              riser sweep are exponential into the drop);
+     impact — the boundary sub-band peak exceeds the trans-free control's
+              same window ×≥1.1 (the impact lands ON the section kick);
+     xfade  — from BASS STEMS: the 2-beat glide is measurably SLOWER than
+              the legacy instant glide — mid-glide RMS ratio (trans) is
+              still above the snapshot floor while the no-xfade variant is
+              already at floor, and the glide CONVERGES to the floor
+              (ratio < .4 by +1.4 s);
+     determinism — the trans render repeated in a fresh context: maxDiff
+              < 1e-6 (the established offline bound). */
+if((window.__psy6GateSkip||[]).includes('G50')){gate('G50','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR50=44100,bp50=compose('PSYTRANCE',1,42).project;
+/* silent FX carriers (v0.16.1): the composed fixture only carries a 'riser'-type
+   fx track — revcym/impact carriers are appended so the transition elements
+   resolve by TYPE (findTransTrack: riser→8, revcym→9, impact→10). Carriers
+   carry no pattern data → they emit ONLY trans events; the trans-free control
+   renders the same track list (fair comparison). */
+{const mkCarrier=(nm,tp)=>({idx:bp50.tracks.length,name:nm,kind:'drum',presetId:'fx-'+tp,base:null,sound:{type:tp,tune:1,decay:1,tone:1,punch:1},type:tp,mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,voiceMode:'synth'});
+bp50.tracks.push(mkCarrier('FX REVCYM','revcym'),mkCarrier('FX IMPACT','impact'))}
+const st50_0=bp50.arranger.steps[0].scene,st50_1=bp50.arranger.steps[1].scene;
+bp50.arranger.steps=[{scene:st50_0,bars:4},{scene:st50_1,bars:4}];
+const S50=64,B50=SONG_LEAD+64*(60/bp50.bpm/4),sd50=60/bp50.bpm/4;
+/* force bass notes into the cut window on the section-0 pattern (phase of
+   section 0 starts at 0 → pattern index = abs % len) — deterministic */
+const pat50=bp50.patterns[bp50.scenes[st50_0].pattern],L50=pat50.data[4].len;
+for(const s of[S50-2,S50-1]){const stp=pat50.data[4].steps[((s%L50)+L50)%L50];stp.on=1;stp.vel=.9}
+const mk50=(withTrans,withXf)=>{const p=JSON.parse(JSON.stringify(bp50));if(withTrans){sceneSetTrans(p,st50_1,{riser:1,revcym:1,impact:1,cut:1,xfade:withXf?2:0});sceneSetMix(p,st50_1,{tracks:{4:{vol:.25}}})}return p};
+const lp50=(x,fc)=>{const a=1-Math.exp(-2*Math.PI*fc/SR50),y=new Float32Array(x.length);let s=0;for(let i=0;i<x.length;i++){s+=a*(x[i]-s);y[i]=s}return y};
+const rms50=(x,a,b)=>{const A=Math.max(0,Math.round(a*SR50)),B=Math.min(Math.round(b*SR50),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
+const subRms50=(buf,a,b)=>rms50(lp50(buf.getChannelData(0),120),a,b);
+const hfRms50=(buf,a,b)=>{const low=lp50(buf.getChannelData(0),2000),d=buf.getChannelData(0);const y=new Float32Array(d.length);for(let i=0;i<d.length;i++)y[i]=d[i]-low[i];return rms50(y,a,b)};
+const subPk50=(buf,a,b)=>{const y=lp50(buf.getChannelData(0),120);const A=Math.round(a*SR50),B=Math.min(Math.round(b*SR50),y.length);let m=0;for(let i=A;i<B;i++)if(Math.abs(y[i])>m)m=Math.abs(y[i]);return m};
+const p50C=mk50(false,false),p50T=mk50(true,true),p50X=mk50(true,false);
+const f50C=await renderSong(p50C,{}),f50T=await renderSong(p50T,{});
+const s50C=await renderSong(p50C,{trackFilter:4}),s50T=await renderSong(p50T,{trackFilter:4}),s50X=await renderSong(p50X,{trackFilter:4});
+/* cut: bass stem RMS in the 2-step window */
+const cutC=rms50(s50C.buf.getChannelData(0),B50-2*sd50,B50),cutT=rms50(s50T.buf.getChannelData(0),B50-2*sd50,B50);
+const cutRatio=cutT/Math.max(cutC,1e-12);
+/* swell: HF rises into the boundary (full mix) */
+const swLate=hfRms50(f50T.buf,B50-.35,B50-.05),swEarly=hfRms50(f50T.buf,B50-1.5,B50-1.2),swRatio=swLate/Math.max(swEarly,1e-12);
+/* impact: boundary sub peak vs control */
+const impT=subPk50(f50T.buf,B50,B50+.06),impC=subPk50(f50C.buf,B50,B50+.06),impRatio=impT/Math.max(impC,1e-12);
+/* xfade: 2-beat glide measurably slower than the legacy instant glide, converging to the floor */
+const rMid=rms50(s50T.buf.getChannelData(0),B50+.35,B50+.5)/Math.max(rms50(s50C.buf.getChannelData(0),B50+.35,B50+.5),1e-12);
+const rMidX=rms50(s50X.buf.getChannelData(0),B50+.35,B50+.5)/Math.max(rms50(s50C.buf.getChannelData(0),B50+.35,B50+.5),1e-12);
+const rLate=rms50(s50T.buf.getChannelData(0),B50+1.4,B50+1.6)/Math.max(rms50(s50C.buf.getChannelData(0),B50+1.4,B50+1.6),1e-12);
+/* determinism: trans render twice, fresh contexts */
+const f50T2=await renderSong(mk50(true,true),{});
+const d50=Math.min(f50T.buf.length,f50T2.buf.length);let diff50=0;{const a=f50T.buf.getChannelData(0),b=f50T2.buf.getChannelData(0);for(let i=0;i<d50;i+=7){const v=Math.abs(a[i]-b[i]);if(v>diff50)diff50=v}}
+const pk50=Math.max(peakOf(f50T.buf),peakOf(f50C.buf));
+const ok50=cutRatio<.05&&swRatio>=2&&impRatio>=1.1&&rMid>rMidX+.06&&rLate<.4&&diff50<1e-6&&pk50>.05;
+gate('G50','transitions v1: bass-cut ratio<.05, HF swell ratio>=2 into boundary, impact sub-peak >=1.1x control, xfade mid-glide >.06 above instant floor + converges(<.4), determinism<1e-6',ok50,'cut='+cutRatio.toExponential(1)+' | swell='+swRatio.toFixed(2)+' | imp='+impRatio.toFixed(2)+' | rMid='+rMid.toFixed(3)+'>'+rMidX.toFixed(3)+'(inst) rLate='+rLate.toFixed(3)+' | det='+diff50.toExponential(1)+' | pk='+pk50.toFixed(2))}catch(e){gate('G50','transitions v1',false,'ERR '+e.message)}}
 
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
