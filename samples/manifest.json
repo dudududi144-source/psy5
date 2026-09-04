@@ -15,37 +15,12 @@
     "subcategory": "909"
   },
   {
-    "file": "samples/real/909_BD_06.wav",
-    "category": "kick",
-    "subcategory": "909"
-  },
-  {
-    "file": "samples/real/909_BD_07.wav",
-    "category": "kick",
-    "subcategory": "909"
-  },
-  {
     "file": "samples/real/md_clap_Claps_0000.wav",
     "category": "clap",
     "subcategory": "md"
   },
   {
-    "file": "samples/real/md_clap_Claps_0001.wav",
-    "category": "clap",
-    "subcategory": "md"
-  },
-  {
-    "file": "samples/real/md_clap_Claps_0002.wav",
-    "category": "clap",
-    "subcategory": "md"
-  },
-  {
     "file": "samples/real/md_hat_Hats_0008.wav",
-    "category": "hat",
-    "subcategory": "md"
-  },
-  {
-    "file": "samples/real/md_hat_Hats_0012.wav",
     "category": "hat",
     "subcategory": "md"
   },
@@ -61,11 +36,6 @@
   },
   {
     "file": "samples/real/md_kick_Kicks_0007.wav",
-    "category": "kick",
-    "subcategory": "md"
-  },
-  {
-    "file": "samples/real/md_kick_Kicks_0010.wav",
     "category": "kick",
     "subcategory": "md"
   },
@@ -100,42 +70,12 @@
     "subcategory": "nord"
   },
   {
-    "file": "samples/real/nord_kick_sub_93.wav",
-    "category": "kick",
-    "subcategory": "nord"
-  },
-  {
-    "file": "samples/real/nord_kick_warm_45.wav",
-    "category": "kick",
-    "subcategory": "nord"
-  },
-  {
     "file": "samples/real/nord_perc_Perc1.wav",
     "category": "perc",
     "subcategory": "nord"
   },
   {
-    "file": "samples/real/nord_perc_Perc2.wav",
-    "category": "perc",
-    "subcategory": "nord"
-  },
-  {
-    "file": "samples/real/nord_perc_Perc3.wav",
-    "category": "perc",
-    "subcategory": "nord"
-  },
-  {
     "file": "samples/real/nord_snare_Snare1.wav",
-    "category": "snare",
-    "subcategory": "nord"
-  },
-  {
-    "file": "samples/real/nord_snare_Snare10.wav",
-    "category": "snare",
-    "subcategory": "nord"
-  },
-  {
-    "file": "samples/real/nord_snare_Snare11.wav",
     "category": "snare",
     "subcategory": "nord"
   }
