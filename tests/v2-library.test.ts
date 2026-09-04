@@ -24,7 +24,7 @@ describe('v2 library breadth (v0.12.0 P2)', () => {
   test('every preset passes the schema check', () => {
     for (const p of ALL) {
       expect(p.id).toBeTruthy(); expect(p.name).toBeTruthy(); expect(p.genre).toBeTruthy()
-      expect(['drum', 'bass', 'lead', 'pad', 'pluck', 'arp', 'fx', 'synth']).toContain(p.cat)
+      expect(['drum', 'bass', 'lead', 'pad', 'pluck', 'arp', 'fx', 'synth', 'texture']).toContain(p.cat)
       expect(['DRUM', 'SYNTH']).toContain(p.engine)
       if (p.cat === 'drum') {
         expect(DRUM_TYPES.has(p.type)).toBe(true)

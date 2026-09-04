@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 650 tests across 50 files — 650 pass / 0 fail (543480 expect() calls)
+bun test             # 657 tests across 51 files — 657 pass / 0 fail
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 bun tools/rom-audit.mjs  # PERCUSSION ROM + REASON kit audit (v0.24.0) — 13/13 + 48/48 kit×type PASS
@@ -286,9 +286,11 @@ CHANGELOG 0.12.0 is the measured proof):
 - **Drum track editor (v0.14.0)** — the Sound tab edits drum tracks
   directly: TYPE select (all 25 types) + the 4 core params + the 4
   v2 params; no preset hunt required.
-- **Library 423 presets / 9 genres** (PSYTRANCE, DARK-PSY, GOA, FULL-ON,
+- **Library 456 presets / 9 genres / 10 categories** (PSYTRANCE, DARK-PSY,
+  GOA, FULL-ON,
   TECHNO, TRANCE, PROGRESSIVE, HI-TECH, FOREST — FOREST native since
-  v0.19.0) with layered per-genre kits (KITS export) — all AUDITION-able
+  v0.19.0; texture category filled 0→9 in v0.25.0) with layered per-genre
+  kits (KITS export) — all AUDITION-able
   in the Sound tab; live search box + library-derived genre filter.
 - **Master space** — stereo width `widthMaster` (0–200 %, mid/side with
   300 Hz bass-mono protection; 1 = exact-neutral bypass), ping-pong delay

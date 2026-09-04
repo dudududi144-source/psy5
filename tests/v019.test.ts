@@ -150,10 +150,10 @@ describe('TRANZ carrier + genre contract + DJ DOWN (v0.19.0)', () => {
     expect(src).toContain('new Set(libFilter(')
   })
 
-  test('library totals: 423 presets, FOREST kit complete, all ids unique', () => {
-    expect(libCount()).toBe(423)
+  test('library totals: 456 presets (423 + 33 in v0.25.0), FOREST kit complete, all ids unique', () => {
+    expect(libCount()).toBe(456)
     const ids = new Set<string>(); let dups = 0
-    for (const c of ['drum', 'bass', 'lead', 'pad', 'pluck', 'arp', 'fx', 'synth']) {
+    for (const c of ['drum', 'bass', 'lead', 'pad', 'pluck', 'arp', 'fx', 'synth', 'texture']) {
       for (const x of libFilter(c, 'ALL')) { if (ids.has(x.id)) dups++; ids.add(x.id) }
     }
     expect(dups).toBe(0)

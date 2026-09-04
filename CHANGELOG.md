@@ -3,6 +3,34 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.25.0] — Run 24: STRATIFICATION II — no more lonely options
+
+> Owner: "don't let every feature have just a few lonely options" / instruction
+> 14: take from psyreason, test, extend, improve, surpass.
+
+- **Library 423 → 456** (`bun test tests/v025.test.ts`) — 33 new presets that
+  fill the thin cells the owner kept hitting:
+  - **texture 0 → 9** — the category existed in the runtime LIB key set but
+    held ZERO factory presets (the soundBank TEXTURES never reached it); now
+    one slow-evolving bed per genre (9/9), LFO-cutoff movement, atk ≥ 1.2 s.
+  - **synth 1 → 6** — the loneliest category gets 5 utility voices (zapper,
+    screamer, gnarl, stab, brute).
+  - **FOREST 22 → 32** — the thinnest genre (siblings owned 45-62) gets 2
+    basses, 2 leads, 2 pads, 1 pluck, 2 drum FX (+ its first texture); every
+    FOREST cell non-zero.
+  - **BANDPASS dimension 0 → 6 in the runtime library** — 6 bandpass acid
+    basses across PSYTRANCE/
+    TECHNO/HI-TECH/DARK-PSY/TRANCE/PROGRESSIVE with per-genre res/fenv laws
+    (the filter dimension was 75× lowpass); takes psyreason's 8e97cd6 "bass
+    acid bandpass" idea and exceeds it (6 distinct laws, not one template).
+  - **WIDE pads** — 4 new pads at detune 24-30 (psyreason's "pad stereo
+    width" dimension, realized through our 2-osc detune engine).
+- **UI**: the library category dropdown gains `texture` (was invisible);
+  genre dropdown already derives from the library itself (v0.19.0 law).
+- **Tests**: `bun test` 650 → 657 across 51 files — tests/v025.test.ts pins
+  every claim above (7 tests); v2-library schema walker now accepts the
+  texture cat; exact-count pins recalibrated 423 → 456 in v018/v019 suites.
+
 ## [0.24.0] — Run 23: PSYREASON PORT — the KIT-GOVERNED REASON SYSTEM (every hit plays through the kit)
 
 > Owner: "replace ALL your sounds with psyreason's; the kit must COHERE — no

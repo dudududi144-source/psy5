@@ -34,8 +34,8 @@ const NEW_IDS = [
 ]
 
 describe('preset batch v0.18 — richer variety, purely additive', () => {
-  test('library total is exactly 423 (381 + 42 in v0.19.0)', () => {
-    expect(libCount()).toBe(423)
+  test('library total is exactly 456 (381 + 42 in v0.19.0 + 33 in v0.25.0)', () => {
+    expect(libCount()).toBe(456)
   })
   test('all 36 new ids resolve with the right category', () => {
     for (const id of NEW_IDS) {
@@ -58,8 +58,8 @@ describe('preset batch v0.18 — richer variety, purely additive', () => {
     }
     expect(dups).toBe(0)
   })
-  test('per-category deltas: drum 257, bass 47, lead 33, pad 25, pluck 23, arp 22, fx 15', () => {
-    const want: Record<string, number> = { drum: 257, bass: 47, lead: 33, pad: 25, pluck: 23, arp: 22, fx: 15 }
+  test('per-category deltas: drum 259, bass 55, lead 35, pad 31, pluck 24, arp 22, fx 15', () => {
+    const want: Record<string, number> = { drum: 259, bass: 55, lead: 35, pad: 31, pluck: 24, arp: 22, fx: 15 }
     for (const [c, n] of Object.entries(want)) expect(libFilter(c, 'ALL').length).toBe(n)
   })
   test('FOREST carries its own kit now (was 2 presets — it rode DARK-PSY)', () => {
