@@ -35,6 +35,15 @@
 // shaping. The offline bounce (js/bounce.js) builds the same PooledEngine, so
 // WAV renders get the same ROM. The worklet engine keeps its documented
 // reduced set (V_PERC synth) — honest limitation, unchanged.
+//
+// RUN23-1a KIT-AWARE OPTS (backward-compatible): renderRomPcm(type, sampleRate,
+// opts) accepts {rootMul, rmsMul, variant} — rootMul rescales the per-type
+// base f0 (mode/jingle RATIOS stay relative), rmsMul scales the levelRms
+// target BEFORE the existing peak clamp (the ≤0.97 peak law holds for any
+// rmsMul), variant salts every per-type seed by XOR with variant·7919 (the
+// voice-bank.ts variant step). ALL DEFAULTS (no opts / variant 0 / rootMul 1 /
+// rmsMul 1) render BYTE-IDENTICAL to the pre-opt module — the 563-test suite
+// and every existing caller are untouched.
 
 import { mulberry32, fnv1a } from '../foundation.mjs';
 
@@ -81,6 +90,23 @@ export function romSpec(type) { return SPEC[type] ? Object.assign({}, SPEC[type]
    Fold the low 32 bits (>>>0 keeps it in the unsigned range). */
 function seedOf(label) {
   return parseInt(fnv1a(label).slice(-8), 16) >>> 0;
+}
+
+/* ── RUN23-1a opts plumbing ──────────────────────────────────────────────
+   salted(label, salt) — the per-type seed XOR the variant salt
+   (variant·7919, the voice-bank.ts renderOne step, kept in the family
+   derivation style). salt 0 = the exact legacy seed.
+   rootHz(base, mul, sr) — the per-type base f0 under rootMul, clamped to
+   [0.4×, 2.5×] of the recipe base (nothing sub-audible, nothing runaway)
+   plus a Nyquist guard; mode/jingle RATIOS stay relative so a shifted
+   conga is still a conga. mul 1 = the exact legacy f0.
+   rmsMul is applied at the levelRms call (target·rmsMul) so the existing
+   peak clamp still has the final word. */
+const ROM_OPTS0 = { salt: 0, rootMul: 1, rmsMul: 1 };
+function salted(label, salt) { return (seedOf(label) ^ (salt | 0)) >>> 0; }
+function rootHz(base, mul, sr) {
+  const f = base * mul;
+  return Math.min(sr * 0.45, Math.max(base * 0.4, Math.min(base * 2.5, f)));
 }
 
 /* ────────────────────────── DSP PRIMITIVES ──────────────────────────
@@ -189,10 +215,12 @@ const MEMBRANE = [
   [3.76, 0.07, 0.07],
 ];
 
-function rConga(sr) {
+function rConga(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.conga.sec * sr);
-  const seed = seedOf('perc-rom:conga');
-  const body = modalHit(n, sr, SPEC.conga.f0, MEMBRANE, 1.045, 0.012, 0.001);
+  const seed = salted('perc-rom:conga', o.salt);
+  const f0 = rootHz(SPEC.conga.f0, o.rootMul, sr);
+  const body = modalHit(n, sr, f0, MEMBRANE, 1.045, 0.012, 0.001);
   /* slap — the hand transient: bandpassed noise 1.9 kHz Q 1.1, 14 ms + a
      brighter 3.4 kHz touch (skin slap), both through the per-sample biquad */
   const slap = seedNoise(n, seed ^ 0xC0A1);
@@ -204,16 +232,17 @@ function rConga(sr) {
   const snapEnv = envExp(n, sr, 0.003, 0.0002);
   for (let i = 0; i < n; i++) body[i] += snap[i] * snapEnv[i] * 0.30;
   /* shell resonance — the wooden body at ~1.9×f0, very short */
-  const shell = modalHit(n, sr, SPEC.conga.f0 * 1.9, [[1, 0.12, 0.035]], 1, 0.001, 0.0005);
+  const shell = modalHit(n, sr, f0 * 1.9, [[1, 0.12, 0.035]], 1, 0.001, 0.0005);
   for (let i = 0; i < n; i++) body[i] += shell[i];
   return body;
 }
 
-function rBongo(sr) {
+function rBongo(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.bongo.sec * sr);
-  const seed = seedOf('perc-rom:bongo');
+  const seed = salted('perc-rom:bongo', o.salt);
   const taus = MEMBRANE.map(([r, a, t]) => [r, a, t * 0.72]);
-  const body = modalHit(n, sr, SPEC.bongo.f0, taus, 1.06, 0.010, 0.0008);
+  const body = modalHit(n, sr, rootHz(SPEC.bongo.f0, o.rootMul, sr), taus, 1.06, 0.010, 0.0008);
   /* bongos are SLAPPIER: louder, brighter slap */
   const slap = seedNoise(n, seed ^ 0xB0);
   applyBiquad(slap, biquadCoeffs('bandpass', sr, 2600, 1.0));
@@ -222,12 +251,13 @@ function rBongo(sr) {
   return body;
 }
 
-function rDarbuka(sr) {
+function rDarbuka(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.darbuka.sec * sr);
-  const seed = seedOf('perc-rom:darbuka');
+  const seed = salted('perc-rom:darbuka', o.salt);
   /* dum — the deep center hit (lower f0, longer fundamental) */
   const dumModes = [[1.0, 1.0, 0.22], [1.02, 0.4, 0.19], [1.475, 0.5, 0.15], [2.09, 0.26, 0.11], [2.63, 0.15, 0.09]];
-  const dum = modalHit(n, sr, SPEC.darbuka.f0, dumModes, 1.05, 0.014, 0.001);
+  const dum = modalHit(n, sr, rootHz(SPEC.darbuka.f0, o.rootMul, sr), dumModes, 1.05, 0.014, 0.001);
   applyBiquad(dum, biquadCoeffs('lowpass', sr, 2600, 0.8));
   /* tek — the fish-skin rim stroke riding on top (metallic band 3.2 kHz) */
   const tek = seedNoise(n, seed ^ 0x7E1);
@@ -273,10 +303,11 @@ function cymbalBank(n, sr, f0, tau, seed) {
   return out;
 }
 
-function rCrash(sr) {
+function rCrash(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.crash.sec * sr);
-  const seed = seedOf('perc-rom:crash');
-  const bank = cymbalBank(n, sr, SPEC.crash.f0, 1.55, seed);
+  const seed = salted('perc-rom:crash', o.salt);
+  const bank = cymbalBank(n, sr, rootHz(SPEC.crash.f0, o.rootMul, sr), 1.55, seed);
   /* the circuit: BP 8.6 kHz → HP 4.6 kHz (crash corners — v0.15 pinned the
      audible corners; the ROM renders the SAME character but DENSE) */
   applyBiquad(bank, biquadCoeffs('bandpass', sr, 8600, 0.72));
@@ -301,10 +332,11 @@ function rCrash(sr) {
   return bank;
 }
 
-function rRevcym(sr) {
+function rRevcym(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.revcym.sec * sr);
-  const seed = seedOf('perc-rom:revcym');
-  const bank = cymbalBank(n, sr, SPEC.revcym.f0, 9.9, seed); /* near-flat τ: the envelope does the shape */
+  const seed = salted('perc-rom:revcym', o.salt);
+  const bank = cymbalBank(n, sr, rootHz(SPEC.revcym.f0, o.rootMul, sr), 9.9, seed); /* near-flat τ: the envelope does the shape */
   applyBiquad(bank, biquadCoeffs('bandpass', sr, 9000, 0.75));
   applyBiquad(bank, biquadCoeffs('highpass', sr, 4200, 0.71));
   const wash = seedNoise(n, seed ^ 0x8E);
@@ -323,9 +355,11 @@ function rRevcym(sr) {
   return bank;
 }
 
-function rTriangle(sr) {
+function rTriangle(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.triangle.sec * sr);
-  const seed = seedOf('perc-rom:triangle');
+  const seed = salted('perc-rom:triangle', o.salt);
+  const tf0 = rootHz(SPEC.triangle.f0, o.rootMul, sr);
   /* a struck triangle bends slightly SHARP then settles; partials near-
      harmonic with a stretch: n·f0·(1 + 0.0009·n²). Amps 1/n^1.15. The 5.5 kHz
      BEAT pair (2×f0 partner at ×1.012) is the characteristic "ting". */
@@ -334,8 +368,8 @@ function rTriangle(sr) {
     const r = m * (1 + 0.0009 * m * m);
     modes.push([r, 1 / Math.pow(m, 1.15), 1.9 / (0.75 + m * 0.28)]);
   }
-  const ring = modalHit(n, sr, SPEC.triangle.f0, modes, 1.008, 0.004, 0.0006);
-  const beat = modalHit(n, sr, SPEC.triangle.f0 * 2.012, [[1, 0.4, 1.2], [1.009, 0.35, 1.1]], 1, 0.001, 0.0006);
+  const ring = modalHit(n, sr, tf0, modes, 1.008, 0.004, 0.0006);
+  const beat = modalHit(n, sr, tf0 * 2.012, [[1, 0.4, 1.2], [1.009, 0.35, 1.1]], 1, 0.001, 0.0006);
   for (let i = 0; i < n; i++) ring[i] += beat[i];
   const strike = seedNoise(n, seed ^ 0x31C7);
   applyBiquad(strike, biquadCoeffs('bandpass', sr, 8200, 1.2));
@@ -344,9 +378,10 @@ function rTriangle(sr) {
   return ring;
 }
 
-function rTambourine(sr) {
+function rTambourine(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.tambourine.sec * sr);
-  const seed = seedOf('perc-rom:tambourine');
+  const seed = salted('perc-rom:tambourine', o.salt);
   /* jingles — two rows of double-rolled pairs: dense 6–11 kHz stack, fast
      beating (the double jingle rows of a real tambourine), then the head
      thump under them (f0 190, short) */
@@ -365,16 +400,20 @@ function rTambourine(sr) {
     }
   }
   applyBiquad(jing, biquadCoeffs('highpass', sr, 5600, 0.7));
-  const head = modalHit(n, sr, SPEC.tambourine.f0, [[1, 1, 0.09], [1.475, 0.5, 0.06], [2.09, 0.3, 0.05]], 1.05, 0.008, 0.0008);
+  /* rootMul shifts the pitched HEAD only — the 6.2 kHz jingle stack is
+     timbre, not the per-type base f0 (documented honest scope) */
+  const head = modalHit(n, sr, rootHz(SPEC.tambourine.f0, o.rootMul, sr), [[1, 1, 0.09], [1.475, 0.5, 0.06], [2.09, 0.3, 0.05]], 1.05, 0.008, 0.0008);
   applyBiquad(head, biquadCoeffs('lowpass', sr, 1400, 0.8));
   const out = new Float32Array(n);
   for (let i = 0; i < n; i++) out[i] = jing[i] * 0.9 + head[i] * 0.55;
   return out;
 }
 
-function rShaker(sr) {
+function rShaker(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.shaker.sec * sr);
-  const seed = seedOf('perc-rom:shaker');
+  const seed = salted('perc-rom:shaker', o.salt);
+  /* shaker has no pitched content (SPEC.f0 = 0) — rootMul is a no-op here */
   /* the seed rattle: BP noise with a swept center (6.4 → 4.8 kHz across the
      hit — the beads' mass loading) and a shaped attack (triangular ~9 ms,
      the "chh" of a real shaker is an ATTACK shape, not a click) */
@@ -394,13 +433,14 @@ function rShaker(sr) {
   return s;
 }
 
-function rAgogo(sr) {
+function rAgogo(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.agogo.sec * sr);
-  const seed = seedOf('perc-rom:agogo');
+  const seed = salted('perc-rom:agogo', o.salt);
   /* the double-bell recipe (1 : 1.506) with the small inharmonic tail modes
      and the 6 % strike bend — the dry wooden-metal ring */
   const modes = [[1, 1.0, 0.16], [1.506, 0.72, 0.12], [2.44, 0.24, 0.08], [3.76, 0.10, 0.05]];
-  const body = modalHit(n, sr, SPEC.agogo.f0, modes, 1.06, 0.012, 0.0006);
+  const body = modalHit(n, sr, rootHz(SPEC.agogo.f0, o.rootMul, sr), modes, 1.06, 0.012, 0.0006);
   const click = seedNoise(n, seed ^ 0xA6);
   applyBiquad(click, biquadCoeffs('highpass', sr, 3600, 0.7));
   const clickEnv = envExp(n, sr, 0.0015, 0.0001);
@@ -408,13 +448,14 @@ function rAgogo(sr) {
   return body;
 }
 
-function rTimbale(sr) {
+function rTimbale(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.timbale.sec * sr);
-  const seed = seedOf('perc-rom:timbale');
+  const seed = salted('perc-rom:timbale', o.salt);
   /* metal-shell drum: near-membrane ladder at 840 + the shell modes, plus
      the rim-shot crack band 2.6 kHz */
   const modes = [[1, 1.0, 0.14], [1.68, 0.5, 0.09], [2.47, 0.24, 0.07], [3.51, 0.12, 0.05]];
-  const body = modalHit(n, sr, SPEC.timbale.f0, modes, 1.18, 0.022, 0.0008);
+  const body = modalHit(n, sr, rootHz(SPEC.timbale.f0, o.rootMul, sr), modes, 1.18, 0.022, 0.0008);
   const crack = seedNoise(n, seed ^ 0x8CA);
   applyBiquad(crack, biquadCoeffs('bandpass', sr, 2600, 1.4));
   const crackEnv = envExp(n, sr, 0.003, 0.0002);
@@ -422,19 +463,24 @@ function rTimbale(sr) {
   return body;
 }
 
-function rCowbell(sr) {
+function rCowbell(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.cowbell.sec * sr);
   const seed = fnv1a('perc-rom:cowbell');
   /* THE 808 recipe, finally RENDERED properly: two squares 560:845 Hz (the
      classic non-integer pair), BAND-PASSED at 1.9 kHz Q 1.1 — the old synth
      path had NO filter (raw squares = the harshness the owner kept hitting),
-     and a real two-stage env: 70 ms sustain-ish then ~150 ms fall */
+     and a real two-stage env: 70 ms sustain-ish then ~150 ms fall.
+     rootMul scales BOTH members (the 560:845 ratio is the recipe); the
+     recipe is fully deterministic (no noise) → variant is a documented
+     no-op for this type. */
   const f1 = SPEC.cowbell.f0, f2 = 845;
+  const F1 = rootHz(f1, o.rootMul, sr), F2 = rootHz(f2, o.rootMul, sr);
   const s1 = new Float32Array(n), s2 = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const t = i / sr;
-    s1[i] = Math.sign(Math.sin(2 * Math.PI * f1 * t)) * 0.8;
-    s2[i] = Math.sign(Math.sin(2 * Math.PI * f2 * t + 0.7)) * 0.8;
+    s1[i] = Math.sign(Math.sin(2 * Math.PI * F1 * t)) * 0.8;
+    s2[i] = Math.sign(Math.sin(2 * Math.PI * F2 * t + 0.7)) * 0.8;
   }
   for (let i = 0; i < n; i++) s1[i] += s2[i];
   applyBiquad(s1, biquadCoeffs('bandpass', sr, 1900, 1.1));
@@ -449,25 +495,27 @@ function rCowbell(sr) {
   return s1;
 }
 
-function rClave(sr) {
+function rClave(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.clave.sec * sr);
   /* wooden claves: two modes 1 : 2.63 (the measured clave ratio), extremely
      fast decay + a tiny contact click */
   const modes = [[1, 1.0, 0.028], [2.63, 0.55, 0.016]];
-  const body = modalHit(n, sr, SPEC.clave.f0, modes, 1.04, 0.002, 0.0003);
-  const click = seedNoise(n, seedOf('perc-rom:clave') ^ 0xC1);
+  const body = modalHit(n, sr, rootHz(SPEC.clave.f0, o.rootMul, sr), modes, 1.04, 0.002, 0.0003);
+  const click = seedNoise(n, salted('perc-rom:clave', o.salt) ^ 0xC1);
   applyBiquad(click, biquadCoeffs('bandpass', sr, 4200, 1.5));
   const clickEnv = envExp(n, sr, 0.0008, 0.0001);
   for (let i = 0; i < n; i++) body[i] += click[i] * clickEnv[i] * 0.4;
   return body;
 }
 
-function rRim(sr) {
+function rRim(sr, o) {
+  o = o || ROM_OPTS0;
   const n = Math.round(SPEC.rim.sec * sr);
-  const seed = seedOf('perc-rom:rim');
+  const seed = salted('perc-rom:rim', o.salt);
   /* stick on the rim: wood modes + wire buzz, all inside 45 ms */
   const modes = [[1, 1.0, 0.022], [2.87, 0.6, 0.014], [4.13, 0.35, 0.009]];
-  const body = modalHit(n, sr, SPEC.rim.f0, modes, 1.12, 0.003, 0.0002);
+  const body = modalHit(n, sr, rootHz(SPEC.rim.f0, o.rootMul, sr), modes, 1.12, 0.003, 0.0002);
   const buzz = seedNoise(n, seed ^ 0xB2);
   applyBiquad(buzz, biquadCoeffs('highpass', sr, 3000, 0.7));
   const buzzEnv = envExp(n, sr, 0.0015, 0.0001);
@@ -501,21 +549,31 @@ function levelRms(buf, target) {
   return rms;
 }
 
-/* renderRomPcm — THE export. (type, sampleRate) → Float32Array, byte-
+/* renderRomPcm — THE export. (type, sampleRate, opts?) → Float32Array, byte-
    deterministic. Throws on unknown type (the engine never calls it for
-   non-ROM types; the fallback path is the legacy synth). */
-export function renderRomPcm(type, sampleRate) {
+   non-ROM types; the fallback path is the legacy synth).
+   RUN23-1a opts = {rootMul=1, rmsMul=1, variant=0}: rootMul rescales the
+   per-type base f0 (ratios stay relative, clamped [0.4×, 2.5×] + Nyquist
+   guard), rmsMul scales the levelRms target BEFORE the existing peak clamp
+   (peak ≤ 0.97 holds for any rmsMul), variant XOR-salts every per-type seed
+   by variant·7919. NO opts / all defaults → BYTE-IDENTICAL to the pre-opt
+   module (salt 0, mul 1 are exact no-ops in the math). */
+export function renderRomPcm(type, sampleRate, opts) {
   const r = RENDERERS[type];
   if (!r) throw new Error('perc-rom: unknown type ' + type);
   if (!Number.isFinite(sampleRate) || sampleRate < 8000 || sampleRate > 192000) {
     throw new Error('perc-rom: bad sampleRate ' + sampleRate);
   }
-  const buf = r(sampleRate);
+  const o = opts || ROM_OPTS0;
+  const salt = (((typeof o.variant === 'number' && isFinite(o.variant) ? o.variant : 0) | 0) * 7919) >>> 0;
+  const rootMul = (typeof o.rootMul === 'number' && isFinite(o.rootMul) && o.rootMul > 0) ? o.rootMul : 1;
+  const rmsMul = (typeof o.rmsMul === 'number' && isFinite(o.rmsMul) && o.rmsMul > 0) ? Math.min(4, o.rmsMul) : 1;
+  const buf = r(sampleRate, { salt, rootMul, rmsMul });
   /* micro-fade the last 3 ms — buffer-source reuse may cut the tail at the
      busyUntil window; a click-free landing is part of the spec */
   const fade = Math.min(Math.round(0.003 * sampleRate), buf.length);
   for (let i = 0; i < fade; i++) buf[buf.length - 1 - i] *= i / fade;
-  levelRms(buf, SPEC[type].rms);
+  levelRms(buf, SPEC[type].rms * rmsMul);
   return buf;
 }
 
