@@ -246,16 +246,33 @@ async function main() {
     await cdp.eval(`(()=>{const s=document.querySelector('#bStop');if(s&&['PLAYING','RECORDING','TRANSITIONING'].includes(window.__psy6.fsm))s.click();return true})()`);
     await sleep(250);
     await cdp.eval(`document.querySelector('#bGate').click(); true`);
-    let timedOut = false;
-    try {
-      await waitFor(cdp, `document.querySelector('#log').textContent.includes('SELF-GATE:')`, GATE_TIMEOUT, 1000, 'Self-Gate verdict line');
-    } catch (e) {
-      timedOut = true; /* v0.12.0: still collect the gates that DID run (partial evidence) */
+    /* v0.26.0 STREAMING EVIDENCE — the driver snapshots window.__psy6Gates
+       (assigned after EVERY gate in js/ui/tests.js) each poll and keeps the
+       last good copy node-side. A browser death at suite end — observed on
+       4 GB boxes under the heavy offline renders — can no longer destroy
+       the evidence already earned: the verdict is built from the snapshot,
+       and the post-verdict collection eval (the exact eval that stalled)
+       is gone. */
+    let timedOut = false, verdictLine = '', lastGates = [];
+    {
+      const t0 = Date.now();
+      for (;;) {
+        try {
+          const gj = await cdp.eval(`JSON.stringify(window.__psy6Gates||[])`);
+          try { const arr = JSON.parse(gj); if (Array.isArray(arr) && arr.length >= lastGates.length) lastGates = arr; } catch { /* keep last */ }
+          if (await cdp.eval(`document.querySelector('#log').textContent.includes('SELF-GATE:')`)) {
+            verdictLine = await cdp.eval(`(document.querySelector('#log').textContent.match(/SELF-GATE: \\d+\\/\\d+ passed/)||[''])[0]`);
+            break;
+          }
+        } catch (e) {
+          if (lastGates.length) break; /* browser died mid-run — keep the evidence it earned */
+          timedOut = true; break;
+        }
+        if (Date.now() - t0 > GATE_TIMEOUT) { timedOut = true; break; }
+        await sleep(1000);
+      }
     }
-
-    const gates = await cdp.eval(`window.__psy6Gates?window.__psy6Gates.map(g=>({id:g.id,claim:g.claim,pass:g.pass,ev:g.ev||'',ms:g.ms||0})):[]`);
-    const verdictLine0 = await cdp.eval(`(document.querySelector('#log').textContent.match(/SELF-GATE: \\d+\\/\\d+ passed/)||[''])[0]`);
-    const verdictLine = await cdp.eval(`(document.querySelector('#log').textContent.match(/SELF-GATE: \\d+\\/\\d+ passed/)||[''])[0]`);
+    const gates = lastGates.map((g) => ({ id: g.id, claim: g.claim, pass: g.pass, ev: g.ev || '', ms: g.ms || 0 }));
 
     const byId = new Map(gates.map((g) => [g.id, g]));
     const expected = EXPECTED.filter((id) => !SKIP.includes(id));

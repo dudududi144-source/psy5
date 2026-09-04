@@ -29,7 +29,7 @@ import { canonicalProject, encodeShare, decodeShare } from '../share.js';
 
 function logLine(cls,msg){const L=$('log');const s=document.createElement('span');s.className=cls;L.appendChild(s);s.textContent=msg+'\n';L.scrollTop=L.scrollHeight}
 const GATE_RES=[];
-let _gateT0=Date.now();function gate(id,claim,pass,ev){GATE_RES.push({id,claim,pass,ev,ms:Date.now()-_gateT0});_gateT0=Date.now();logLine(pass?'':'fail',(pass?'PASS':'FAIL')+' '+id+' — '+claim+(ev?' ['+ev+']':''))}
+let _gateT0=Date.now();function gate(id,claim,pass,ev){GATE_RES.push({id,claim,pass,ev,ms:Date.now()-_gateT0});_gateT0=Date.now();window.__psy6Gates=GATE_RES.slice();/* v0.26.0: streaming evidence — the driver snapshots after EVERY gate, so a browser death at suite end can no longer destroy the evidence already earned */logLine(pass?'':'fail',(pass?'PASS':'FAIL')+' '+id+' — '+claim+(ev?' ['+ev+']':''))}
 function peakOf(buf){const d=buf.getChannelData(0);let m=0;for(let i=0;i<d.length;i++){const a=Math.abs(d[i]);if(a>m)m=a}return m}
 async function renderGenre(style){const sr=44100,oc=new OfflineAudioContext(2,sr*2,sr);const eng=new PooledEngine(oc);const p=buildStyle(style,1234);eng.syncMix(p);const sd=60/p.bpm/4;let t=.05;const total=Math.floor(1.8/sd);for(let s=0;s<total;s++){for(const ev of stepEvents(p,s)){const tr=p.tracks[ev.track];eng.trigger(tr,t+ev.off,ev,sd)}t+=sd}return await oc.startRendering()}
 /* G9 — priority voice stealing under deliberate overload:
