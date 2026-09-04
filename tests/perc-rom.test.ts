@@ -53,7 +53,11 @@ function stats(buf) {
 
 describe('PERCUSSION ROM v3 — render law', () => {
   test('all 13 types render finite, peak-safe, RMS-leveled PCM', () => {
-    expect(ROM_TYPES.length).toBe(13)
+    expect(ROM_TYPES.size).toBe(13)
+    /* the engine routes EVERY drum hit through ROM_TYPES.has() — a plain
+       array here throws inside the scheduler tick (caught live: the first
+       browser audition crashed all 13 types before this pin existed) */
+    expect(typeof ROM_TYPES.has).toBe('function')
     for (const t of ROM_TYPES) {
       const buf = renderRomPcm(t, 48000)
       const s = stats(buf)

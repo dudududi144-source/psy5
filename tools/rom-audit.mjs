@@ -49,5 +49,5 @@ for (const r of rows) {
     r.rmsDb.padStart(10), r.win.padStart(8), String(r.det).padStart(6), String(r.finite).padStart(7), (r.ok ? 'PASS' : 'FAIL').padStart(5)
   );
 }
-console.log(fails === 0 ? '\nALL LAWS HOLD — ' + ROM_TYPES.length + ' types' : '\nFAILURES: ' + fails);
+console.log(fails === 0 ? '\nALL LAWS HOLD — ' + ROM_TYPES.size + ' types' : '\nFAILURES: ' + fails);
 process.exit(fails === 0 ? 0 : 1);

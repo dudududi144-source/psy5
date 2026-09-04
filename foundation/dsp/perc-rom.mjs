@@ -41,14 +41,16 @@ import { mulberry32, fnv1a } from '../foundation.mjs';
 /* The types rendered by this module. Everything else (kick/snare/clap/hat×2,
    tom, glitch, zap, boom, riser, impact, downlifter) keeps the existing
    DrumVoice synthesis — those are the classic rebuilds with their own
-   multi-layer recipes and their own pinned tests. */
-export const ROM_TYPES = [
+   multi-layer recipes and their own pinned tests. A Set — the engine routes
+   hits with ROM_TYPES.has(type) on EVERY drum hit (a wrong container here
+   would throw inside the scheduler tick). */
+export const ROM_TYPES = new Set([
   'conga', 'bongo', 'darbuka',          // membrane family
   'crash', 'revcym', 'triangle',        // metal ring family
   'tambourine', 'shaker',               // jingle / seed family
   'agogo', 'timbale', 'cowbell',        // metal shell family
   'clave', 'rim',                       // wood family
-];
+]);
 
 /* ── Per-type spec: base f0, buffer seconds (≤ drumDurEst·1.15 so a pooled
    reuse can never cut an audible tail), and loudness target.
