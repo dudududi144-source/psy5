@@ -170,6 +170,9 @@ function resolveMidiParam(p,path,v01){
   return false;
 }
 function applyMidiParam(path,v01){if(!I.p)return false;const ok=resolveMidiParam(I.p,path,v01);if(ok){if(I.eng)I.eng.syncMix(I.p);if(I.eng&&I.eng.master&&I.p.masterVol!=null)I.eng.master.gain.value=I.p.masterVol;I.dirty=true;I.renderDirty=true;recordFromMidiPath(I.p,path)}return ok}
-function recHit(track,note,vel){if(!I.recOn||I.fsm!=='RECORDING')return;const grid=I.p.recQ||1,sc=I.sched;let best=null,bd=1e9;for(const r of sc.recent){const d=Math.abs(r.t-I.ctx.currentTime);if(d<bd){bd=d;best=r}}if(!best)return;const rem=best.s%grid,sAdj=rem>grid/2?best.s+(grid-rem):best.s-rem;const pat=I.p.patterns[I.p.currentPattern],d=pat.data[track];if(!d)return;const len=d.len,idx=((sAdj%len)+len)%len;pushHist();const st=d.steps[idx];st.on=1;st.vel=clamp(vel,.05,1);if(note!=null)st.note=note;I.dirty=true;I.renderDirty=true}
+/* v0.22.0: recHit carries an optional param LOCK — the pad VARIANTS (+OCT,
+   TIGHT, …) record their transform into the step lock (the same mechanism
+   step locks use); absent/empty lock = the exact legacy behavior. */
+function recHit(track,note,vel,lock){if(!I.recOn||I.fsm!=='RECORDING')return;const grid=I.p.recQ||1,sc=I.sched;let best=null,bd=1e9;for(const r of sc.recent){const d=Math.abs(r.t-I.ctx.currentTime);if(d<bd){bd=d;best=r}}if(!best)return;const rem=best.s%grid,sAdj=rem>grid/2?best.s+(grid-rem):best.s-rem;const pat=I.p.patterns[I.p.currentPattern],d=pat.data[track];if(!d)return;const len=d.len,idx=((sAdj%len)+len)%len;pushHist();const st=d.steps[idx];st.on=1;st.vel=clamp(vel,.05,1);if(note!=null)st.note=note;if(lock&&typeof lock==='object'&&Object.keys(lock).length)st.lock=Object.assign({},st.lock,lock);I.dirty=true;I.renderDirty=true}
 
 export { $, toast, I, pushHist, after, resolveMacros, PERF, K_MAIN, K_TMP, saveProject, loadStored, loadProjectObj, recHit, resolveMidiParam, applyMidiParam, autoRecMove, recordFromMidiPath, midiPathToParam };

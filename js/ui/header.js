@@ -8,7 +8,7 @@ import { exportBundle, importBundle, createSampleStore, referencedSampleIds } fr
 import { hydrateProjectSamples } from './samples.js';
 import { padHit, djFire } from './perform.js';
 import { helpRows } from '../shortcuts.js';
-const padTrigger=i=>{try{padHit(i)}catch(e){/* engine not booted yet */}};
+const padTrigger=i=>{try{padHit(i);const el=document.querySelectorAll('#pads .pad')[i];if(el){el.classList.add('hit');setTimeout(()=>el.classList.remove('hit'),110)}}catch(e){/* engine not booted yet */}};
 function toggleHelp(){const o=$('helpOverlay');if(!o)return;o.style.display=o.style.display==='flex'?'none':'flex'}
 function closeHelp(){const o=$('helpOverlay');if(o)o.style.display='none'}
 

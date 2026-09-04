@@ -176,7 +176,7 @@ function padHit(i){
     const tr=I.p.tracks[m.track];
     if(!tr||tr.kind!=='drum'){toast('STALE PAD MAP — tap again');I.padMap=null;return}
     I.eng.trigger(tr,I.ctx.currentTime,{vel,note:48,lock:m.lock?Object.assign({},m.lock):{}},0);
-    recHit(m.track,null,vel);
+    recHit(m.track,null,vel,m.lock);/* v0.22.0: variants record their lock — the transform lands in the step, not just the air */
   }else{
     let ti=I.p.selTrack;
     if(!(I.p.tracks[ti]&&I.p.tracks[ti].kind==='synth'))ti=I.p.tracks.findIndex(t=>t&&t.kind==='synth');
