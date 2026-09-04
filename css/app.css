@@ -1,182 +1,280 @@
-:root{--bg:#0a0c0f;--panel:#14171d;--panel2:#1a1e26;--line:#262c38;--txt:#dfe5ee;--dim:#7c8698;--acc:#ffb454;--acc2:#4fd6c0;--red:#ff5d5d;--grn:#5dd27a;--blu:#6aa9ff;--pur:#c58cff;--yel:#e8d44d;--mono:ui-monospace,monospace;--sans:system-ui,-apple-system,sans-serif}
+/* ══════════════════════════════════════════════════════════════════════
+   PSY6 — PRODUCTION SKIN v0.27.0
+   One source of truth. Every color, radius, shadow and spacing step in
+   this file derives from the token block below. (ROAST_v0.27 §1.4/§1.5:
+   the fossil dig of 30× hard-coded #171c25 and 5/6/7/8/9/10px dice-roll
+   paddings is over.)
+
+   Design language: deep-space dark · single teal accent (#4fd6c0, kept
+   from the v0.26 identity so the JS-built strips stay coherent) · amber
+   reserved for record/warm states · 4px spacing grid · two radii · two
+   shadows · uppercase letter-spaced labels for data, sentence case for
+   reading.
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* surfaces */
+  --bg0:#07090d;        /* page */
+  --bg1:#0a0c0f;        /* PWA splash anchor (manifest parity) */
+  --p1:#0e1218;         /* panel */
+  --p2:#131820;         /* raised */
+  --p3:#1a2130;         /* highest */
+  --inset:#0b0e13;      /* wells: log, stepgrid, meter */
+  /* lines */
+  --line:#232c3c;
+  --line2:#31405a;
+  /* text */
+  --txt:#e6ecf5;
+  --dim:#93a0b8;
+  --faint:#5c6a84;
+  /* accent system */
+  --acc:#4fd6c0;        /* primary — teal, matches JS strip builders */
+  --acc-ink:#062019;    /* text on accent */
+  --acc2:#ffb454;       /* amber — record/warm */
+  --red:#ff5d5d;
+  --yel:#ffd75e;
+  --grn:#5dd27a;
+  --blu:#6aa9ff;
+  --pur:#c58cff;
+  /* geometry */
+  --r1:8px;
+  --r2:12px;
+  --sh1:0 2px 12px #0006;
+  --sh2:0 10px 34px #000a;
+  --glow:0 0 22px #4fd6c033;
+  /* type */
+  --mono:ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  /* spacing scale (4px grid) */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;
+}
+
+/* ── base ─────────────────────────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:13px;user-select:none}
-button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:6px;padding:5px 10px;font-size:12px}
-button:hover{background:#232936}
-button.on{background:var(--acc);color:#1a1204;border-color:var(--acc);font-weight:600}
-button.rec.on{background:var(--red);border-color:var(--red);color:#fff}
-select,input[type=number]{background:#0f1216;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 5px;font-family:var(--mono);font-size:12px}
+html{scrollbar-color:var(--line) var(--inset)}
+body{background:var(--bg0);color:var(--txt);font-family:var(--sans);font-size:13px;line-height:1.45;user-select:none}
+::selection{background:#4fd6c044}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}}
+
+button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--p2);color:var(--txt);border-radius:var(--r1);padding:6px 11px;font-size:12px;transition:background .12s,border-color .12s,color .12s,box-shadow .12s}
+button:hover{background:var(--p3);border-color:var(--line2)}
+button:active{transform:translateY(1px)}
+button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
+button.rec.on{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 0 14px #ff5d5d55}
+button.cta{border-color:var(--acc);color:var(--acc);font-weight:700}
+button.cta:hover{box-shadow:var(--glow)}
+
+select,input[type=number],input[type=text],input[type=file]{background:var(--inset);border:1px solid var(--line);color:var(--txt);border-radius:var(--r1);padding:4px 6px;font-family:var(--mono);font-size:12px}
+select:hover,input:hover{border-color:var(--line2)}
 input[type=range]{accent-color:var(--acc);width:100%}
-label{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:1px}
-h3{font-size:10px;text-transform:uppercase;letter-spacing:.13em;color:var(--dim);margin:0 0 7px}
-.mono{font-family:var(--mono)}.note{color:var(--dim);font-size:11px;line-height:1.5}
+label{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:2px}
+h3{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin:0 0 8px;font-weight:600}
+.mono{font-family:var(--mono)}
+.note{color:var(--dim);font-size:11px;line-height:1.5}
+
 table{border-collapse:collapse;width:100%;font-size:11px}
-th,td{border:1px solid var(--line);padding:3px 7px;text-align:left;vertical-align:top}
-th{background:#11151b;color:var(--dim);text-transform:uppercase;font-size:8px;letter-spacing:.08em}
+th,td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+th{background:var(--p1);color:var(--dim);text-transform:uppercase;font-size:8px;letter-spacing:.1em}
+
 .tag{display:inline-block;font-family:var(--mono);font-size:8px;padding:1px 7px;border-radius:10px;border:1px solid;white-space:nowrap}
-.t-V{color:var(--grn);border-color:var(--grn)}.t-F{color:var(--red);border-color:var(--red)}
-header{display:flex;align-items:center;gap:6px;padding:7px 10px;background:linear-gradient(#171b22,#11141a);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:60}
-.brand{font-family:var(--mono);font-weight:700;letter-spacing:.14em;font-size:14px;color:var(--acc)}
-.brand small{display:block;font-size:7px;color:var(--dim);letter-spacing:.2em}
-.tg{display:flex;align-items:center;gap:5px;padding:0 8px;border-left:1px solid var(--line);flex-wrap:wrap}
-.chip{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
-.chip.st{color:var(--acc2);border-color:#2a4a44}
-nav{display:flex;gap:2px;background:#0d1015;border-bottom:1px solid var(--line);padding:0 8px;flex-wrap:wrap}
-nav button{border:none;border-radius:0;background:transparent;color:var(--dim);padding:8px 12px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid transparent}
-nav button:hover{background:#161b24}
-/* v0.16.1 FIX — the global button.on (orange bg, specificity 0-1-1) beat nav button's transparent bg (0-0-2): the ACTIVE TAB rendered as a solid orange block with invisible orange-on-orange text. Explicit overrides. */
+.t-V{color:var(--grn);border-color:var(--grn)}
+.t-F{color:var(--red);border-color:var(--red)}
+
+/* ── scrollbars ───────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:var(--inset)}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px;border:2px solid var(--inset)}
+::-webkit-scrollbar-thumb:hover{background:var(--line2)}
+
+/* ════════════════ POWER / LANDING ════════════════ */
+#power{position:fixed;inset:0;background:radial-gradient(1100px 640px at 50% -80px,#12202a 0%,var(--bg1) 46%,var(--bg0) 100%);display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:var(--s5);z-index:100;padding:var(--s5);overflow-y:auto}
+.powGlow{position:absolute;inset:auto -20% -34% -20%;height:52%;background:radial-gradient(ellipse at 50% 100%,#4fd6c014,transparent 65%);pointer-events:none}
+.powHead{display:flex;flex-direction:column;align-items:center;gap:var(--s2);position:relative}
+.powBrand{font-family:var(--mono);font-weight:800;letter-spacing:.32em;font-size:44px;color:var(--txt);text-indent:.32em;line-height:1}
+.powBrand span{color:var(--acc);text-shadow:var(--glow)}
+.powTag{color:var(--faint);font-size:9.5px;letter-spacing:.24em;text-align:center}
+.powLead{max-width:600px;text-align:center;color:var(--dim);font-size:13.5px;line-height:1.6;position:relative}
+.powRow{display:flex;gap:var(--s6);align-items:flex-start;justify-content:center;flex-wrap:wrap;max-width:1020px;position:relative}
+.powCol{display:flex;flex-direction:column;gap:var(--s2);align-items:center}
+.powLabel{font-size:8.5px;color:var(--faint);letter-spacing:.18em;text-transform:uppercase}
+.powInline{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;justify-content:center}
+.powSec{opacity:.9;transition:opacity .15s}
+.powSec:hover{opacity:1}
+.powEngine{opacity:.62}
+.powEngine:hover{opacity:1}
+#power .styles{display:flex;gap:var(--s3);flex-wrap:wrap;justify-content:center}
+#power .styles button{padding:10px 16px;font-size:11px;letter-spacing:.04em}
+#power .note{font-size:10px;max-width:540px}
+/* genre cards — injected by boot(): one card per style, per-style accent */
+.genreCard{display:flex;flex-direction:column;gap:3px;min-width:150px;text-align:left;padding:12px 14px!important;border-radius:var(--r2);background:linear-gradient(165deg,var(--p2),var(--p1));position:relative;overflow:hidden}
+.genreCard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--gc,var(--acc));opacity:.85}
+.genreCard:hover{border-color:var(--gc,var(--acc));box-shadow:var(--sh1)}
+.genreCard .gName{font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.06em;color:var(--txt)}
+.genreCard .gMeta{font-size:9px;color:var(--dim);letter-spacing:.03em}
+.genreCard .gBar{position:absolute;right:10px;bottom:8px;width:34px;height:3px;border-radius:2px;background:var(--gc,var(--acc));opacity:.5}
+/* hero — the one-press entrance */
+.heroBtn{padding:18px 34px!important;font-size:14px!important;font-weight:700;letter-spacing:.08em;border-color:var(--acc)!important;color:var(--acc)!important;box-shadow:var(--glow);border-radius:var(--r2)!important}
+.heroBtn:hover{box-shadow:0 0 34px #4fd6c055}
+/* showcase demo tiles */
+.demoRow{gap:var(--s2)!important}
+.demoBtn{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:11px 15px!important;border-radius:var(--r2);min-width:170px;background:linear-gradient(165deg,var(--p2),var(--p1))}
+.demoBtn b{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--acc)}
+.demoBtn small{font-size:8.5px;color:var(--faint);letter-spacing:.08em}
+.demoBtn:hover b{color:var(--txt)}
+/* bare sketch — honest ghost */
+.sketchBtn{background:transparent!important;border-style:dashed;color:var(--faint)!important;font-size:10px!important}
+.sketchBtn:hover{color:var(--dim)!important;border-color:var(--line2)!important}
+
+/* ════════════════ APP SHELL ════════════════ */
+.app{display:none;min-height:100vh;flex-direction:column}
+header{display:flex;align-items:center;gap:var(--s2);padding:var(--s2) var(--s3);background:linear-gradient(var(--p2),var(--p1));border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;z-index:60;box-shadow:var(--sh1)}
+.brand{font-family:var(--mono);font-weight:700;letter-spacing:.14em;font-size:14px;color:var(--acc);padding-right:var(--s2)}
+.brand small{display:block;font-size:7px;color:var(--faint);letter-spacing:.22em}
+.tg{display:flex;align-items:center;gap:var(--s1);padding:0 var(--s2);border-left:1px solid var(--line);flex-wrap:wrap}
+.tg>button{min-height:40px;min-width:40px}
+.chip{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--dim);background:var(--inset)}
+.chip.st{color:var(--acc);border-color:#2a4a44;min-width:52px;text-align:center}
+#meter{background:var(--inset);border:1px solid var(--line);border-radius:var(--r1)}
+
+nav{display:flex;gap:2px;background:var(--p1);border-bottom:1px solid var(--line);padding:0 var(--s2);flex-wrap:wrap}
+nav button{border:none;border-radius:0;background:transparent;color:var(--dim);padding:10px 14px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-bottom:2px solid transparent;min-height:40px}
+nav button:hover{background:var(--p2);color:var(--txt)}
+/* v0.16.1 history: the global .on used to paint orange-on-orange here.
+   The token system keeps the nav override explicit. */
 nav button.on{background:transparent;color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
-main{padding:10px}.tab{display:none}.tab.on{display:block}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
-.cols{display:grid;grid-template-columns:minmax(430px,1.4fr) 380px;gap:10px}
+
+main{padding:var(--s3);flex:1}
+.tab{display:none}
+.tab.on{display:block}
+
+/* sticky status footer — sticks to the bottom on short views,
+   pushed naturally on long ones (.app is a min-height flex column) */
+#statusBar{margin-top:auto;display:flex;align-items:center;gap:var(--s3);padding:8px var(--s3);border-top:1px solid var(--line);background:var(--p1);color:var(--faint);font-size:9.5px;letter-spacing:.05em;flex-wrap:wrap;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+#statusBar .fBrand{color:var(--dim);letter-spacing:.14em}
+#statusBar .fVer{color:var(--acc)}
+#statusBar .fSep{flex:1}
+#statusBar .fKeys b{color:var(--acc)}
+
+/* ── panels ───────────────────────────────────────────────────────── */
+.panel{background:var(--p1);border:1px solid var(--line);border-radius:var(--r2);padding:var(--s3);margin-bottom:var(--s3);box-shadow:var(--sh1)}
+.pHead{display:flex;justify-content:space-between;align-items:center;gap:var(--s2)}
+.hBtns{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:minmax(430px,1.4fr) 380px;gap:var(--s3)}
 @media(max-width:980px){.cols{grid-template-columns:1fr}}
+
+/* ── perform: scenes ──────────────────────────────────────────────── */
+#scenes{display:flex;flex-wrap:wrap;gap:var(--s1);max-height:340px;overflow-y:auto;align-content:flex-start}
+.scene{display:flex;flex-direction:column;gap:4px;flex:1 1 340px;max-width:420px;min-width:220px;text-align:left;padding:8px 10px;border-radius:var(--r1);background:var(--p2);border:1px solid var(--line);cursor:pointer}
+.scene:hover{border-color:var(--line2)}
+.scene.active{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset,var(--glow)}
+.scene.pending{border-color:var(--acc2);animation:pulse .5s infinite alternate}
+@keyframes pulse{from{opacity:.55}to{opacity:1}}
+.scene.scAdd{justify-content:center;align-items:center;border-style:dashed;color:var(--acc);min-height:46px}
+.scene .scTop{display:flex;align-items:center;gap:5px;min-width:0}
+.scene .dot{width:9px;height:9px;border-radius:50%;border:1px solid var(--line2);flex:none;cursor:pointer}
+.scene .nm{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto;max-width:150px}
+.scene .nm:hover{color:var(--acc)}
+.scene .pn{font-size:8px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto;text-align:right}
+.scene .scOps,.scene .scFollow,.scene .scTrans{display:flex;gap:3px;align-items:center;flex-wrap:wrap;row-gap:3px}
+.scene .scOps button,.scene .scOps .bars,.scene .scFollow select,.scene .scFollow input,.scene .scTrans button,.scene .scTrans select{font-size:8px;padding:2px 5px;background:var(--inset);border:1px solid var(--line);border-radius:4px;color:#fff9;cursor:pointer;min-width:0}
+.scene .scOps .bars{width:30px;text-align:center}
+.scene .scFollow input{width:40px;text-align:center}
+.scene .scOps button:hover,.scene .scFollow select:hover,.scene .scFollow input:hover,.scene .scTrans button:hover,.scene .scTrans select:hover{color:#fff;border-color:var(--line2)}
+.scene .scOps button.on,.scene .scTrans button.on{color:var(--acc);border-color:var(--acc)}
+.scene .scOps button:disabled{opacity:.3;cursor:default}
+.scene .scOps .smix{color:var(--acc)}
+.scene .rename{font-size:11px;font-weight:700;background:var(--inset);border:1px solid var(--acc);border-radius:4px;color:#fff;width:88px;padding:1px 3px}
+.scene .mixtag{font-size:7px;font-weight:700;letter-spacing:.08em;color:var(--acc2);border:1px solid var(--acc2);border-radius:3px;padding:0 3px;flex:none}
+
+/* ── perform: pads ────────────────────────────────────────────────── */
 #pads{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-/* v0.16.1 LAYOUT — 8-wide pad grid on desktop: the 4×4 wall of ~110px pads pushed every panel below ~1900px down; 2 compact rows keep the whole Perform tab near one screen */
 @media(min-width:981px){#pads{grid-template-columns:repeat(8,1fr)}.pad .lb{font-size:8px}.pad .lb.big{font-size:13px}.pad .tg2{font-size:7px}}
-.pad{aspect-ratio:1/.72;border-radius:8px;background:linear-gradient(160deg,#222836,#171c25);border:1px solid #2c3442;position:relative;touch-action:none;cursor:pointer;transition:border-color .12s,box-shadow .12s}
-.pad:hover{border-color:#3d4a60;box-shadow:0 0 0 1px #0006,0 2px 10px #0004}
-.pad.hit{background:linear-gradient(160deg,var(--acc),#9c6212);border-color:var(--acc)}
-.pad.hit .gl polyline{stroke:#1a1206;opacity:.9}
-/* v0.22.0 PADS v3 — envelope glyph + variant/empty identities */
+.pad{aspect-ratio:1/.72;border-radius:var(--r1);background:linear-gradient(160deg,var(--p3),var(--p1));border:1px solid var(--line);position:relative;touch-action:none;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.pad:hover{border-color:var(--line2);box-shadow:0 0 0 1px #0006,0 2px 10px #0004}
+.pad.hit{background:linear-gradient(160deg,var(--acc),#1f8a77);border-color:var(--acc);box-shadow:var(--glow)}
+.pad.hit .gl polyline{stroke:var(--acc-ink);opacity:.9}
 .pad .gl{position:absolute;left:7%;top:30%;width:86%;height:50%;pointer-events:none}
 .pad .gl polyline{fill:none;stroke:var(--acc);stroke-width:3.5;stroke-linejoin:round;stroke-linecap:round;opacity:.62}
 .pad.var{border-color:#4d4330;background:linear-gradient(160deg,#26222e,#181420)}
-.pad.var .tg2{color:var(--acc);font-weight:700}
+.pad.var .tg2{color:var(--acc2);font-weight:700}
 .pad.empty{opacity:.4;border-style:dashed}
 .pad .lb{position:absolute;top:3px;left:5px;font-size:9px;color:#fffc;font-family:var(--mono);letter-spacing:.02em;max-width:calc(100% - 10px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pad .lb.big{top:38%;left:50%;transform:translateX(-50%);font-size:15px;font-weight:700;color:#fffd;letter-spacing:.04em}
 .pad .tg{position:absolute;bottom:2px;left:5px;font-size:7.5px;color:#fff5;font-family:var(--mono);text-transform:uppercase}
 .pad .tg2{position:absolute;bottom:2px;right:4px;font-size:8px;color:#fff6;font-family:var(--mono)}
-#scenes{display:flex;gap:5px;flex-wrap:wrap}
-.scene{min-width:92px;text-align:left;padding:5px 8px}
-.scene.active{border-color:var(--acc2);box-shadow:0 0 0 1px var(--acc2) inset}
-.scene.pending{border-color:var(--acc);animation:pulse .5s infinite alternate}
-@keyframes pulse{from{opacity:.55}to{opacity:1}}
+.padTools{display:flex;gap:var(--s2);margin-top:var(--s2);align-items:center;flex-wrap:wrap}
+
+/* ── perform: macros / layers / midi ──────────────────────────────── */
+.macros{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.macro{background:var(--p2);border:1px solid var(--line);border-radius:var(--r1);padding:6px;display:flex;align-items:center;gap:6px}
+.macro input[type=range]{flex:1;min-width:60px}
+.macro .mn{font-family:var(--mono);font-size:9px;color:var(--acc)}
+.layerGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+.midiRow{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+
+/* ── sequencer ────────────────────────────────────────────────────── */
+#seqScroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:4px}
 #stepGrid{display:grid;gap:3px;margin-top:6px}
-.cell{height:34px;border-radius:4px;background:#171c25;border:1px solid #232a36;cursor:pointer;position:relative}
-.cell:hover{border-color:#3d485c}
-.cell.on{background:linear-gradient(180deg,var(--acc),#8a5a15);border-color:var(--acc)}
-.cell.syn.on{background:linear-gradient(180deg,var(--acc2),#1c6a5c);border-color:var(--acc2)}
+.cell{height:34px;border-radius:4px;background:var(--p2);border:1px solid var(--line);cursor:pointer;position:relative;transition:border-color .1s}
+.cell:hover{border-color:var(--line2)}
+.cell.on{background:linear-gradient(180deg,var(--acc),#1f8a77);border-color:var(--acc)}
+.cell.syn.on{background:linear-gradient(180deg,var(--acc),#1f8a77);border-color:var(--acc)}
 .cell.beat{box-shadow:inset 0 2px 0 #ffffff22}
 .cell.play{outline:2px solid #fff;outline-offset:-2px}
 .cell.lock::after{content:"";position:absolute;bottom:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--blu)}
-.trk{display:flex;align-items:center;gap:6px;padding:4px 7px;border:1px solid var(--line);border-radius:6px;margin-bottom:4px;background:var(--panel2)}
-.trk.sel{border-color:var(--acc2)}
+#tracks{display:flex;flex-direction:column;gap:5px;max-height:560px;overflow-y:auto}
+.trk{display:flex;align-items:center;gap:6px;padding:4px 7px;border:1px solid var(--line);border-radius:var(--r1);margin-bottom:4px;background:var(--p2)}
+.trk.sel{border-color:var(--acc)}
 .trk .nm{width:62px;font-family:var(--mono);font-size:10px;white-space:nowrap;overflow:hidden}
 .trk .ps{flex:1;font-size:9px;color:var(--dim);white-space:nowrap;overflow:hidden}
-.ms button{padding:1px 6px;font-size:9px}
+.trkAdd{border-style:dashed;color:var(--acc);padding:8px;font-size:10px}
+.ms button{padding:2px 6px;font-size:9px}
 .ms button.mute.on{background:var(--red);border-color:var(--red);color:#fff}
 .ms button.solo.on{background:var(--yel);border-color:var(--yel);color:#000}
-.macros{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.macro{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px}
-.macro .mn{font-family:var(--mono);font-size:9px;color:var(--acc2)}
-.lib{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;margin-bottom:3px;background:var(--panel2);cursor:pointer}
-.lib:hover{border-color:#3d485c}.lib.assigned{border-color:var(--acc2)}
-.lib .ln{font-size:11px;font-weight:600}.lib .lm{font-size:9px;color:var(--dim);font-family:var(--mono)}
-#log{background:#000;border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:10px;padding:9px;max-height:320px;overflow:auto;white-space:pre-wrap}
-#log .fail{color:var(--red)}#log .info{color:#8ab4ff}#log .warn{color:var(--acc)}
-#meter{background:#000;border:1px solid var(--line);border-radius:4px}
-#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#000d;border:1px solid var(--acc);color:var(--acc);font-family:var(--mono);font-size:11px;padding:7px 15px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;text-align:center;white-space:pre-line}
-#toast.show{opacity:1}
-#power{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 35%,#141a23,#060709);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:100;padding:20px}
-#power h1{font-family:var(--mono);letter-spacing:.3em;color:var(--acc);font-size:26px}
-#power .styles{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-#power .styles button{padding:16px 24px;font-size:13px;letter-spacing:.08em}
-/* v0.17.0 — READY SET hero: the one-press entrance, visibly primary */
-#power .styles button.heroBtn{padding:20px 34px;font-size:15px;border-color:var(--acc);color:var(--acc);box-shadow:0 0 22px rgba(79,214,192,.18);font-weight:700}
-#power .styles button.heroBtn:hover{box-shadow:0 0 30px rgba(79,214,192,.32)}
-/* v0.17.0 — macro cards: wrap the label+slider+readout on one row */
-.macro{display:flex;align-items:center;gap:6px}
-.macro input[type=range]{flex:1;min-width:60px}
-.app{display:none}
-/* ── v0.5.0 UNLIMIT: 16 tracks / 128 steps / 64 scenes ── */
-#seqScroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:4px}
-#seqScroll::-webkit-scrollbar{height:10px}
-#seqScroll::-webkit-scrollbar-track{background:#11151d;border-radius:5px}
-#seqScroll::-webkit-scrollbar-thumb{background:#2c3442;border-radius:5px}
-#seqScroll::-webkit-scrollbar-thumb:hover{background:#3d485c}
-#tracks{display:flex;flex-direction:column;gap:5px;max-height:560px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
-#tracks::-webkit-scrollbar{width:8px}
-#tracks::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
-.trkAdd{border-style:dashed;color:var(--acc2);padding:8px;font-size:10px}
-#strips{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:8px;max-height:600px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
-#strips::-webkit-scrollbar{width:8px}
-#strips::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
-/* ── v0.5.0 scene bank ── */
-#scenes{display:flex;flex-wrap:wrap;gap:5px;max-height:340px;overflow-y:auto;align-content:flex-start;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
-#scenes::-webkit-scrollbar{width:8px}
-#scenes::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
-/* v0.16.1 LAYOUT — the card grew a 4th control row (TRANS); 3-up at ~230px
-   overlapped its rows. Two comfortable cards per row (one on narrow phones):
-   every row fits on ONE line — ops, follow, trans — no wrapping, no overlap. */
-.scene{display:flex;flex-direction:column;gap:4px;flex:1 1 340px;max-width:420px;min-width:220px;text-align:left;padding:7px 9px;border-radius:8px;background:#171c25;border:1px solid #2c3442;cursor:pointer}
-.scene:hover{border-color:#3d485c}
-.scene .scTop{display:flex;align-items:center;gap:5px;min-width:0}
-.scene .dot{width:9px;height:9px;border-radius:50%;border:1px solid #3d485c;flex:none;cursor:pointer}
-.scene .nm{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto;max-width:150px}
-.scene .nm:hover{color:var(--acc2)}
-.scene .pn{font-size:8px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto;text-align:right}
-.scene .scOps{display:flex;gap:3px;align-items:center;flex-wrap:wrap;row-gap:3px}
-.scene .scOps button,.scene .scOps .bars{font-size:8px;padding:1px 4px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer;min-width:0}
-.scene .scOps .bars{width:30px;text-align:center}
-.scene .scOps button:hover{color:#fff;border-color:#3d485c}
-.scene .scOps button.on{color:var(--acc);border-color:var(--acc)}
-.scene .scOps button:disabled{opacity:.3;cursor:default}
-.scene .rename{font-size:11px;font-weight:700;background:#11151d;border:1px solid var(--acc2);border-radius:4px;color:#fff;width:88px;padding:1px 3px}
-.scene.scAdd{justify-content:center;align-items:center;border-style:dashed;color:var(--acc2);min-height:46px}
-/* ── v0.8.0 scene mix snapshots ── */
-.scene .mixtag{font-size:7px;font-weight:700;letter-spacing:.08em;color:var(--acc);border:1px solid var(--acc);border-radius:3px;padding:0 3px;flex:none}
-.scene .scOps .smix{color:var(--acc2)}
-/* v0.16.1 LAYOUT — the follow row was UNSTYLED (raw 13px selects/inputs broke the 8px card grid); same compact chip look as ops/trans */
-.scene .scFollow{display:flex;gap:3px;align-items:center;flex-wrap:wrap;row-gap:3px}
-.scene .scFollow select,.scene .scFollow input{font-size:8px;padding:1px 4px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer;min-width:0;max-width:120px}
-.scene .scFollow input{width:40px;text-align:center}
-.scene .scFollow select:hover,.scene .scFollow input:hover{color:#fff;border-color:#3d485c}
-/* ── v0.16.0 scene transitions (TRANS row) ── */
-.scene .scTrans{display:flex;gap:3px;align-items:center;flex-wrap:wrap}
-.scene .scTrans button,.scene .scTrans select{font-size:8px;padding:1px 4px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer;min-width:0}
-.scene .scTrans button:hover,.scene .scTrans select:hover{color:#fff;border-color:#3d485c}
-.scene .scTrans button.on{color:var(--acc);border-color:var(--acc)}
-/* ── v0.5.0 automation editor ── */
-#laneWrap{position:relative;margin-top:6px;width:100%;max-width:900px;height:96px;border:1px solid #2c3442;border-radius:6px;overflow:hidden}
-#laneWrap canvas{position:absolute;inset:0;width:100%;height:100%}
-#laneList{display:flex;flex-direction:column;gap:3px;scrollbar-width:thin;scrollbar-color:#2c3442 #11151d}
-#laneList::-webkit-scrollbar{width:8px}
-#laneList::-webkit-scrollbar-thumb{background:#2c3442;border-radius:4px}
-.laneRow{display:flex;gap:6px;align-items:center;padding:4px 8px;background:#171c25;border:1px solid #2c3442;border-radius:6px;cursor:pointer}
-.laneRow.sel{border-color:var(--acc2)}
-.laneRow .arm{color:#5a6070;font-size:11px;padding:1px 5px;background:#11151d;border:1px solid #2c3442;border-radius:4px;cursor:pointer}
-.laneRow .arm.on{color:#ff5d5d;border-color:#ff5d5d}
-.laneRow .lb{font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.laneRow .lb i{color:var(--dim);font-style:normal;font-size:8px}
-.laneRow .val{font-size:9px;color:var(--acc);min-width:44px;text-align:right}
-.laneRow .del{font-size:9px;padding:1px 5px;background:#11151d;border:1px solid #2c3442;border-radius:4px;color:#fff9;cursor:pointer}
-/* ── v0.5.0 accessibility: touch targets + small screens ── */
-.tg>button{min-height:40px;min-width:40px}
-nav button{min-height:40px}
-#bCompose,#bComposeHdr,#bDemoFull,#bDemoDark{min-height:40px}
-@media(max-width:480px){
-.tg{flex-wrap:wrap}
-.tg>button{flex:1 1 auto}
-.panel{padding:10px}
-h3{font-size:12px}
-#scenes{max-height:280px}
-.cols{gap:8px}
-header select{max-width:90px}
-}
 
-/* ── v0.26.0 PRODUCT FINISH — power screen hierarchy (roast fix #5) ──
-   The entrance is a product surface now: hero → genre grid → two-column
-   SHOWCASE / ADVANCED row → engine A/B demoted to a secondary footnote. */
-#power .powTag{color:var(--dim);font-size:10px;letter-spacing:.2em}
-#power .powLead{max-width:560px;text-align:center}
-#power .powRow{display:flex;gap:26px;align-items:flex-start;justify-content:center;flex-wrap:wrap;max-width:980px}
-#power .powCol{display:flex;flex-direction:column;gap:7px;align-items:center}
-#power .powLabel{font-size:8.5px;color:var(--dim);letter-spacing:.16em;text-transform:uppercase}
-#power .powInline{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
-#power .powSec{opacity:.72;transition:opacity .15s}
-#power .powSec:hover{opacity:1}
-#power .powSec .styles button{padding:9px 16px;font-size:11px}
-#power .powSec .note{font-size:10px;max-width:540px}
-#demoRow button{border-color:#3a4456}
-@media(max-width:760px){#power .powRow{flex-direction:column;align-items:center;gap:14px}}
+/* automation lanes */
+#laneWrap{position:relative;margin-top:6px;width:100%;max-width:900px;height:96px;border:1px solid var(--line);border-radius:var(--r1);overflow:hidden;background:var(--inset)}
+#laneWrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#laneList{display:flex;flex-direction:column;gap:3px}
+.laneRow{display:flex;gap:6px;align-items:center;padding:4px 8px;background:var(--p2);border:1px solid var(--line);border-radius:var(--r1);cursor:pointer}
+.laneRow.sel{border-color:var(--acc)}
+.laneRow .arm{color:var(--faint);font-size:11px;padding:1px 5px;background:var(--inset);border:1px solid var(--line);border-radius:4px;cursor:pointer}
+.laneRow .arm.on{color:var(--red);border-color:var(--red)}
+.laneRow .lb{font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.laneRow .lb i{color:var(--faint);font-style:normal;font-size:8px}
+.laneRow .val{font-size:9px;color:var(--acc);min-width:44px;text-align:right}
+.laneRow .del{font-size:9px;padding:1px 5px;background:var(--inset);border:1px solid var(--line);border-radius:4px;color:#fff9;cursor:pointer}
+
+/* ── sound tab ────────────────────────────────────────────────────── */
+.lib{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:var(--r1);margin-bottom:3px;background:var(--p2);cursor:pointer}
+.lib:hover{border-color:var(--line2)}
+.lib.assigned{border-color:var(--acc)}
+.lib .ln{font-size:11px;font-weight:600}
+.lib .lm{font-size:9px;color:var(--faint);font-family:var(--mono)}
+#strips{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:var(--s2);max-height:600px;overflow-y:auto}
+
+/* ── self-gate ────────────────────────────────────────────────────── */
+#log{background:var(--inset);border:1px solid var(--line);border-radius:var(--r1);font-family:var(--mono);font-size:10px;padding:var(--s2);max-height:320px;overflow:auto;white-space:pre-wrap}
+#log .fail{color:var(--red)}
+#log .info{color:var(--blu)}
+#log .warn{color:var(--acc2)}
+
+/* ── toast / modals / help ────────────────────────────────────────── */
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#000d;border:1px solid var(--acc);color:var(--acc);font-family:var(--mono);font-size:11px;padding:8px 16px;border-radius:var(--r1);opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;text-align:center;white-space:pre-line;box-shadow:var(--sh2);max-width:92vw}
+#toast.show{opacity:1}
+.modal{background:var(--p2);border:1px solid var(--line2);border-radius:var(--r2);padding:18px;min-width:300px;max-width:440px;text-align:left;box-shadow:var(--sh2)}
+
+/* ── a11y: touch targets ──────────────────────────────────────────── */
+nav button{min-height:40px}
+#bCompose,#bComposeHdr,#bDemoFull,#bDemoDark,#bDemoForest{min-height:40px}
+@media(max-width:480px){
+  .tg{flex-wrap:wrap}
+  .tg>button{flex:1 1 auto}
+  h3{font-size:12px}
+  #scenes{max-height:280px}
+  header select{max-width:90px}
+  .macros{grid-template-columns:repeat(2,1fr)}
+  .powBrand{font-size:32px}
+}
+@media(max-width:760px){.powRow{flex-direction:column;align-items:center;gap:var(--s4)}}

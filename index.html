@@ -1,149 +1,350 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>PSY6 · STANDALONE GROOVEBOX — POOLED ENGINE</title>
+<title>PSY6 — Psytrance Groovebox</title>
+<meta name="description" content="A complete psytrance groovebox in your browser — nine genres, deterministic composer, arranged sets, live performance tools. Everything runs locally.">
 <link rel="stylesheet" href="css/app.css">
-</head><body>
+</head>
+<body>
+
+<!-- ══════════════════════════ POWER / LANDING ══════════════════════════ -->
 <div id="power">
-<h1>PSY6</h1>
-<div class="mono powTag">PSYTRANCE GROOVEBOX · DETERMINISTIC ENGINE · RUNS ENTIRELY IN YOUR BROWSER</div>
-<div class="note powLead">Press <b>ENTER</b> — a complete arranged set loads instantly: scenes, transitions, arranger and a preseeded song album. Ready to perform, never empty.</div>
-<div class="styles" id="stylePicker"></div>
-<div class="powRow">
-<div class="powCol">
-<div class="mono powLabel">SHOWCASE — 8-MIN FULL-FORM DEMOS</div>
-<div class="styles" id="demoRow">
-<button id="bDemoFull" title="SHOWCASE — the FULL-ON demo song: 8 minutes, full album form (intro→build→drop→break→riser→drop2→outro), composed deterministically from the pinned recipe (seed 424242)">▶ FULL-ON · 8 MIN</button>
-<button id="bDemoDark" title="SHOWCASE — the DARK-PSY demo song: 8 minutes, full album form, composed deterministically from the pinned recipe (seed 90210)">▶ DARK-PSY · 8 MIN</button>
-<button id="bDemoForest" title="SHOWCASE — the FOREST demo song: 8 minutes, full album form, composed deterministically from the pinned recipe (seed 1337)">▶ FOREST · 8 MIN</button>
+  <div class="powGlow" aria-hidden="true"></div>
+
+  <header class="powHead">
+    <div class="powBrand" aria-label="PSY6">PSY<span>6</span></div>
+    <p class="powTag mono">PSYTRANCE GROOVEBOX · DETERMINISTIC ENGINE · RUNS ENTIRELY IN YOUR BROWSER</p>
+  </header>
+
+  <p class="powLead">Nine genres. One press. A complete arranged set —<br>
+  scenes, transitions, arranger, album — playing in seconds. Never empty.</p>
+
+  <div class="styles powGenres" id="stylePicker"></div>
+
+  <div class="powRow">
+    <section class="powCol powSec" aria-label="Showcase demos">
+      <div class="powLabel mono">SHOWCASE — 8-MIN FULL-FORM DEMOS</div>
+      <div class="styles demoRow" id="demoRow">
+        <button id="bDemoFull" class="demoBtn" title="SHOWCASE — the FULL-ON demo song: 8 minutes, full album form (intro→build→drop→break→riser→drop2→outro), composed deterministically from the pinned recipe (seed 424242)"><b>FULL-ON</b><small>8 MIN · FULL FORM · SEED 424242</small></button>
+        <button id="bDemoDark" class="demoBtn" title="SHOWCASE — the DARK-PSY demo song: 8 minutes, full album form, composed deterministically from the pinned recipe (seed 90210)"><b>DARK-PSY</b><small>8 MIN · FULL FORM · SEED 90210</small></button>
+        <button id="bDemoForest" class="demoBtn" title="SHOWCASE — the FOREST demo song: 8 minutes, full album form, composed deterministically from the pinned recipe (seed 1337)"><b>FOREST</b><small>8 MIN · FULL FORM · SEED 1337</small></button>
+      </div>
+    </section>
+
+    <section class="powCol powSec" aria-label="Compose your own">
+      <div class="powLabel mono">ADVANCED — COMPOSE YOUR OWN</div>
+      <div class="powInline">
+        <select id="compStyle" title="composer style" aria-label="composer style"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option><option>PSYTRANCE</option><option>GOA</option><option>TECHNO</option><option>TRANCE</option></select>
+        <select id="compLen" title="target length" aria-label="target length"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option><option value="12">12 min</option><option value="20">20 min</option></select>
+        <input id="compSeed" placeholder="seed" style="width:110px" title="seed — same seed = identical song" aria-label="seed">
+        <button id="bCompose" class="cta" title="generate a complete unique arrangement (intro→build→drop→break→riser→drop2→outro)">✦ COMPOSE</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="powSec powEngine" id="engineSec" aria-label="Audio engine">
+    <div class="powLabel mono">AUDIO ENGINE — MAIN IS THE DEFAULT · WORKLET IS AN EXPERIMENTAL A/B</div>
+    <div class="styles" id="enginePicker"></div>
+    <div class="note" id="engNote" style="max-width:560px;text-align:center"></div>
+  </section>
+
+  <button id="resumeBtn" style="display:none;border-color:var(--acc);color:var(--acc);padding:12px 20px">RESUME LAST SESSION</button>
 </div>
-</div>
-<div class="powCol">
-<div class="mono powLabel">ADVANCED — COMPOSE YOUR OWN</div>
-<div class="powInline">
-<select id="compStyle" title="composer style"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option><option>PSYTRANCE</option><option>GOA</option><option>TECHNO</option><option>TRANCE</option></select>
-<select id="compLen" title="target length"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option><option value="12">12 min</option><option value="20">20 min</option></select>
-<input id="compSeed" placeholder="seed" style="width:110px" title="seed — same seed = identical song">
-<button id="bCompose" title="generate a complete unique arrangement (intro→build→drop→break→riser→drop2→outro)">✦ COMPOSE</button>
-</div>
-</div>
-</div>
-<div class="powSec" id="engineSec">
-<div class="mono powLabel">AUDIO ENGINE — MAIN IS THE DEFAULT; WORKLET IS AN EXPERIMENTAL A/B</div>
-<div class="styles" id="enginePicker"></div>
-<div class="note" id="engNote" style="max-width:560px;text-align:center"></div>
-</div>
-<button id="resumeBtn" style="display:none;border-color:var(--acc2);color:var(--acc2);padding:12px 20px">RESUME LAST SESSION</button>
-</div>
+
+<!-- ══════════════════════════ APP SHELL ══════════════════════════ -->
 <div class="app" id="app">
-<header>
-<div class="brand">PSY6<small>POOLED ENGINE</small></div>
-<div class="tg"><button id="bPlay" title="Start playback from the top (Space)">▶ PLAY</button><button id="bStop" title="Stop playback and kill all voices (Space)">■ STOP</button><button id="bRec" class="rec" title="Record-arm: pad and MIDI note hits write into the sequencer (r)">● REC</button><button id="bCap" title="Record the live master output losslessly (WAV). Starts on the next bar, stops on the next bar.">CAPTURE</button><button id="bSongRec" title="RECORD SONG: capture the whole live song playback (PLAY SONG) to WAV — starts next bar, auto-stops at the end of the final section +1 bar">RECORD SONG</button><button id="bPanic" title="Kill all sounding voices immediately">PANIC</button></div>
-<div class="tg">
-<div><label for="bpm">BPM</label><input id="bpm" type="number" min="40" max="300" style="width:56px"></div>
-<div style="width:80px"><label for="swing">Swing <span id="swV" class="mono"></span></label><input id="swing" type="range" min="0" max="66"></div>
-<div style="width:80px"><label for="padVel">Velocity</label><input id="padVel" type="range" min="10" max="100" value="90"></div>
-<div style="width:96px"><label for="grooveSel">Groove</label><select id="grooveSel"></select></div>
-<div style="width:104px"><label for="scaleSel" title="Project scale — drives the live pads (CHORD/NOTE), evolution mutations and melodic content">Scale</label><select id="scaleSel"></select></div>
-<div style="width:84px"><label for="seedIn">Seed</label><input id="seedIn" type="text" style="width:78px" title="Project seed — same seed + bar = identical events every loop"></div>
+
+  <header>
+    <div class="brand">PSY6<small>POOLED ENGINE</small></div>
+
+    <div class="tg" role="group" aria-label="Transport">
+      <button id="bPlay" title="Start playback from the top (Space)">▶ PLAY</button>
+      <button id="bStop" title="Stop playback and kill all voices (Space)">■ STOP</button>
+      <button id="bRec" class="rec" title="Record-arm: pad and MIDI note hits write into the sequencer (r)">● REC</button>
+      <button id="bCap" title="Record the live master output losslessly (WAV). Starts on the next bar, stops on the next bar.">CAPTURE</button>
+      <button id="bSongRec" title="RECORD SONG: capture the whole live song playback (PLAY SONG) to WAV — starts next bar, auto-stops at the end of the final section +1 bar">RECORD SONG</button>
+      <button id="bPanic" title="Kill all sounding voices immediately">PANIC</button>
+    </div>
+
+    <div class="tg" role="group" aria-label="Groove parameters">
+      <div><label for="bpm">BPM</label><input id="bpm" type="number" min="40" max="300" style="width:56px"></div>
+      <div style="width:80px"><label for="swing">Swing <span id="swV" class="mono"></span></label><input id="swing" type="range" min="0" max="66"></div>
+      <div style="width:80px"><label for="padVel">Velocity</label><input id="padVel" type="range" min="10" max="100" value="90"></div>
+      <div style="width:96px"><label for="grooveSel">Groove</label><select id="grooveSel"></select></div>
+      <div style="width:104px"><label for="scaleSel" title="Project scale — drives the live pads (CHORD/NOTE), evolution mutations and melodic content">Scale</label><select id="scaleSel"></select></div>
+      <div style="width:84px"><label for="seedIn">Seed</label><input id="seedIn" type="text" style="width:78px" title="Project seed — same seed + bar = identical events every loop"></div>
+    </div>
+
+    <div class="tg" role="group" aria-label="Engine status">
+      <span class="chip st" id="fsm">OFF</span>
+      <span class="chip" id="pos">—</span>
+      <span class="chip" id="copChip" title="CO-PILOT — consent-driven suggestions">✦ CO-PILOT</span>
+      <canvas id="meter" width="90" height="26" aria-label="master level meter"></canvas>
+      <span class="chip mono" id="loadMeter" title="ENGINE LOAD — active voices (synth/drum/sample) of pool · steals · tier-0 starvation attempts · output latency ms. Red = pool pressure.">LOAD —</span>
+    </div>
+
+    <div class="tg" role="group" aria-label="Project">
+      <button id="bUndo" title="Undo (z)">⟲</button>
+      <button id="bRedo" title="Redo (Shift+z)">⟳</button>
+      <button id="bSave" title="Save the project to this browser (localStorage)">SAVE</button>
+      <button id="bShare" title="Copy a share link: project → canonical JSON → deflate-raw → base64url → #p= — loads only with explicit consent">SHARE</button>
+      <button id="bExport" title="Download the project as a JSON file">EXPORT</button>
+      <button id="bImport" title="Load a project JSON file">IMPORT</button>
+      <button id="bBounce" title="Offline-render the current pattern loop ×N to a 16-bit WAV">BOUNCE</button>
+      <button id="bComposeHdr" title="Compose a complete unique song (intro→build→drop→break→riser→drop2→outro)">COMPOSE</button>
+      <input type="file" id="impF" accept=".json" style="display:none">
+    </div>
+  </header>
+
+  <nav aria-label="Views">
+    <button data-t="perform" class="on">Perform</button>
+    <button data-t="seq">Sequencer</button>
+    <button data-t="sound">Sound</button>
+    <button data-t="mix">Mixer</button>
+    <button data-t="tests">Self-Gate</button>
+  </nav>
+
+  <main>
+    <!-- ─────────── PERFORM ─────────── -->
+    <section class="tab on" id="tab-perform">
+      <div class="cols">
+        <div>
+          <div class="panel">
+            <div class="pHead"><h3>Scenes — click=launch(quantized) shift=assign alt=instant</h3><button id="bChain">CHAIN OFF</button></div>
+            <div id="scenes" style="margin-top:6px"></div>
+          </div>
+
+          <div class="panel">
+            <div class="pHead"><h3>Pads</h3><div id="padModes" style="display:flex;gap:4px"></div></div>
+            <div id="pads" style="margin-top:7px"></div>
+            <div class="padTools">
+              <button id="bFill">⚡ FILL</button>
+              <button id="bVar">🎲 VARIATION</button>
+              <button id="bRiser" title="DJ TOOL — fire a RISER now: a 1.6 s sweep that lands on whatever comes next (q). Needs a drum track of type riser — every READY SET carries one on the FX lane.">RISER</button>
+              <button id="bSwell" title="DJ TOOL — fire a REVERSE-CYMBAL swell now (w). Needs a drum track of type revcym — assign one from the Sound tab if the set lacks it.">SWELL</button>
+              <button id="bImpact" title="DJ TOOL — fire an IMPACT hit now (e). Needs a drum track of type impact (TRANCE sets carry one; assign from the Sound tab otherwise).">IMPACT</button>
+              <button id="bDown" title="DJ TOOL — fire a DOWNLIFTER now (d): the mirror of the riser — a falling sweep for endings and wind-downs. Needs a drum track of type downlifter — assign from the Sound tab if the set lacks it.">DOWN</button>
+              <button id="bThrowE" title="ECHO THROW (g) — slam the master delay feedback to its ceiling for 2 bar boundaries so whatever plays smears into repeats; press again to release now. Momentary — the release restores the exact pre-throw value.">ECHO THROW</button>
+              <button id="bThrowM" title="MUFFLE (h) — pull the master high/mid EQ shelves down for 2 bar boundaries (the DJ veil for builds and breaks); press again to release now. Momentary — the release restores the exact pre-throw values.">MUFFLE</button>
+              <span class="note">DRUM=every drum voice + live variants (+OCT/TIGHT/…) · SCALE=key-locked notes · CHORD=diatonic triads · keys 1-8 / y u i o p j k l.</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Macros — resolve to REAL engine state</h3>
+            <div class="macros" id="macros"></div>
+          </div>
+
+          <div class="panel">
+            <div class="pHead"><h3>MIDI IN — notes play the selected track</h3><span class="mono" id="midiState" style="font-size:9px;color:var(--dim)">offline</span></div>
+            <div class="midiRow">
+              <select id="midiDev" style="max-width:170px;font-size:10px"></select>
+              <button id="midiConnect">CONNECT</button>
+              <select id="midiTarget" class="mono" style="font-size:9px;max-width:150px"></select>
+              <button id="midiLearnBtn" title="Pick a target, press LEARN, then move the MIDI control (CC). CC 0 is ignored.">LEARN</button>
+              <span class="mono" id="midiLearn" style="font-size:9px;color:var(--dim)">idle</span>
+            </div>
+            <div id="midiBinds" style="margin-top:6px;max-height:96px;overflow-y:auto"></div>
+            <div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">note-off releases synth voices · CC123 = PANIC · CC0 ignored · MIDI clock sync: out of scope</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <h3>Layers</h3>
+            <div class="layerGrid" id="layers"></div>
+          </div>
+
+          <div class="panel">
+            <div class="pHead"><h3>CO-PILOT — suggestions need APPLY (never auto)</h3><button id="bLearn">LEARN ON</button></div>
+            <div id="copBody" style="margin-top:6px"></div>
+            <div id="copStats" class="mono" style="font-size:9px;color:var(--dim);margin-top:5px"></div>
+          </div>
+
+          <div class="panel">
+            <div class="pHead"><h3>SECTION ARRANGER — [scene, bars] auto-advance</h3>
+              <span class="hBtns"><button id="bArr">ARRANGER OFF</button><button id="bPlaySong" title="PLAY SONG: jump to section 0 and auto-advance through the whole arrangement (quantized)">▶ PLAY SONG</button></span>
+            </div>
+            <div id="arrBody" style="margin-top:6px"></div>
+          </div>
+
+          <div class="panel">
+            <div class="pHead"><h3>SONG LIBRARY — recipes, not snapshots</h3>
+              <span class="hBtns"><button id="bLibAdd" title="ADD CURRENT: store the current project's composer recipe (style/seed/length) in the album. Free-form projects have no recipe — honest 'recipe unavailable'.">+ ADD CURRENT</button><button id="bLibNew" title="COMPOSE NEW: open the composer; the finished song joins THIS album (the album survives — stash/restore)">COMPOSE NEW</button></span>
+            </div>
+            <div id="libBody" style="margin-top:6px;max-height:240px;overflow-y:auto"></div>
+            <div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">A song = compose(style, seed, length) — byte-reproducible. LOAD re-renders the recipe in memory; the current free-form project stays independent. The header COMPOSE starts a FRESH project (no album) by design.</div>
+          </div>
+
+          <div class="panel">
+            <h3>Tracks</h3>
+            <div id="tracks"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────── SEQUENCER ─────────── -->
+    <section class="tab" id="tab-seq">
+      <div class="panel">
+        <div class="pHead" style="flex-wrap:wrap;gap:6px"><h3 style="margin:0" id="seqT">Step Sequencer</h3>
+          <span class="hBtns"><select id="seqTrack"></select><select id="lenSel"></select><select id="zoomSel" title="Step width / zoom — AUTO stretches cells; larger sizes scroll for 64/128-step patterns"><option value="0">ZOOM AUTO</option><option value="14">XS 14px</option><option value="18">S 18px</option><option value="24">M 24px</option><option value="34">L 34px</option><option value="48">XL 48px</option></select><button id="bClr">CLEAR</button><button id="bDup">DUP</button></span>
+        </div>
+        <div id="seqScroll"><div id="stepGrid"></div></div>
+        <div class="note" style="margin-top:6px">click=toggle · shift+click=step editor (vel/prob/micro/lock). Blue dot=parameter lock.</div>
+        <div class="pHead" style="margin-top:12px;flex-wrap:wrap;gap:6px"><h3 style="margin:0">Automation</h3>
+          <span class="hBtns">
+            <select id="laneParam" title="parameter for the new lane — follows the selected track"></select>
+            <button id="bLaneAdd" title="add an automation lane for the selected track + parameter">+ LANE</button>
+            <button id="bArmAuto" title="arm automation recording — knob/CC moves land in armed lanes at the playhead">ARM-AUTO</button>
+            <button id="bAutoQ" title="quantize recorded points to 1/16 steps">Q 1/16</button>
+            <button id="bLaneClear" title="clear the selected lane's points">CLEAR LANE</button>
+          </span>
+        </div>
+        <div id="laneWrap"><canvas id="laneCanvas" width="900" height="96"></canvas><canvas id="lanePlay" width="900" height="96"></canvas></div>
+        <div id="laneList" style="margin-top:6px;max-height:150px;overflow-y:auto"></div>
+      </div>
+    </section>
+
+    <!-- ─────────── SOUND ─────────── -->
+    <section class="tab" id="tab-sound">
+      <div class="cols">
+        <div>
+          <div class="panel">
+            <div class="pHead" style="gap:6px"><h3 style="margin:0">Factory library — real engine state</h3>
+              <span class="hBtns">
+                <input id="libQ" placeholder="search" style="width:96px;font-size:10px" title="filter the factory library by preset name or id — substring, case-insensitive" aria-label="library search">
+                <select id="libCat"></select><select id="libGenre"></select>
+                <button id="bAud">AUDITION</button><button id="bAssign">ASSIGN</button>
+              </span>
+            </div>
+            <div class="mono" style="font-size:10px;color:var(--dim);margin:5px 0" id="libMeta"></div>
+            <div id="libList" style="max-height:340px;overflow:auto"></div>
+          </div>
+
+          <div class="panel">
+            <div class="pHead"><h3 style="margin:0">Samples — user library (IndexedDB)</h3>
+              <span class="hBtns">
+                <label class="mono" style="font-size:9px;display:flex;gap:3px;align-items:center;cursor:pointer"><input type="checkbox" id="smpNorm" checked title="normalize peak to 0.95 at import (baked into the stored PCM; the sample id is computed BEFORE normalize — re-import stays idempotent)"> NORM</label>
+                <button id="bSmpImport" title="import audio files — decoded by the browser (wav/mp3/ogg/flac); caps: 20 s duration, 50 MB file, 128 rows">+ IMPORT</button>
+                <select id="rsBars" title="RESAMPLE length in bars (starts bar-quantized, auto-stops)"><option value="1">1 bar</option><option value="2" selected>2 bars</option><option value="4">4 bars</option><option value="8">8 bars</option></select>
+                <button id="bResample" title="record the live master output for N bars (bar-quantized start, auto-stop) into the sample store — the jam → resample → mangle loop">RESAMPLE</button>
+              </span>
+            </div>
+            <div id="smpDrop" class="mono" style="border:1px dashed var(--line);border-radius:8px;padding:8px;margin:6px 0;text-align:center;color:var(--dim)">drop audio here / + IMPORT — stored in IndexedDB, referenced by id</div>
+            <div id="smpBody" style="max-height:240px;overflow-y:auto"></div>
+            <canvas id="smpWave" width="456" height="64" style="display:none;width:100%;height:64px;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:6px;margin:6px 0 0" title="waveform — deterministic min/max peaks per pixel bucket (ch0)"></canvas>
+            <div id="smpEdit" style="display:none;border:1px solid var(--line);border-radius:8px;padding:6px;margin:6px 0">
+              <div class="mono" id="smpEditName" style="font-size:9px;margin-bottom:4px;color:var(--dim)"></div>
+              <div class="hBtns" style="flex-wrap:wrap;align-items:center">
+                <span class="mono" style="font-size:8px;color:var(--dim)">FADE ms</span><input type="number" id="smpFadeMs" min="0" max="2000" step="10" value="250" style="width:58px" title="fade length in ms (0..2000)">
+                <button id="smpFin" title="derive: exact linear fade-in over the first N ms (new sample, base untouched)">FADE-IN</button>
+                <button id="smpFout" title="derive: exact linear fade-out over the last N ms (new sample, base untouched)">FADE-OUT</button>
+                <span class="mono" style="font-size:8px;color:var(--dim)">GAIN %</span><input type="number" id="smpGainPct" min="0" max="200" step="5" value="100" style="width:54px" title="gain factor in percent (0..200)">
+                <button id="smpGainB" title="derive: multiply by the factor (new sample, base untouched)">GAIN</button>
+                <button id="smpNormB" title="derive: bake peak to 0.95 (new sample, base untouched)">NORM</button>
+                <button id="smpRevB" title="derive: reversed copy (new sample, base untouched)">REVERSE</button>
+                <button id="smpSliceB" title="derive: detect transients (deterministic energy flux) and store the boundaries — up to 16 slices, no PCM duplication">SLICE</button>
+                <button id="smpAssignSlices" style="display:none" title="fill the SELECTED track's pattern with sequential slice locks (the classic breakbeat fill)">SLICES → STEPS</button>
+                <button id="smpKeyB" title="detect the sample's key (deterministic chroma + Krumhansl-Schmuckler) and tune the SELECTED track onto the project root">KEY → ROOT</button>
+              </div>
+              <div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">edits create DERIVED samples (deterministic id = base+op+params) — the base import is immutable</div>
+            </div>
+            <div class="mono" id="smpMeta" style="font-size:8px;color:var(--dim);margin-top:4px"></div>
+            <input type="file" id="smpF" accept="audio/*" multiple style="display:none">
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Synth editor — selected track</h3>
+          <div id="synthEd" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────── MIXER ─────────── -->
+    <section class="tab" id="tab-mix">
+      <div class="panel">
+        <h3>Mixer</h3>
+        <div id="masterBar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;background:var(--p2);border:1px solid var(--line);border-radius:8px;padding:8px"></div>
+        <div id="fxBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px"></div>
+        <div id="strips"></div>
+      </div>
+    </section>
+
+    <!-- ─────────── SELF-GATE ─────────── -->
+    <section class="tab" id="tab-tests">
+      <div class="panel">
+        <div class="pHead"><h3 style="margin:0">Self-Gate — pooled engine, no device needed</h3><button id="bGate">RUN SELF-GATE</button></div>
+        <div id="log"></div>
+        <table id="gateTab" style="margin-top:8px;display:none"><thead><tr><th>ID</th><th>Claim</th><th>Result</th><th>Evidence</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+  </main>
+
+  <footer id="statusBar" role="contentinfo">
+    <span class="mono fBrand">PSY6 <span class="fVer">v0.27.0</span></span>
+    <span class="fSep" aria-hidden="true"></span>
+    <span class="fNote">everything runs locally — no accounts · no telemetry · your music stays yours</span>
+    <span class="fKeys mono">SPACE play/stop · <b>?</b> shortcuts</span>
+  </footer>
 </div>
-<div class="tg"><span class="chip st" id="fsm">OFF</span><span class="chip" id="pos">—</span><span class="chip" id="copChip" title="CO-PILOT — consent-driven suggestions">✦ CO-PILOT</span><canvas id="meter" width="90" height="26"></canvas><span class="chip mono" id="loadMeter" title="ENGINE LOAD — active voices (synth/drum/sample) of pool · steals · tier-0 starvation attempts · output latency ms. Red = pool pressure.">LOAD —</span></div>
-<div class="tg"><button id="bUndo" title="Undo (z)">⟲</button><button id="bRedo" title="Redo (Shift+z)">⟳</button><button id="bSave" title="Save the project to this browser (localStorage)">SAVE</button><button id="bShare" title="Copy a share link: project → canonical JSON → deflate-raw → base64url → #p= — loads only with explicit consent">SHARE</button><button id="bExport" title="Download the project as a JSON file">EXPORT</button><button id="bImport" title="Load a project JSON file">IMPORT</button><button id="bBounce" title="Offline-render the current pattern loop ×N to a 16-bit WAV">BOUNCE</button><button id="bComposeHdr" title="Compose a complete unique song (intro→build→drop→break→riser→drop2→outro)">COMPOSE</button><input type="file" id="impF" accept=".json" style="display:none"></div>
-</header>
-<nav>
-<button data-t="perform" class="on">Perform</button><button data-t="seq">Sequencer</button>
-<button data-t="sound">Sound</button><button data-t="mix">Mixer</button>
-<button data-t="tests">Self-Gate</button>
-</nav>
-<main>
-<section class="tab on" id="tab-perform"><div class="cols"><div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Scenes — click=launch(quantized) shift=assign alt=instant</h3><button id="bChain">CHAIN OFF</button></div><div id="scenes" style="margin-top:6px"></div></div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Pads</h3><div id="padModes" style="display:flex;gap:4px"></div></div><div id="pads" style="margin-top:7px"></div>
-<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap"><button id="bFill">⚡ FILL</button><button id="bVar">🎲 VARIATION</button><button id="bRiser" title="DJ TOOL — fire a RISER now: a 1.6 s sweep that lands on whatever comes next (q). Needs a drum track of type riser — every READY SET carries one on the FX lane.">RISER</button><button id="bSwell" title="DJ TOOL — fire a REVERSE-CYMBAL swell now (w). Needs a drum track of type revcym — assign one from the Sound tab if the set lacks it.">SWELL</button><button id="bImpact" title="DJ TOOL — fire an IMPACT hit now (e). Needs a drum track of type impact (TRANCE sets carry one; assign from the Sound tab otherwise).">IMPACT</button><button id="bDown" title="DJ TOOL — fire a DOWNLIFTER now (d): the mirror of the riser — a falling sweep for endings and wind-downs. Needs a drum track of type downlifter — assign from the Sound tab if the set lacks it.">DOWN</button><button id="bThrowE" title="ECHO THROW (g) — slam the master delay feedback to its ceiling for 2 bar boundaries so whatever plays smears into repeats; press again to release now. Momentary — the release restores the exact pre-throw value.">ECHO THROW</button><button id="bThrowM" title="MUFFLE (h) — pull the master high/mid EQ shelves down for 2 bar boundaries (the DJ veil for builds and breaks); press again to release now. Momentary — the release restores the exact pre-throw values.">MUFFLE</button><span class="note">DRUM=every drum voice + live variants (+OCT/TIGHT/…) · SCALE=key-locked notes · CHORD=diatonic triads · keys 1-8 / y u i o p j k l.</span></div></div>
-<div class="panel"><h3>Macros — resolve to REAL engine state</h3><div class="macros" id="macros"></div></div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">MIDI IN — notes play the selected track</h3><span class="mono" id="midiState" style="font-size:9px;color:var(--dim)">offline</span></div>
-<div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap"><select id="midiDev" style="max-width:170px;font-size:10px"></select><button id="midiConnect">CONNECT</button><select id="midiTarget" class="mono" style="font-size:9px;max-width:150px"></select><button id="midiLearnBtn" title="Pick a target, press LEARN, then move the MIDI control (CC). CC 0 is ignored.">LEARN</button><span class="mono" id="midiLearn" style="font-size:9px;color:var(--dim)">idle</span></div>
-<div id="midiBinds" style="margin-top:6px;max-height:96px;overflow-y:auto"></div>
-<div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">note-off releases synth voices · CC123 = PANIC · CC0 ignored · MIDI clock sync: out of scope</div></div>
-</div><div>
-<div class="panel"><h3>Layers</h3><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px" id="layers"></div></div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">CO-PILOT — suggestions need APPLY (never auto)</h3><button id="bLearn">LEARN ON</button></div><div id="copBody" style="margin-top:6px"></div><div id="copStats" class="mono" style="font-size:9px;color:var(--dim);margin-top:5px"></div></div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">SECTION ARRANGER — [scene, bars] auto-advance</h3><button id="bArr">ARRANGER OFF</button><button id="bPlaySong" title="PLAY SONG: jump to section 0 and auto-advance through the whole arrangement (quantized)">▶ PLAY SONG</button></div><div id="arrBody" style="margin-top:6px"></div></div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><h3 style="margin:0">SONG LIBRARY — recipes, not snapshots</h3><div style="display:flex;gap:4px;flex-wrap:wrap"><button id="bLibAdd" title="ADD CURRENT: store the current project's composer recipe (style/seed/length) in the album. Free-form projects have no recipe — honest 'recipe unavailable'.">+ ADD CURRENT</button><button id="bLibNew" title="COMPOSE NEW: open the composer; the finished song joins THIS album (the album survives — stash/restore)">COMPOSE NEW</button></div></div><div id="libBody" style="margin-top:6px;max-height:240px;overflow-y:auto"></div><div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">A song = compose(style, seed, length) — byte-reproducible. LOAD re-renders the recipe in memory; the current free-form project stays independent. The header COMPOSE starts a FRESH project (no album) by design.</div></div>
-<div class="panel"><h3>Tracks</h3><div id="tracks"></div></div>
-</div></div></section>
-<section class="tab" id="tab-seq"><div class="panel">
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><h3 style="margin:0" id="seqT">Step Sequencer</h3>
-<div style="display:flex;gap:6px;align-items:center"><select id="seqTrack"></select><select id="lenSel"></select><select id="zoomSel" title="Step width / zoom — AUTO stretches cells; larger sizes scroll for 64/128-step patterns"><option value="0">ZOOM AUTO</option><option value="14">XS 14px</option><option value="18">S 18px</option><option value="24">M 24px</option><option value="34">L 34px</option><option value="48">XL 48px</option></select><button id="bClr">CLEAR</button><button id="bDup">DUP</button></div></div>
-<div id="seqScroll"><div id="stepGrid"></div></div>
-<div class="note" style="margin-top:6px">click=toggle · shift+click=step editor (vel/prob/micro/lock). Blue dot=parameter lock.</div>
-<div style="display:flex;gap:6px;align-items:center;margin-top:12px;flex-wrap:wrap"><h3 style="margin:0">Automation</h3>
-<select id="laneParam" title="parameter for the new lane — follows the selected track"></select>
-<button id="bLaneAdd" title="add an automation lane for the selected track + parameter">+ LANE</button>
-<button id="bArmAuto" title="arm automation recording — knob/CC moves land in armed lanes at the playhead">ARM-AUTO</button>
-<button id="bAutoQ" title="quantize recorded points to 1/16 steps">Q 1/16</button>
-<button id="bLaneClear" title="clear the selected lane's points">CLEAR LANE</button></div>
-<div id="laneWrap"><canvas id="laneCanvas" width="900" height="96"></canvas><canvas id="lanePlay" width="900" height="96"></canvas></div>
-<div id="laneList" style="margin-top:6px;max-height:150px;overflow-y:auto"></div>
-</div></section>
-<section class="tab" id="tab-sound"><div class="cols">
-<div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><h3 style="margin:0">Factory library — real engine state</h3>
-<div style="display:flex;gap:5px;flex-wrap:wrap"><input id="libQ" placeholder="search" style="width:96px;font-size:10px" title="filter the factory library by preset name or id — substring, case-insensitive" aria-label="library search"><select id="libCat"></select><select id="libGenre"></select><button id="bAud">AUDITION</button><button id="bAssign">ASSIGN</button></div></div>
-<div class="mono" style="font-size:10px;color:var(--dim);margin:5px 0" id="libMeta"></div><div id="libList" style="max-height:340px;overflow:auto"></div></div>
-<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Samples — user library (IndexedDB)</h3><div style="display:flex;gap:4px;align-items:center"><label class="mono" style="font-size:9px;display:flex;gap:3px;align-items:center;cursor:pointer"><input type="checkbox" id="smpNorm" checked title="normalize peak to 0.95 at import (baked into the stored PCM; the sample id is computed BEFORE normalize — re-import stays idempotent)"> NORM</label><button id="bSmpImport" title="import audio files — decoded by the browser (wav/mp3/ogg/flac); caps: 20 s duration, 50 MB file, 128 rows">+ IMPORT</button><select id="rsBars" title="RESAMPLE length in bars (starts bar-quantized, auto-stops)"><option value="1">1 bar</option><option value="2" selected>2 bars</option><option value="4">4 bars</option><option value="8">8 bars</option></select><button id="bResample" title="record the live master output for N bars (bar-quantized start, auto-stop) into the sample store — the jam → resample → mangle loop">RESAMPLE</button></div></div>
-<div id="smpDrop" class="mono" style="border:1px dashed var(--line);border-radius:8px;padding:8px;margin:6px 0;text-align:center;color:var(--dim)">drop audio here / + IMPORT — stored in IndexedDB, referenced by id</div>
-<div id="smpBody" style="max-height:240px;overflow-y:auto"></div>
-<canvas id="smpWave" width="456" height="64" style="display:none;width:100%;height:64px;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:6px;margin:6px 0 0" title="waveform — deterministic min/max peaks per pixel bucket (ch0)"></canvas>
-<div id="smpEdit" style="display:none;border:1px solid var(--line);border-radius:8px;padding:6px;margin:6px 0">
-<div class="mono" id="smpEditName" style="font-size:9px;margin-bottom:4px;color:var(--dim)"></div>
-<div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-<span class="mono" style="font-size:8px;color:var(--dim)">FADE ms</span><input type="number" id="smpFadeMs" min="0" max="2000" step="10" value="250" style="width:58px" title="fade length in ms (0..2000)">
-<button id="smpFin" title="derive: exact linear fade-in over the first N ms (new sample, base untouched)">FADE-IN</button>
-<button id="smpFout" title="derive: exact linear fade-out over the last N ms (new sample, base untouched)">FADE-OUT</button>
-<span class="mono" style="font-size:8px;color:var(--dim)">GAIN %</span><input type="number" id="smpGainPct" min="0" max="200" step="5" value="100" style="width:54px" title="gain factor in percent (0..200)">
-<button id="smpGainB" title="derive: multiply by the factor (new sample, base untouched)">GAIN</button>
-<button id="smpNormB" title="derive: bake peak to 0.95 (new sample, base untouched)">NORM</button>
-<button id="smpRevB" title="derive: reversed copy (new sample, base untouched)">REVERSE</button>
-<button id="smpSliceB" title="derive: detect transients (deterministic energy flux) and store the boundaries — up to 16 slices, no PCM duplication">SLICE</button>
-<button id="smpAssignSlices" style="display:none" title="fill the SELECTED track's pattern with sequential slice locks (the classic breakbeat fill)">SLICES → STEPS</button>
-<button id="smpKeyB" title="detect the sample's key (deterministic chroma + Krumhansl-Schmuckler) and tune the SELECTED track onto the project root">KEY → ROOT</button>
+
+<!-- ══════════════════════════ MODALS ══════════════════════════ -->
+<div id="bounceModal" style="display:none;position:fixed;inset:0;background:#000d;z-index:150;align-items:center;justify-content:center">
+  <div class="modal">
+    <h3 style="margin:0 0 8px">BOUNCE — offline WAV</h3>
+    <div class="note" style="margin-bottom:10px">Renders the current pattern loop ×N through a fresh offline engine graph. The live engine keeps running — the bounce never touches it. 16-bit PCM stereo, 44.1 kHz.</div>
+    <div class="hBtns" style="justify-content:center;margin-bottom:12px">
+      <label class="mono" style="font-size:10px">MODE <select id="bounceMode"><option value="mix" selected>MIX</option><option value="stems" title="One WAV per non-empty track — same deterministic offline graph">STEMS</option><option value="song" title="Render the WHOLE arranger ([scene,bars] chain) to one WAV — the actual song, not a loop">SONG</option></select></label>
+      <label class="mono" style="font-size:10px">LOOPS <select id="bounceLoops"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option><option value="8">8</option></select></label>
+      <label id="songStemsWrap" class="mono" style="font-size:10px;display:none;align-items:center;gap:4px" title="One WAV per non-empty track — the WHOLE song per track, same offline renderer as the SONG bounce"><input type="checkbox" id="songStems"> STEMS (per-track WAVs)</label>
+      <span class="mono" id="bounceInfo" style="font-size:9px;color:var(--dim)"></span>
+    </div>
+    <div id="songProg" style="display:none;margin:10px 0">
+      <div class="mono" id="songProgLabel" style="font-size:9px;color:var(--dim);margin-bottom:4px"></div>
+      <div style="height:8px;background:#0007;border-radius:4px;overflow:hidden"><div id="songProgBar" style="height:100%;width:0%;background:var(--acc);transition:width .2s"></div></div>
+    </div>
+    <div class="hBtns" style="justify-content:center">
+      <button id="bounceGo">RENDER WAV</button>
+      <button id="bMidi" title="Export the WHOLE arranger as a standard MIDI file (format 1): same song expansion as the SONG render">EXPORT MIDI</button>
+      <button id="bounceCancel">CLOSE</button>
+    </div>
+  </div>
 </div>
-<div class="mono" style="font-size:8px;color:var(--dim);margin-top:4px">edits create DERIVED samples (deterministic id = base+op+params) — the base import is immutable</div>
-</div>
-<div class="mono" id="smpMeta" style="font-size:8px;color:var(--dim);margin-top:4px"></div>
-<input type="file" id="smpF" accept="audio/*" multiple style="display:none"></div>
-</div>
-<div class="panel"><h3>Synth editor — selected track</h3><div id="synthEd" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div></div>
-</div></section>
-<section class="tab" id="tab-mix"><div class="panel"><h3>Mixer</h3><div id="masterBar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px"></div><div id="fxBar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px"></div><div id="strips"></div></div></section>
-<section class="tab" id="tab-tests"><div class="panel">
-<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Self-Gate — pooled engine, no device needed</h3><button id="bGate">RUN SELF-GATE</button></div>
-<div id="log"></div>
-<table id="gateTab" style="margin-top:8px;display:none"><thead><tr><th>ID</th><th>Claim</th><th>Result</th><th>Evidence</th></tr></thead><tbody></tbody></table>
-</div></section>
-</main></div><div id="bounceModal" style="display:none;position:fixed;inset:0;background:#000d;z-index:150;align-items:center;justify-content:center"><div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:300px;max-width:420px;text-align:center"><h3 style="margin:0 0 8px">BOUNCE — offline WAV</h3><div class="note" style="margin-bottom:10px">Renders the current pattern loop ×N through a fresh offline engine graph. The live engine keeps running — the bounce never touches it. 16-bit PCM stereo, 44.1 kHz.</div><div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:12px;flex-wrap:wrap"><label class="mono" style="font-size:10px">MODE <select id="bounceMode"><option value="mix" selected>MIX</option><option value="stems" title="One WAV per non-empty track — same deterministic offline graph">STEMS</option><option value="song" title="Render the WHOLE arranger ([scene,bars] chain) to one WAV — the actual song, not a loop">SONG</option></select></label><label class="mono" style="font-size:10px">LOOPS <select id="bounceLoops"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option><option value="8">8</option></select></label><label id="songStemsWrap" class="mono" style="font-size:10px;display:none;align-items:center;gap:4px" title="One WAV per non-empty track — the WHOLE song per track, same offline renderer as the SONG bounce"><input type="checkbox" id="songStems"> STEMS (per-track WAVs)</label><span class="mono" id="bounceInfo" style="font-size:9px;color:var(--dim)"></span></div><div id="songProg" style="display:none;margin:10px 0"><div class="mono" id="songProgLabel" style="font-size:9px;color:var(--dim);margin-bottom:4px"></div><div style="height:8px;background:#0007;border-radius:4px;overflow:hidden"><div id="songProgBar" style="height:100%;width:0%;background:var(--acc,#4fd6c0);transition:width .2s"></div></div></div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button id="bounceGo">RENDER WAV</button><button id="bMidi" title="Export the WHOLE arranger as a standard MIDI file (format 1): same song expansion as the SONG render">EXPORT MIDI</button><button id="bounceCancel">CLOSE</button></div></div></div><div id="toast"></div>
+
 <div id="composeModal" style="display:none;position:fixed;inset:0;background:#000c;align-items:center;justify-content:center;z-index:50">
-<div style="background:#171c25;border:1px solid #2c3442;border-radius:12px;padding:18px;min-width:300px;max-width:420px">
-<h3 style="margin:0 0 10px">✦ COMPOSE — complete arrangement</h3>
-<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-<label for="cmpStyle" style="font-size:10px;color:var(--dim)">STYLE <select id="cmpStyle"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option><option>PSYTRANCE</option><option>GOA</option><option>TECHNO</option><option>TRANCE</option></select></label>
-<label style="font-size:10px;color:var(--dim)">LENGTH <select id="cmpLen"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option><option value="12">12 min</option><option value="20">20 min</option></select></label>
-<label style="font-size:10px;color:var(--dim)">SEED <input id="cmpSeed" placeholder="seed" style="width:100px"></label>
+  <div class="modal">
+    <h3 style="margin:0 0 10px">✦ COMPOSE — complete arrangement</h3>
+    <div class="hBtns" style="flex-wrap:wrap">
+      <label for="cmpStyle" style="font-size:10px;color:var(--dim)">STYLE <select id="cmpStyle"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option><option>PSYTRANCE</option><option>GOA</option><option>TECHNO</option><option>TRANCE</option></select></label>
+      <label style="font-size:10px;color:var(--dim)">LENGTH <select id="cmpLen"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option><option value="12">12 min</option><option value="20">20 min</option></select></label>
+      <label style="font-size:10px;color:var(--dim)">SEED <input id="cmpSeed" placeholder="seed" style="width:100px"></label>
+    </div>
+    <div class="note" id="cmpInfo" style="margin:8px 0"></div>
+    <div class="note" style="margin:8px 0">Generates scenes INTRO→BUILD→DROP→BREAK→RISER→DROP2→OUTRO plus derived variant scenes for every repeated section (no identical repeats), patterns for all 9 tracks, the arranger chain and filter/send lanes. Deterministic: same seed = identical song.</div>
+    <div class="hBtns" style="margin-top:6px"><button id="cmpGo">GENERATE</button><button id="cmpCancel">CANCEL</button></div>
+  </div>
 </div>
-<div class="note" id="cmpInfo" style="margin:8px 0"></div>
-<div class="note" style="margin:8px 0">Generates scenes INTRO→BUILD→DROP→BREAK→RISER→DROP2→OUTRO plus derived variant scenes for every repeated section (no identical repeats), patterns for all 9 tracks, the arranger chain and filter/send lanes. Deterministic: same seed = identical song.</div>
-<div style="display:flex;gap:8px;margin-top:6px"><button id="cmpGo">GENERATE</button><button id="cmpCancel">CANCEL</button></div>
-</div>
-</div>
+
 <div id="helpOverlay" style="display:none;position:fixed;inset:0;background:#000d;z-index:60;align-items:center;justify-content:center">
-<div style="background:#171c25;border:1px solid #2c3442;border-radius:12px;padding:18px;min-width:300px;max-width:520px;max-height:80vh;overflow-y:auto">
-<h3 style="margin:0 0 10px">Keyboard shortcuts</h3>
-<div id="helpBody"></div>
-<div style="margin-top:10px"><button id="bHelpClose">CLOSE (Esc)</button></div>
+  <div class="modal" style="min-width:300px;max-width:520px;max-height:80vh;overflow-y:auto">
+    <h3 style="margin:0 0 10px">Keyboard shortcuts</h3>
+    <div id="helpBody"></div>
+    <div style="margin-top:10px"><button id="bHelpClose">CLOSE (Esc)</button></div>
+  </div>
 </div>
-</div>
+
 <button id="bHelp" title="Keyboard shortcuts (?)" style="position:fixed;right:10px;bottom:10px;z-index:55;border-radius:50%;width:40px;height:40px;font-weight:700">?</button>
-<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0a0c0f"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"><script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){/* registration is best-effort — the device works without it */})})}</script><script type="module" src="js/main.js"></script>
+
+<div id="toast"></div>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#07090d">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){/* registration is best-effort — the device works without it */})})}</script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
