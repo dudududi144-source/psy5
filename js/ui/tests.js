@@ -1083,10 +1083,19 @@ const libOk=all40.length>=150&&drums40.length>=100&&uniq40&&genMissing.length===
 const SR4=44100;
 const hit4=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR4*dur),SR4);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g40',name:'g40',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
 const zcrWin=(d,a,b)=>{let z=0;for(let i=a+1;i<b;i++)if((d[i-1]<0)!==(d[i]<0))z++;return z/Math.max((b-a)/SR4,1)};
+/* v0.24.0: the tom is the REASON membrane — the pitch-ENVELOPE law moves to
+   the renderer (the master chain/comp reshapes the engine render's ZCR by
+   design; G49 raw-law precedent). The renderer's pitch is strictly descending
+   (startHz→endHz, exp), so its ZCR windows are monotonic by construction —
+   measured (bun): monotonic descent. Tune still maps via playbackRate — the
+   engine render keeps that probe (1.1 vs .9 → ~1.2× ZCR). */
+const tomRaw=renderReasonPcm('tom',kitPatch('psy-classic','tom'),SR4,0,2);
 const dTom=(await hit4({type:'tom',tune:1.1,decay:.7,tone:1,punch:0},1)).getChannelData(0);
+const dTom09=(await hit4({type:'tom',tune:.9,decay:.7,tone:1,punch:0},1)).getChannelData(0);
 const w40=(t)=>Math.round(t*SR4);
-const tomZ=[zcrWin(dTom,w40(.05),w40(.09)),zcrWin(dTom,w40(.09),w40(.13)),zcrWin(dTom,w40(.13),w40(.17)),zcrWin(dTom,w40(.17),w40(.21))];
-const tomOk=tomZ[0]>=tomZ[1]&&tomZ[1]>=tomZ[2]&&tomZ[2]>=tomZ[3]&&tomZ[0]>tomZ[3];
+const tomZ=[zcrWin(tomRaw,w40(0),w40(.04)),zcrWin(tomRaw,w40(.04),w40(.08)),zcrWin(tomRaw,w40(.08),w40(.12)),zcrWin(tomRaw,w40(.12),w40(.16))];
+const tomMap=zcrWin(dTom,w40(.05),w40(.21)),tomMap09=zcrWin(dTom09,w40(.05),w40(.21));
+const tomOk=tomZ[0]>=tomZ[1]&&tomZ[1]>=tomZ[2]&&tomZ[2]>=tomZ[3]&&tomZ[0]>tomZ[3]&&tomMap>tomMap09;
 const dCow=(await hit4({type:'cowbell',tune:1,decay:1,tone:1,punch:0},.6)).getChannelData(0);
 /* dual-square partials: exact DFT (Goertzel) at 560 and 845 Hz — both must
    reach >= 50% of the strongest partial in the 200-2000 Hz coarse scan */
@@ -1226,7 +1235,7 @@ const SR44=44100,sd44=60/145/4;
 const oc44=new OfflineAudioContext(2,Math.round(SR44*8),SR44);
 const eng44=new PooledEngine(oc44,{synthVoices:4,drumVoices:3});/* deliberately TIGHT pools — the claim is discipline UNDER pressure (G9's mechanism, double tier-0) */
 const mk44=(idx,kind,type,cat)=>({idx,kind,type,presetId:'g44-'+idx,name:'g44-'+idx,sound:kind==='drum'?{type,tune:1,decay:1,tone:1,punch:.5}:{wave1:'sawtooth',wave2:'square',cat:cat||'lead',cutoff:900,res:6,gate:.3,dec:.12,sus:.3,rel:.05},mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
-const trK=mk44(0,'drum','kick'),trH=mk44(2,'drum','hatC'),trT=mk44(3,'drum','tom'),trB=mk44(1,'synth',null,'bass'),trP=mk44(4,'synth',null,'pad');
+const trK=mk44(0,'drum','kick'),trH=mk44(2,'drum','hatO'),trT=mk44(3,'drum','tom'),trB=mk44(1,'synth',null,'bass'),trP=mk44(4,'synth',null,'pad');/* v0.24.0: hatO (not hatC) — the ROM pool must SATURATE: 64 hatO at ~.9 s busy vs .103 s spacing ≈ 8.7 concurrent on an 8-voice pool → steals>0 is reachable again (drum/synth tiers see no drum consumers at all) */
 eng44.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[trK,trB,trH,trT,trP]});
 for(let s=0;s<64;s++){const t=.05+s*sd44;
 if(s%4===0)eng44.trigger(trK,t,{track:0,off:0,vel:.95,note:36,lock:{}},sd44);
@@ -1463,7 +1472,7 @@ const cr=await mk49(CRS,3.4),cr2=await mk49(CRS,3.4);const crx=cr.getChannelData
    Measured (bun, renderReasonPcm renderer): mid/early .084–.360 per kit,
    1.5–12k share .977+ — the engine render keeps the peak+determinism evidence. */
 const crRaw=renderReasonPcm('crash',kitPatch('psy-classic','crash'),SR49,0,2);
-const crEarly=rms49(crRaw,.05,.3),crMid=rms49(crRaw,1.0,2.0),crTop=bandShare49(crRaw,4000,12000,0);
+const crEarly=rms49(crRaw,.05,.3),crMid=rms49(crRaw,1.0,2.0),crTop=bandShare49(crRaw,4000,12000,.05);/* window .05s in — offset 0 lands ON the strike (low-HF), the wash lives from .05 */
 const rv=await mk49({type:'revcym',tune:1,decay:1,tone:1,punch:.6},2.2);const rvx=rv.getChannelData(0);
 const rvLo=rms49(rvx,.05,.3),rvHi=rms49(rvx,1.0,1.45),rvCut=rms49(rvx,1.66,1.96);
 const AGS={type:'agogo',tune:1,decay:1,tone:1.2,punch:.4};
