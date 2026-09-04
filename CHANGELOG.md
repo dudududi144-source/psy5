@@ -3,6 +3,59 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.26.0] — Run 25: PRODUCT FINISH — the engineering roast, on the record
+
+> Owner: "we built in layers and got a hysterical mess — go over EVERYTHING,
+> roast yourself as an engineer releasing to production, dissect the design,
+> bring the demos to the final full version, organize the repo."
+
+- **docs/ENGINEERING-ROAST.md** — ten findings, each evidence-anchored at
+  v0.25.0, each FIXED here or standing as documented debt. Highlights:
+  the demo buttons played a different DARK-PSY song than the file+test
+  pinned (777 vs 90210); the boot copy claimed "19 checks" against a real
+  48; the seed table existed twice; four of nine styles silently bypassed
+  kit governance; two inline onclick handlers survived a CSP field report;
+  the library search rebuilt 456 DOM rows per keystroke.
+- **Demos → SHOWCASE (roast #1)** — `data/demos/*.json` are the 8-minute
+  full-form versions (292–300 bars, ~480 s, 40 scenes each), form summaries
+  generated from `compose()` itself. File = usability test = boot button =
+  one identity per demo (FULL-ON 424242, DARK-PSY 90210, FOREST 1337).
+  Static guard: the button wiring is regex-pinned to the file recipe, and
+  the duplicate local seed table is banned (`READY_SEEDS` in library.js is
+  the only table).
+- **Gates manifest (roast #3/#9)** — `js/gates-manifest.js` is the single
+  source of the MAIN gate list; `tools/e2e.mjs` imports it, the boot copy
+  renders the live count, and a bun test statically reconciles it against
+  the ids `js/ui/tests.js` registers. Live specimen found during the audit:
+  **G52 (v0.23.0, reason liveness) was registered in-page but missing from
+  the hand-typed e2e EXPECTED list** — three releases unasserted while the
+  docs claimed CI coverage. Manifest now carries **49 CI-asserted ids**.
+- **Kit governance 9/9 (roast #4 — now FIVE findings)** — `STYLE_KIT` maps
+  all nine styles; psytrance/goa/trance ride `psy-classic`, techno rides
+  `progressive` (the documented family law). `data/styles.json` documents all
+  nine styles. The fix's own browser check found the fifth bypass: DARK-PSY's
+  dedicated `dark-forest` kit was UNREACHABLE since v0.23.0 — the map key
+  `darkpsy` never matched the runtime lookup key `dark-psy`, so the flagship
+  style silently rode DEFAULT_KIT and the unit pins stayed green. Runtime
+  lookup is now ONE canonical accessor `styleKit()` (case/hyphen-insensitive),
+  used by all four call sites; DARK-PSY showcase browser-verified booting
+  with kit `dark-forest`. Honest limitation: no new kit sound design this
+  run — governance only.
+- **Power screen hierarchy (roast #5)** — hero → genre grid → SHOWCASE /
+  ADVANCED two-column row → engine A/B demoted to a secondary footnote.
+  Product-voice copy; the ui-evidence contract (hero first / 9 ⚡ SETs /
+  BARE last) unchanged and still asserted.
+- **Zero inline JS (roast #6)** — the two helpOverlay `onclick=` attributes
+  are wired in main.js; index.html carries no inline handlers.
+- **Search perf (roast #7)** — 120 ms debounce, DocumentFragment build,
+  delegated clicks (456 per-row closures gone).
+- **powerOn() split (roast #8)** — bootAudio / bootProject / bootWarmKit /
+  bootStart; behavior identical, the same gates assert the same boot.
+- **Standing debt (documented)** — doc-number docgen, new kit sound design,
+  worklet feature parity.
+- **Tests**: 657 → **665** across 52 files (gates-manifest reconciliation
+  suite + demo coherence guards). `verify` GREEN. SW `psy6-v0.26.0`.
+
 ## [0.25.0] — Run 24: STRATIFICATION II — no more lonely options
 
 > Owner: "don't let every feature have just a few lonely options" / instruction

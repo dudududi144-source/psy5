@@ -313,16 +313,16 @@ describe('choke config (kitChoke: hat exclusivity + cymbal polyphony for every k
 describe('UI + composer hooks (the wiring is reachable, not just available)', () => {
   test('Sound tab KIT selector: auto (follow style) + KIT_IDS, sets pin, saves snapshot', () => {
     expect(SOUND_SRC).toContain("'<option value=\"auto\">KIT auto (follow style)</option>'")
-    expect(SOUND_SRC).toContain('p.kitPinned=false;p.kit=STYLE_KIT[String(p.style||\'\').toLowerCase()]||DEFAULT_KIT')
+    expect(SOUND_SRC).toContain('p.kitPinned=false;p.kit=styleKit(p.style)') /* v0.26.0: canonical lookup (roast fix #4) — the raw toLowerCase() lookup missed DARK-PSY forever */
     expect(SOUND_SRC).toContain('p.kitPinned=true;p.kit=s.value')
     expect(SOUND_SRC).toContain('I.eng.setKit(p.kit);warmKit(p.kit)')
     expect(SOUND_SRC).toContain('saveProject()')
     expect(SOUND_SRC).toContain('aria-label')
   })
   test('composer style hook in BOTH compose paths (header modal + power screen) + composeBoot', () => {
-    expect(COMPOSE_SRC.split('STYLE_KIT[String(styleId).toLowerCase()]').length).toBe(3) /* both compose paths */
+    expect(COMPOSE_SRC.split('styleKit(styleId)').length).toBe(3) /* both compose paths — v0.26.0 canonical lookup */
     expect(COMPOSE_SRC.split('r.project.kitPinned = true').length).toBe(3)
-    expect(MAIN_SRC.replace(/\s/g, '')).toContain('STYLE_KIT[String(style).toLowerCase()]||DEFAULT_KIT')
+    expect(MAIN_SRC.replace(/\s/g, '')).toContain('r.project.kit=styleKit(style)') /* v0.26.0 canonical lookup */
   })
   test('syncKitSel mirrors state on every renderAll', () => {
     expect(MAIN_SRC).toContain('syncKitSel();')
@@ -330,8 +330,8 @@ describe('UI + composer hooks (the wiring is reachable, not just available)', ()
 })
 
 describe('release pins', () => {
-  test('sw.js CACHE_VERSION bumped to psy6-v0.25.0', () => {
-    expect(SW_SRC).toContain("const CACHE_VERSION = 'psy6-v0.25.0'")
+  test('sw.js CACHE_VERSION bumped to psy6-v0.26.0', () => {
+    expect(SW_SRC).toContain("const CACHE_VERSION = 'psy6-v0.26.0'")
   })
   test('drumDurEst windows UNTOUCHED (pool discipline moved zero)', () => {
     const durEst = PooledEngine.prototype.drumDurEst

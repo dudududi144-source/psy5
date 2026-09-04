@@ -67,7 +67,7 @@ boot note renders the manifest count, and a bun test statically reconciles the
 manifest against the ids `js/ui/tests.js` actually registers. Drift of this
 class is now structurally impossible without a red suite.
 
-## 4. Four of nine shipped styles silently bypass the v0.24.0 flagship feature
+## 4. FIVE of nine shipped styles silently bypass the v0.24.0 flagship feature
 
 **Evidence.** v0.24.0's headline: *"every hit plays through the kit."*
 `STYLE_KIT` maps exactly five styles; the test hardens the ceiling ("exactly
@@ -78,12 +78,26 @@ behind it. TECHNO at 132 BPM gets a full-on kit at 145 BPM's character. The
 data file that documents styles (`data/styles.json`) is frozen at five entries
 — a snapshot of a younger product wearing the clothes of the current one.
 
+**And then the fix's own browser check found the fifth — worse.** `DARK-PSY`,
+a NATIVE style with a real dedicated kit (`dark-forest`), has been riding
+`DEFAULT_KIT` since the day the kit system shipped: the map's key is
+`'darkpsy'` (the styles.json spelling) while every runtime lookup does
+`'DARK-PSY'.toLowerCase()` = `'dark-psy'` — a key that has NEVER existed.
+The dedicated dark-forest kit was dead code reachable only through the manual
+kit picker. Five of nine, and the flagship feature's own demo could never
+reach its own kit. The unit test suite pinned the map against `styles.json`
+names, so it stayed green while the product was wrong — pins protect the
+artifact, not the behavior.
+
 **FIXED (v0.26.0).** `styles.json` documents all nine shipped styles;
 `STYLE_KIT` carries nine deliberate mappings onto the existing six kits
 (PSYTRANCE/GOA/TRANCE → `psy-classic` where that is the honest truth, TECHNO →
-`progressive`); the kit test asserts nine-with-gaps-zero. Honest limitation
-recorded: no NEW kit sound-design was commissioned this run — the fix is
-governance (every style is a *decision*), not new patches.
+`progressive`); the kit test asserts nine-with-gaps-zero. The runtime lookup
+is now ONE canonical accessor, `styleKit()` (case- and hyphen-insensitive both
+ways), used by all four call sites — the `dark-psy`/`darkpsy` split is dead.
+Browser-verified: the DARK-PSY showcase now boots with kit `dark-forest`.
+Honest limitation recorded: no NEW kit sound-design was commissioned this run
+— the fix is governance (every style is a *decision*), not new patches.
 
 ## 5. The boot screen is a system dialog, not a product entrance
 

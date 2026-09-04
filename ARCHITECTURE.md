@@ -359,6 +359,15 @@ never bit-exact audio), so CI has no realtime dependency. The WORKLET reduced
 set (G14w/G15w) and live-scheduler loop checks stay local-only; they are
 exercised from the live site at each release. See README "Self-Gate in CI".
 
+v0.26.0 (roast #3/#9): the gate inventory is machine-read —
+`js/gates-manifest.js` (49 CI-asserted MAIN ids) is imported by
+`tools/e2e.mjs` as its EXPECTED list, rendered in the boot copy via
+`MAIN_GATE_COUNT`, and statically reconciled against the ids
+`js/ui/tests.js` registers by `tests/gates-manifest.test.ts` (red in
+seconds, not after a 9-minute e2e run). The audit's live specimen: G52 had
+been registered in-page but was missing from the hand-typed e2e list for
+three releases. EDIT THE MANIFEST, never the copies.
+
 ## 12. MIDI / Capture / Stems / Share (v0.4.0)
 
 **MIDI layer** — `js/midi.js` is a DOM-free core: bytes in (0x90/0x80/0xB0)

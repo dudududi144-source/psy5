@@ -589,6 +589,21 @@ export const STYLE_KIT = Object.freeze({
   'trance': 'psy-classic',
 });
 
+/* v0.26.0 — canonical style→kit lookup (roast fix #4, live specimen #2).
+   The map keys on the composer's lowercase labels ('dark-psy'); the kit
+   declarations and data/styles.json say 'darkpsy'. The raw toLowerCase()
+   lookups missed DARK-PSY FOREVER and silently served DEFAULT_KIT — the
+   roast's finding #4 was actually five unmapped styles, not four. One
+   canonical accessor now: exact lowercase first, then hyphen-stripped. */
+const STYLE_KIT_NORM = Object.freeze(
+  Object.fromEntries(Object.entries(STYLE_KIT).map(([k, v]) => [k.toLowerCase().replace(/-/g, ''), v]))
+);
+export function styleKit(styleId) {
+  if (!styleId) return DEFAULT_KIT;
+  const k = String(styleId).toLowerCase();
+  return STYLE_KIT[k] || STYLE_KIT_NORM[k.replace(/-/g, '')] || DEFAULT_KIT;
+}
+
 /* The warm loop slices: engine core first (kick,snare,clap,hatC,hatO,tom,
    crash — note hatC BEFORE hatO), then ride, then the ROM family in order.
    8 engine roles + 12 ROM roles = 20. */

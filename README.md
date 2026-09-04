@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 657 tests across 51 files — 657 pass / 0 fail
+bun test             # 665 tests across 52 files — 665 pass / 0 fail
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 bun tools/rom-audit.mjs  # PERCUSSION ROM + REASON kit audit (v0.24.0) — 13/13 + 48/48 kit×type PASS
@@ -129,16 +129,19 @@ Honest subset classification (v0.4.0):
 | `G41` (master space) | v0.12.0: neutral perturb→restore maxDiff 2.46e-7; width 1.8 HF-side ×1.77 (300 Hz protection by design); ping-pong L−R flips 2→46; long-IR decay 48.7× short | CI + local |
 | `G14w`, `G15w` (WORKLET engine reduced set) | worklet offline render | **local-only** — worklet rendering is environment-sensitive in CI; exercised from the live site at release |
 
-Gate-truth accounting (v0.19.0 — canonical inventory lives as a comment above
-`runSelfGate()` in js/ui/tests.js): the device runs **50 MAIN entries**, of
-which **48 are hard** (offline/pure — CI asserts all 48 ids incl. G24 song
+Gate-truth accounting (v0.26.0 — the canonical inventory is the machine-read
+`js/gates-manifest.js` module, statically reconciled against `js/ui/tests.js`
+by tests/gates-manifest.test.ts): the device runs **51 MAIN entries**, of
+which **49 are hard** (offline/pure — CI asserts all 49 ids incl. G52 reason
+liveness, which v0.23.0 had registered in-page but silently dropped from the
+hand-typed e2e list — the roast's own finding #9 caught live; plus G24 song
 render, G26 MIDI export, G27 follow actions, G28 snapshots, G29 master,
 G30 stems/sections, G31 progressions, G32 evolution, G33 library, G34 sample
 voice, G35 insert FX, G36 freeze, G37 editor, G38 slices, G39 drum engine
 v2, G40 percussion + library, G41 master space, G42 synth v2-lite, G43 moog
 insert, G44 load/steal stress, G45 UI options exposure, G46 new voices,
 G47 drum v2 params, G48 percussion v3, G49 v0.15 voices, G50 transitions v1,
-G51 v0.18 library voices) and
+G51 v0.18 library voices, G52 reason liveness) and
 **2 are evidence-only realtime** (G17 live capture, G25 record song — they
 run on-device every time, are reported as info in CI, and are exercised
 from the production URL at every release). WORKLET: 3/3 reduced set. Numbering gaps G3/G4/G7/G20
@@ -148,7 +151,7 @@ history) and are left unrenumbered.
 **CI memory note (v0.16.0, current since v0.18.0):** the single-run suite's
 offline-render peak (G29 long masters + G39–G41 stems + G50's six
 renderSong passes) once exceeded a 4 GB runner; G51's evidence pass was
-trimmed so the FULL suite now asserts **48/48 HARD in one run** on the CI
+trimmed so the FULL suite now asserts **49/49 HARD in one run** on the CI
 runner (7 GB) and on a quiet local box. On a loaded 4 GB machine, `--skip`
 chunking (A = all except G50, B = G50 alone) remains available — chunking
 is evidence-neutral (every gate is independent and deterministic; same

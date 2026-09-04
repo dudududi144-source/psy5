@@ -20,7 +20,7 @@ import { wireCapture } from './ui/capture.js';
 import { wireArranger } from './ui/arranger.js';
 import { startSched } from './scheduler.js';
 import { PooledEngine, prepInsertDSP } from './engine.js';
-import { kitWarmTypes, DEFAULT_KIT, STYLE_KIT } from '../foundation/dsp/kit-reason.mjs';
+import { kitWarmTypes, DEFAULT_KIT, styleKit } from '../foundation/dsp/kit-reason.mjs';
 import { mkWorkletEngine, WORKLET_LIMITATIONS } from './worklet-engine.js';
 import { buildStyle } from './presets.js';
 import { parseShareHash, decodeShare } from './share.js';
@@ -72,7 +72,7 @@ async function powerOn(style,resume){await bootAudio();bootProject(style,resume)
 async function composeBoot(style,minutes,seed){try{toast('COMPOSING '+style+' — '+minutes+' MIN…');
 const r=compose(style,minutes,seed);
 /* v0.24.0 KIT HOOK — a composed set follows its style's kit unless the user PINNED one in the Sound tab (the pin rides the live project and carries over). */
-if(I.p&&I.p.kitPinned&&kitWarmTypes(I.p.kit).length){r.project.kit=I.p.kit;r.project.kitPinned=true}else{r.project.kit=STYLE_KIT[String(style).toLowerCase()]||DEFAULT_KIT;r.project.kitPinned=false}
+if(I.p&&I.p.kitPinned&&kitWarmTypes(I.p.kit).length){r.project.kit=I.p.kit;r.project.kitPinned=true}else{r.project.kit=styleKit(style);r.project.kitPinned=false}
 try{readyAlbum(r.project,style,seed,minutes)}catch(e){/* album is enrichment — never blocks the boot */}
 I.pendingCompose=r.project;I.composedLoad=r.form;await powerOn(style,false)}catch(e){toast('COMPOSE FAILED — '+e.message)}}
 

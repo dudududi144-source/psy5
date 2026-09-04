@@ -31,7 +31,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import {
-  REASON_KITS, KIT_IDS, DEFAULT_KIT, STYLE_KIT, ENGINE_ROLES, KIT_ROM_ROLES,
+  REASON_KITS, KIT_IDS, DEFAULT_KIT, STYLE_KIT, styleKit, ENGINE_ROLES, KIT_ROM_ROLES,
   kitPatch, kitRomSpec, kitRootHz, kitChoke, kitMeta,
   isReasonEngineType, isKitRomType, kitWarmTypes,
 } from '../foundation/dsp/kit-reason.mjs'
@@ -381,6 +381,19 @@ describe('kit-reason STYLE_KIT — all 9 styles from data/styles.json (v0.26.0 r
     expect(STYLE_KIT['goa']).toBe('psy-classic')
     expect(STYLE_KIT['trance']).toBe('psy-classic')
     expect(STYLE_KIT['techno']).toBe('progressive')
+  })
+  test('styleKit() — the canonical lookup — is hyphen/case-insensitive both ways', () => {
+    /* the live specimen (roast fix #4): 'DARK-PSY'.toLowerCase() = 'dark-psy'
+       never matched the 'darkpsy' key — DARK-PSY rode DEFAULT_KIT forever */
+    expect(styleKit('DARK-PSY')).toBe('dark-forest')
+    expect(styleKit('darkpsy')).toBe('dark-forest')
+    expect(styleKit('Full-On')).toBe('psy-classic')
+    expect(styleKit('TECHNO')).toBe('progressive')
+    expect(styleKit('GOA')).toBe('psy-classic')
+    expect(styleKit('TRANCE')).toBe('psy-classic')
+    expect(styleKit('PSYTRANCE')).toBe('psy-classic')
+    expect(styleKit('')).toBe(DEFAULT_KIT)
+    expect(styleKit('unknown-style')).toBe(DEFAULT_KIT)
   })
 })
 
