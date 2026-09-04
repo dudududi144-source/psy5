@@ -162,7 +162,7 @@ async function main() {
     await waitFor(cdp, `window.__psy6&&window.__psy6.ctx&&window.__psy6.engine==='main'&&window.__psy6.p&&window.__psy6.p.arranger`, 30000, 250, 'composed boot');
     await sleep(400);
     const boot = JSON.parse(await cdp.eval(`JSON.stringify({scenes:window.__psy6.p.scenes.length,arrOn:window.__psy6.p.arranger.on,arrSteps:window.__psy6.p.arranger.steps.length,tracks:window.__psy6.p.tracks.length,lib:window.__psy6.p.library?window.__psy6.p.library.songs.length:0,active:window.__psy6.p.scenes[window.__psy6.p.activeScene]?window.__psy6.p.scenes[window.__psy6.p.activeScene].name:null,fsm:window.__psy6.fsm})`));
-    ck('boot: composed set — 9 tracks, scenes bank full, arranger RUNNING', boot.tracks === 9 && boot.scenes > 6 && boot.arrOn === true && boot.arrSteps > 6, JSON.stringify(boot));
+    ck('boot: composed set — 10 tracks (FX + TRANZ, v0.19.0), scenes bank full, arranger RUNNING', boot.tracks === 10 && boot.scenes > 6 && boot.arrOn === true && boot.arrSteps > 6, JSON.stringify(boot));
     ck('boot: library preseeded with the READY ALBUM', boot.lib === 9, 'songs=' + boot.lib);
     ck('boot: lands PLAYING on Perform (ready to perform, not empty)', boot.fsm === 'PLAYING', 'fsm=' + boot.fsm + ' scene=' + boot.active);
 

@@ -94,9 +94,20 @@ reproducible with the command shown next to it.
 - bun **514/514** across 44 files (the new `tests/v019.test.ts` adds 11:
   composed-transition contract, determinism, schedule-fires evidence,
   carrier pair, genre data contract, DJ DOWN wiring, fill vocabulary;
-  composer/evolution/presets/midifile/v2-library pins re-recorded).
-- `verify` GREEN. e2e 48/48 HARD (single run). ui-evidence 14/14 (the
-  fill-label check now accepts all five variant names).
+  composer/evolution/presets/midifile/v2-library pins re-recorded). The
+  heaviest composer test (36 full 12/20-min forms) carries an explicit
+  30 s cap — the default 5 s was a CI-box lottery.
+- `verify` GREEN. e2e: the in-page Self-Gate runs **49/50** on the release
+  box (G17 realtime capture is info-only by design, skew -99 ms on the
+  loaded box — the only non-passed entry; G25 record-song pass). All 48
+  hard gates' evidence captured GREEN across chunked runs (G24 full song
+  render 10,075,254 frames non-silent; G26 MIDI = 4389 notes note-for-note;
+  G32 evolution OFF pin 4389/b8de08b276873400; G40 lib=423 kits=9/9;
+  G50 transition precision numbers unchanged: cut 4.9e-4, swell ×14.09,
+  imp ×1.89, rMid 0.273>0.079, det 2.4e-7). Gates G42–G51 carry bun-level
+  coverage and are asserted by the CI single-pass job (7 GB runner) on
+  push. ui-evidence 14/14 (the fill-label check accepts all five variant
+  names).
 
 ## [0.18.0] — Run 20h: LIBRARY 345→381 (+36 presets, FOREST's first own voices) + FILL VARIANTS + DJ TOOLS (on-demand transitions)
 
