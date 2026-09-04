@@ -41,7 +41,7 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 665 tests across 52 files — 665 pass / 0 fail
+bun test             # 666 tests across 52 files — 666 pass / 0 fail
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 bun tools/rom-audit.mjs  # PERCUSSION ROM + REASON kit audit (v0.24.0) — 13/13 + 48/48 kit×type PASS

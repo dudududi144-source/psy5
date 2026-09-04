@@ -692,7 +692,7 @@ gate('G31','chord progression engine: every bass/lead/pad/arp note ∈ the activ
 try{
 const c32=compose('FULL-ON',3,424242);const p32=JSON.parse(JSON.stringify(c32.project));
 const off32=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
-const offOk=off32.evs.length===4389&&evHash(off32.evs)==='b8de08b276873400'; /* v0.19.0: composed sets ship scene.trans — the OFF schedule carries the trans FX triggers (was 4385/b35b75f6a82e48ae) */
+const offOk=off32.evs.length===4325&&evHash(off32.evs)==='b904778b234b387c'; /* v0.27.0: escalating fills re-shaped the BUILD/RISER snare → 4325 events (was 4389/b8de08b276873400; matches tests/evolution.test.ts OFF_PIN) */
 const key32=e=>e.s+'|'+e.track;const sig32=e=>JSON.stringify([e.t.toFixed(6),e.vel.toFixed(3),e.note,JSON.stringify(e.lock||{})]);
 const diff32=(A,B)=>{const ma=new Map(A.map(e=>[key32(e),sig32(e)])),mb=new Map(B.map(e=>[key32(e),sig32(e)]));let d=0;for(const[k,v]of ma)if(mb.get(k)!==v)d++;for(const k of mb.keys())if(!ma.has(k))d++;return d};
 evolutionState(p32);p32.evolution.on=true;p32.evolution.intensity=35;p32.evolution.seed=777;
@@ -701,8 +701,8 @@ const on32b=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
 const p32z=JSON.parse(JSON.stringify(c32.project));evolutionState(p32z);p32z.evolution.on=true;p32z.evolution.intensity=0;p32z.evolution.seed=777;
 const z32=songSchedule(JSON.parse(JSON.stringify(p32z)),0.05);
 const d32=diff32(off32.evs,on32.evs);
-const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='b8de08b276873400';
-gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4389) diff='+d32+'/4389 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='b8de08b276873400')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
+const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='b904778b234b387c';
+gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4325) diff='+d32+'/4325 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='b904778b234b387c')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
 /* G33 — song library (offline — CI-asserted, v0.9.0 P3): recipes are
    RECIPES — 3 stored (style,seed,len) recipes compose twice → identical
    JSON + non-empty scenes + length within ±5%. Persistence: the library
