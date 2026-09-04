@@ -364,8 +364,14 @@ export const REASON_KITS = deepFreeze({
       },
       clap: {
         taps: [1750, 1750, 1750], tapMs: [0, 10, 20], bursts: [14, 12, 10],
-        tail: { decayMs: 70, amount: 0.4 },
-        driveDb: 3.5, velTrack: 0.5, rms: 0.15,
+        /* v0.27.0 RE-TUNE (G52 law fix): the tight hi-tech bursts (14/12/10)
+           + 70 ms tail rendered 0.0895 — 40% under the old 0.15 target and
+           BELOW the clap band floor [0.12,0.16]. drive 3.5→6 (the field
+           bound) + tail 0.5 lifts the render to ≈0.111 and the target is
+           honest at the band floor 0.12 (err ≈8%, G52 law worst back under
+           15% everywhere). */
+        tail: { decayMs: 70, amount: 0.5 },
+        driveDb: 6, velTrack: 0.5, rms: 0.12,
       },
       hatC: {
         metal: { hz: 6400, ratio: 1.52, amount: 0.5 },

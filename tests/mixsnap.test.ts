@@ -216,10 +216,11 @@ describe('composer snapshots', () => {
   })
   test('form fingerprint is UNCHANGED by the snapshot pass (patterns untouched)', () => {
     const c = compose('FULL-ON', 3, SEED)
-    /* v0.9.0 REBUILD VALUE: the fingerprint moved from d0c5f32f032f2a88
-       (v0.8.0) because the P1 chord progression engine re-tones bass/lead/
-       pad/arp; the snapshot pass itself still touches NO pattern data —
-       the pin's purpose (snapshots don't mutate patterns) is unchanged. */
-    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('bb16ce280ff48f88')
+    /* v0.27.0 REBUILD VALUE: the fingerprint moved from bb16ce280ff48f88
+       (v0.9.0) because the pad legato scheduling + gate bump and the ear-candy
+       pops re-shaped pattern data; the snapshot pass itself still touches NO
+       pattern data — the pin's purpose (snapshots don't mutate patterns) is
+       unchanged. */
+    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('4eaab7523d9195e8')
   })
 })

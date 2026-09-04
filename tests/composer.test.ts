@@ -232,13 +232,11 @@ describe('section variants (v0.7.0 — no identical repeats)', () => {
     expect(p.arranger.steps.reduce((a, s) => a + s.bars, 0)).toBe(136)
     expect(c.form.totalBars).toBe(108)
     expect(c.form.sections.map(s => s.id)).toEqual(SECTION_CHAIN.map(s => s.id))
-    /* base patterns' form fingerprint hash is PINNED per build (Phase 0
-       record); any intentional change to fillSection must consciously update
-       this pin (documented). v0.9.0 REBUILD VALUE: the chord progression
-       engine (P1) re-tones bass/lead/pad/arp — rhythm tracks are byte-
-       identical to v0.8.0 (pinned below) but the fingerprint covers notes on
-       all tracks, so it moved from the v0.8.0 value d0c5f32f032f2a88. */
-    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('bb16ce280ff48f88')
+    /* v0.27.0 REBUILD VALUE: pad legato scheduling + gate bump and the
+       ear-candy pops moved the fingerprint from bb16ce280ff48f88 (v0.9.0).
+       The snapshot pass itself still touches NO pattern data — the pin's
+       purpose (snapshots don't mutate patterns) is unchanged. */
+    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('4eaab7523d9195e8')
   })
   test('pairwise step-difference within EVERY family ≥ VARIANT_DIFF_MIN (0.15), base included', () => {
     for (const styleId of Object.keys(COMPOSER_STYLES)) {
@@ -394,9 +392,14 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
          asserted above; determinism re-proven (double run byte-identical);
          the RHYTHM pins (harmony suite) are UNCHANGED — trans is scene
          metadata, never pattern data. */
-      'FULL-ON': ['40cd42b5f8c1c3ea', '4ba8c7892f244f25', '101778dc977656fa'],
-      'DARK-PSY': ['eb85df67415b9298', 'ddd653d5c6304767', '92e128811d39fcbc'],
-      'PROGRESSIVE': ['3514d67754b217dc', '1e66916ab14e18e9', '158c4e6cfa28905d'],
+      /* v0.27.0 RE-PIN: escalating build fills (psyreason 77ea289), ear-candy
+         bass octave pops (63e1fe3), pad legato scheduling + gate bump
+         (f766049) and the pad-legato gate — whole-project hashes moved.
+         v0.19.0 values recorded in CHANGELOG 0.19.0. Determinism re-proven
+         (double run byte-identical); harmony invariant re-proven (0 viol). */
+      'FULL-ON': ['e75a885028ab3e9c', 'aadce05d24d240e6', '60f432e4984cbda4'],
+      'DARK-PSY': ['152d23dfd353e848', 'dec249d54cafa297', 'dcdee5361a94aab3'],
+      'PROGRESSIVE': ['379c4af5155af77c', 'fbbd3d7ae927c1f1', '887afecad1e4e719'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {
@@ -524,15 +527,17 @@ describe('chord progression engine (v0.9.0 P1)', () => {
     expect(bpms.size).toBe(4)
   })
 
-  test('RHYTHM BYTE-IDENTITY: kick/snare/hat/perc/fx digests == the v0.8.0 pre-P1 pins', () => {
-    /* digests computed from the v0.8.0 composer BEFORE the progression engine
-       landed (Run 17 Phase 0 record) — the progression must never touch them */
+  test('RHYTHM DIGESTS: kick/snare/hat/perc/fx digests == the v0.27.0 pins', () => {
+    /* v0.27.0 RE-PIN: the escalating BUILD/RISER fills intentionally move the
+       SNARE track (that is the feature — quarter→8th→16th escalation).
+       v0.8.0 pre-P1 / v0.9.0 values recorded in CHANGELOG. The digest law is
+       unchanged: rhythm tracks move ONLY through documented composer edits. */
     const pins: Record<string, string> = {
-      'FULL-ON/3': 'f8521d29b8ea1bc9', 'FULL-ON/5': 'b84595799b478fae', 'FULL-ON/8': '5fd38f07364c6bf8',
-      'DARK-PSY/3': 'aa09488bfb518051', 'DARK-PSY/5': 'b584b7ac3bb77584', 'DARK-PSY/8': '99ce50d3e6a73896',
-      'PROGRESSIVE/3': '591bec94b770827a', 'PROGRESSIVE/5': '6ec6c6ca94d5ae1d', 'PROGRESSIVE/8': 'dd9f4e0e08e02196',
-      'FOREST/3': '3eaf8951847357f7', 'FOREST/5': '7f27e3a59925b49e', 'FOREST/8': 'c64ad8439123897a',
-      'HI-TECH/3': '6519db783cca9a71', 'HI-TECH/5': '873ae2749bcea630', 'HI-TECH/8': '4c551cad7e670523',
+      'FULL-ON/3': '45c7137dd775a135', 'FULL-ON/5': '49195c67794491fd', 'FULL-ON/8': '8f89c21b60fba366',
+      'DARK-PSY/3': '9f4648dc3c25cb2e', 'DARK-PSY/5': '620bb94065355a49', 'DARK-PSY/8': '6ec4494beff9ef6d',
+      'PROGRESSIVE/3': '8da7f69a570d81c1', 'PROGRESSIVE/5': 'acc2deeafee7bd93', 'PROGRESSIVE/8': 'bebeed3bdde70b15',
+      'FOREST/3': 'b411e90ea880ea34', 'FOREST/5': '2e6b5813d9688b38', 'FOREST/8': 'ae52a14689fe0692',
+      'HI-TECH/3': '6db83aae1497419a', 'HI-TECH/5': '16bfb5488722c410', 'HI-TECH/8': 'ae43088abc0c9968',
     }
     for (const [key, want] of Object.entries(pins)) {
       const [styleId, mStr] = key.split('/')

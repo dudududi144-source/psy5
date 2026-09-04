@@ -272,6 +272,22 @@ async function main() {
         await sleep(1000);
       }
     }
+    /* v0.27.0 FINAL-COLLECTION RETRY — the page can print its verdict line
+       while the driver's last __psy6Gates snapshot is STALE: a poll that
+       landed mid-G52 (the heaviest gate — 48 offline renders) can throw,
+       and the inner keep-last leaves a pre-G52 copy. The page is alive and
+       done; re-collect up to 5×1 s until EXPECTED coverage (G17/G25 are
+       evidence-only) or retries exhaust. This is what the v0.26.0 CI
+       failure (missing: ["G52"], verdictLine 49/50) actually was. */
+    for (let tries = 0; tries < 5; tries++) {
+      try {
+        const arr = JSON.parse(await cdp.eval(`JSON.stringify(window.__psy6Gates||[])`));
+        if (Array.isArray(arr) && arr.length > lastGates.length) lastGates = arr;
+        const have = new Set(lastGates.map((g) => g.id));
+        if (EXPECTED.every((id) => have.has(id))) break;
+      } catch { /* page busy or gone — retry */ }
+      await sleep(1000);
+    }
     const gates = lastGates.map((g) => ({ id: g.id, claim: g.claim, pass: g.pass, ev: g.ev || '', ms: g.ms || 0 }));
 
     const byId = new Map(gates.map((g) => [g.id, g]));

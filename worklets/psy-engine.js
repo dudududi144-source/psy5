@@ -806,7 +806,11 @@ class PadVoice {
     if (!this.active) return [0, 0, true];
     const dt = 1 / sr;
     this.t += dt;
-    if (this.t > this.dur + 0.1) { this.active = false; return [0, 0, true]; }
+    /* v0.27.0 LEGATO (psyreason f766049): hold at level through the note,
+       then release 0.6 s PAST the end — consecutive notes crossfade into a
+       continuous bed instead of the per-bar re-pluck stutter. */
+    const REL = 0.6;
+    if (this.t > this.dur + REL + 0.05) { this.active = false; return [0, 0, true]; }
 
     // Evolve LFO modulates detune (via frequency)
     this.lfoPhase += this.evolveRate * dt;
@@ -842,10 +846,10 @@ class PadVoice {
     left = filteredMid + side;
     right = filteredMid - side;
 
-    // Slow attack/release envelope
-    const attackEnv = Math.min(1, this.t / this.attack);
-    const releaseEnv = Math.min(1, (this.dur - this.t) / 0.4);
-    const ampEnv = Math.max(0, Math.min(1, Math.min(attackEnv, releaseEnv)));
+    // Legato envelope: attack → hold through the note → release past the end
+    const ampEnv = this.t <= this.dur
+      ? Math.min(1, this.t / this.attack)
+      : Math.max(0, 1 - (this.t - this.dur) / REL);
     return [left * ampEnv * this.amp, right * ampEnv * this.amp, false];
   }
 }

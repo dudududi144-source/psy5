@@ -278,6 +278,11 @@ function fillSection(p, pat, section, bars, energy, ctx) {
   } else {
     for (let b = 0; b < len / 16; b++) { put(pat, 4, b * 16, 0.8, chordRootAt(b)); put(pat, 4, b * 16 + 8, 0.75, chordRootAt(b)) }
   }
+  /* v0.27.0 NOTE — psyreason's bass passing tones (788c400) were evaluated
+     and REJECTED: psy5's bass law is stricter (every bass note = the chord
+     ROOT — the evolution roll-op contract in evolution.test.ts depends on
+     it). The octave pops above carry the phrase-ending gesture instead.
+     Drops keep their octave pops instead. */
   /* HATS — offbeat core, 16th ghosts as energy rises (density per recipe) */
   if (energy >= 0.35) {
     for (let b = 0; b < len / 16; b++) for (const o of [2, 6, 10, 14]) put(pat, 2, b * 16 + o, 0.45 + energy * 0.2)
@@ -309,13 +314,20 @@ function fillSection(p, pat, section, bars, energy, ctx) {
       }
     }
   }
-  /* PAD — sustained chord voicings when the mix has room (v0.9.0: root +
-     fifth of the active bar's chord — positions/velocities unchanged) */
+  /* PAD — sustained chord voicings when the mix has room. v0.27.0 LEGATO
+     (ported from psyreason f766049): the pad re-fires only when the chord
+     CHANGES — consecutive bars of the same chord hold one voice and the
+     preset release crossfades it into the next chord. Combined with the
+     bar-spanning gate (compose() pad gate bump) this kills the per-bar
+     "pulsing organ" stutter: one breathing bed instead of re-plucks. */
   if (energy < 0.6 || sec === 'BREAK') {
+    let prevCd = null;
     for (let b = 0; b < len / 16; b++) {
       const cd = chordDegreeAt(prog, b);
+      if (cd === prevCd) continue;
       put(pat, 6, b * 16, 0.35, root + 12 + degreeToSemitone(scaleIv, cd));
       if (len >= 64) put(pat, 6, b * 16 + 8, 0.3, root + 12 + degreeToSemitone(scaleIv, cd + 4));
+      prevCd = cd;
     }
   }
   /* ARP — hypno 16ths only at peak energy (v0.9.0: cycles the active bar's
@@ -328,10 +340,34 @@ function fillSection(p, pat, section, bars, energy, ctx) {
   /* FX — riser sweeps through the RISER section, spacing per recipe
      (default one per 2 bars; HI-TECH one per bar — aggressive placement) */
   if (sec === 'RISER') { for (let s = 0; s < len; s += (rc.riserEvery || 32)) put(pat, 8, s, 0.8) }
-  /* FILL — snare roll ending BUILD and RISER (last bar, rising velocity) */
+  /* FILL — ESCALATING BUILD FILL ending BUILD and RISER (v0.27.0, ported
+     from psyreason 77ea289): professional DJ tension — penultimate bar =
+     quarter-note snare, last bar = 8ths tightening into a 16th roll with
+     RISING velocity. Two bars of escalation instead of one flat roll.
+     Fully deterministic (no rng). */
   if (sec === 'BUILD' || sec === 'RISER') {
-    const fb = len - 16;
-    for (let k = 0; k < 16; k++) put(pat, 1, fb + k, 0.3 + (k / 16) * 0.6)
+    if (len >= 32) {
+      const q = len - 32;
+      for (const o of [0, 4, 8, 12]) put(pat, 1, q + o, 0.42);
+      const fb = len - 16;
+      for (let k = 0; k < 8; k++) put(pat, 1, fb + k * 2, 0.5 + k * 0.03);
+      for (let k = 0; k < 8; k++) put(pat, 1, fb + 8 + k, 0.62 + (k / 8) * 0.38);
+    } else {
+      const fb = len - 16;
+      for (let k = 0; k < 4; k++) put(pat, 1, fb + k * 4, 0.42 + k * 0.04);
+      for (let k = 0; k < 4; k++) put(pat, 1, fb + 4 + k * 2, 0.58 + k * 0.04);
+      for (let k = 0; k < 8; k++) put(pat, 1, fb + 8 + k, 0.7 + (k / 8) * 0.3);
+    }
+  }
+  /* EAR CANDY — bass octave pops (v0.27.0, ported from psyreason 63e1fe3):
+     the last bar of every 4-bar phrase lifts the tail roll an octave with
+     a small velocity boost — a composed phrase-ending gesture, not a loop. */
+  if (sec === 'DROP' || sec === 'DROP2') {
+    const db = pat.data[4];
+    if (db) for (let b = 3; b < db.len / 16; b += 4) for (const o of [13, 15]) {
+      const st = db.steps[b * 16 + o];
+      if (st.on) { st.note = Math.min(108, st.note + 12); st.vel = Math.min(1, st.vel + 0.08) }
+    }
   }
   return pat;
 }
@@ -558,6 +594,10 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
     const pr = libFind(style.presets[key]);
     if (pr) assignPresetToTrack(p, +ti, pr);
   }
+  /* v0.27.0 PAD LEGATO GATE — the pad note's gate stretches to span the bar
+     and release past it (noteOn: dur = stepDur*gate*2): the pad rings UNDER
+     the next chord's attack → continuous crossfade bed (psyreason f766049). */
+  if (p.tracks[6] && p.tracks[6].sound && p.tracks[6].sound.gate != null) p.tracks[6].sound.gate = Math.max(p.tracks[6].sound.gate, 9);
   /* 2b. TRANZ carrier (v0.19.0) — a 10th drum track whose TYPE is the one
      the kit's FX lane does NOT carry (fx=riser → TRANZ=impact; fx=impact
      [TRANCE] → TRANZ=riser), so EVERY composed project can fire both build
