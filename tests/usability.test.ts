@@ -66,10 +66,15 @@ describe('a11y — label associations (v0.13.1 regression guard)', () => {
 })
 
 describe('demo songs', () => {
+  /* v0.26.0 SHOWCASE — the roast (#1): file/test/button used to disagree on
+     DARK-PSY (file 777, button 90210). One identity per demo now: the 8-minute
+     full-form version, seeded from the READY_SEEDS table (library.js). The
+     coherence test below statically pins the BUTTON to the FILE so this
+     drift class is dead. */
   const demos = [
-    { file: 'data/demos/demo-fullon.json', style: 'FULL-ON', minutes: 3, seed: 424242 },
-    { file: 'data/demos/demo-darkpsy.json', style: 'DARK-PSY', minutes: 5, seed: 777 },
-    { file: 'data/demos/demo-forest.json', style: 'FOREST', minutes: 3, seed: 424242 },
+    { file: 'data/demos/demo-fullon.json', style: 'FULL-ON', minutes: 8, seed: 424242, id: 'bDemoFull' },
+    { file: 'data/demos/demo-darkpsy.json', style: 'DARK-PSY', minutes: 8, seed: 90210, id: 'bDemoDark' },
+    { file: 'data/demos/demo-forest.json', style: 'FOREST', minutes: 8, seed: 1337, id: 'bDemoForest' },
   ]
   test('demo files exist and are valid composer recipes', () => {
     for (const d of demos) {
@@ -102,7 +107,21 @@ describe('demo songs', () => {
       expect(I.p.tracks.length).toBe(10)
     }
   })
-  test('the two demos use different styles', () => {
-    expect(demos[0].style).not.toBe(demos[1].style)
+  test('the three demos use different styles AND different seeds', () => {
+    const styles = new Set(demos.map(d => d.style))
+    const seeds = new Set(demos.map(d => d.seed))
+    expect(styles.size).toBe(3)
+    expect(seeds.size).toBe(3)
+  })
+  test('the demo BUTTON wiring plays the demo FILE song (roast #1 regression guard)', () => {
+    const mainJs = readFileSync('js/main.js', 'utf8')
+    for (const d of demos) {
+      /* the wiring must be composeBoot(style, minutes, seed) with the file's identity */
+      const re = new RegExp("composeBoot\\('" + d.style + "'," + d.minutes + ',' + d.seed + "\\)")
+      expect(re.test(mainJs)).toBe(true)
+    }
+    /* and the seeds must come from the READY_SEEDS import — no local duplicate table */
+    expect(mainJs.includes('SET_SEEDS')).toBe(false)
+    expect(mainJs.includes('READY_SEEDS')).toBe(true)
   })
 })

@@ -1,42 +1,42 @@
 {
  "kind": "psy6-demo",
- "v": 1,
- "note": "Deterministic PSY6 composer recipe — the client recomposes byte-identically from style/minutes/seed (js/composer.js). Loading boots into memory only.",
+ "v": 2,
+ "note": "PSY6 SHOWCASE \u2014 deterministic composer recipe: the client recomposes byte-identically from style/minutes/seed (js/composer.js). This file, the boot SHOWCASE button and tests/usability.test.ts pin the SAME song identity. v0.26.0: the 8-minute full-form version (the v0.25.0 demo drift \u2014 file/test/button disagreeing \u2014 is roasted and fixed in docs/ENGINEERING-ROAST.md #1).",
  "style": "DARK-PSY",
- "minutes": 5,
- "seed": 777,
+ "minutes": 8,
+ "seed": 90210,
  "form": {
   "sections": [
    {
     "id": "INTRO",
-    "bars": 24
-   },
-   {
-    "id": "BUILD",
-    "bars": 24
-   },
-   {
-    "id": "DROP",
     "bars": 36
    },
    {
+    "id": "BUILD",
+    "bars": 36
+   },
+   {
+    "id": "DROP",
+    "bars": 60
+   },
+   {
     "id": "BREAK",
-    "bars": 24
+    "bars": 36
    },
    {
     "id": "RISER",
-    "bars": 20
+    "bars": 28
    },
    {
     "id": "DROP2",
-    "bars": 32
+    "bars": 64
    },
    {
     "id": "OUTRO",
-    "bars": 24
+    "bars": 36
    }
   ],
-  "totalBars": 184,
-  "lengthSec": 298.38
+  "totalBars": 296,
+  "lengthSec": 480.0
  }
 }

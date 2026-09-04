@@ -164,3 +164,19 @@ h3{font-size:12px}
 .cols{gap:8px}
 header select{max-width:90px}
 }
+
+/* ── v0.26.0 PRODUCT FINISH — power screen hierarchy (roast fix #5) ──
+   The entrance is a product surface now: hero → genre grid → two-column
+   SHOWCASE / ADVANCED row → engine A/B demoted to a secondary footnote. */
+#power .powTag{color:var(--dim);font-size:10px;letter-spacing:.2em}
+#power .powLead{max-width:560px;text-align:center}
+#power .powRow{display:flex;gap:26px;align-items:flex-start;justify-content:center;flex-wrap:wrap;max-width:980px}
+#power .powCol{display:flex;flex-direction:column;gap:7px;align-items:center}
+#power .powLabel{font-size:8.5px;color:var(--dim);letter-spacing:.16em;text-transform:uppercase}
+#power .powInline{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center}
+#power .powSec{opacity:.72;transition:opacity .15s}
+#power .powSec:hover{opacity:1}
+#power .powSec .styles button{padding:9px 16px;font-size:11px}
+#power .powSec .note{font-size:10px;max-width:540px}
+#demoRow button{border-color:#3a4456}
+@media(max-width:760px){#power .powRow{flex-direction:column;align-items:center;gap:14px}}

@@ -31,6 +31,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { globSync } from 'node:fs';
+import { MAIN_GATE_IDS as EXPECTED } from '../js/gates-manifest.js'; /* v0.26.0: the manifest is the single source (roast fix #9) — the hand-listed copy is gone */
 
 const ROOT = path.resolve(new URL('.', import.meta.url).pathname, '..');
 const args = process.argv.slice(2);
@@ -45,11 +46,8 @@ const OUT = opt('--out', null);
 const SKIP = (opt('--skip', null) || '').split(',').map(x => x.trim()).filter(Boolean);
 const GATE_TIMEOUT = parseInt(opt('--timeout', '1800000'), 10); /* v0.12.0: the suite grew again (G39-G41 heavy offline renders) — 1800 s headroom; the CI gates job carries an explicit timeout-minutes */
 
-const EXPECTED = [
-  'G1-TECHNO', 'G1-PSYTRANCE', 'G1-TRANCE', 'G1-PROGRESSIVE',
-  'G2', 'G5', 'G6', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23', 'G24', 'G26', 'G27', 'G28', 'G29', 'G30', 'G31', 'G32', 'G33', 'G34', 'G35', 'G36', 'G37', 'G38', 'G39', 'G40', 'G41', 'G42', 'G43', 'G44', 'G45', 'G46', 'G47', 'G48', 'G49', 'G50', 'G51',
-];
-/* G17 (live capture, v0.4.0) and G25 (record song, v0.6.0) are REALTIME —
+/* EXPECTED comes from js/gates-manifest.js — v0.26.0 single source of truth.
+   G17 (live capture, v0.4.0) and G25 (record song, v0.6.0) are REALTIME —
    they run on-device (evidence-only) but are explicitly NOT asserted in CI
    (documented subset boundary). Both reuse the ScriptProcessor tap on the
    master output and depend on wall-clock scheduling. */

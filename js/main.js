@@ -1,6 +1,7 @@
 import { $, toast, I, K_MAIN, loadStored, loadProjectObj } from './state.js';
 import { compose, COMPOSER_STYLES } from './composer.js';
-import { readyAlbum } from './library.js';
+import { readyAlbum, READY_SEEDS } from './library.js'; /* v0.26.0: ONE seed table (roast fix #2 — the local duplicate table is gone) */
+import { MAIN_GATE_COUNT } from './gates-manifest.js'; /* v0.26.0: the boot copy can never drift from the suite again (roast fix #3) */
 import { renderHeader, wireHeader } from './ui/header.js';
 import { renderLibrary, wireLibrary } from './ui/library.js';
 import { renderScenes, renderPads, renderTracks, renderLayers, renderMacros, wirePerform } from './ui/perform.js';
@@ -42,12 +43,25 @@ function renderLoop(){requestAnimationFrame(renderLoop);if(I.p&&I.sched.on){rend
 setInterval(()=>{const el=$('loadMeter');if(!el)return;if(!I.eng||I.engine!=='main'||!I.eng.loadSnapshot){el.textContent='LOAD —';return}const l=I.eng.loadSnapshot();const cap=l.pools.synth+l.pools.drum;const load=cap?l.active/cap:0;const txt='LOAD '+(load*100).toFixed(0)+'% · '+l.synth+'/'+l.drum+'/'+l.samples+' · ST'+l.steals+' · T0'+l.tier0StealAttempts+' · '+l.latencyMs+'ms · RK'+l.reasonSpawns+'/'+l.reasonFallbacks+' · '+l.kitId;if(el.textContent!==txt)el.textContent=txt;el.style.color=(load>=.75||l.tier0StealAttempts>0)?'#ff5d5d':(load>=.4?'#ffb84f':'')},250);
 setInterval(()=>{if(!I.eng||!I.eng.analyser)return;const an=I.eng.analyser;if(!I._md)I._md=new Uint8Array(an.frequencyBinCount);an.getByteTimeDomainData(I._md);let pk=0;for(const v of I._md){const a=Math.abs(v-128)/128;if(a>pk)pk=a}const cv=$('meter'),g=cv.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,cv.width,cv.height);g.fillStyle=pk>.9?'#ff5d5d':'#4fd6c0';g.fillRect(0,8,pk*cv.width,10)},150);
 
-async function powerOn(style,resume){const AC=window.AudioContext||window.webkitAudioContext;const ctx=new AC({latencyHint:'interactive'});I.ctx=ctx;try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
+/* ── v0.26.0 ROAST FIX #8 — powerOn() split into named single-concern steps.
+   The v0.25.0 function mixed six concerns in ~40 dense lines (context + engine
+   A/B + project priority + kit warm + wiring + start). Behavior is unchanged —
+   the same gates assert the same boot — the code is just human-shaped now. */
+
+async function bootAudio(){const AC=window.AudioContext||window.webkitAudioContext;const ctx=new AC({latencyHint:'interactive'});I.ctx=ctx;try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
 /* engine A/B (PSY6): MAIN pooled engine = default + reference · WORKLET = opt-in experimental */
 if(I.engineSel==='worklet'){try{I.eng=await mkWorkletEngine(ctx);I.engine='worklet'}catch(e){I.engine='main';I.eng=new PooledEngine(ctx);toast('WORKLET BOOT FAILED → MAIN ENGINE')}}else{I.engine='main';I.eng=new PooledEngine(ctx)}/* v0.13.0: preload the psy-dsp worklet module (MOOG insert) best-effort — live playback gets the real ladder; unloadable → honest per-track biquad fallback (counted) */
 try{prepInsertDSP(ctx)}catch(e){}
-try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
-let p=null;if(resume)p=loadStored();if(!p&&I.pendingCompose){p=I.pendingCompose;I.pendingCompose=null}if(!p&&I.pendingShare){p=I.pendingShare;I.pendingShare=null}if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;loadProjectObj(p);/* backfill (midiMap/masterVol/sc/fx) — idempotent, sets I.p to the same object *//* v0.24.0 REASON KIT warm — the kit list (20 types: 8 reason engines + 12 kit ROM roles) rendered NOW at power-on, idle-sliced so the boot frame never blocks. It runs AFTER the project load so the PROJECT'S kit is the one warmed (the render cache keys on kitId — warming the default kit would miss a stored/pinned kit). The idle callback guards engine loss. */if(I.eng&&I.eng.warmRom){const WARM=kitWarmTypes((I.p&&I.p.kit)||DEFAULT_KIT);let wi=0;const warmStep=()=>{if(!I.eng||!I.eng.warmRom)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(wi<WARM.length){I.eng.romBuffer(WARM[wi++]);warmStep()}}catch(e){}})};warmStep()}I.upAt=Date.now();I.eng.syncMix(p);hydrateProjectSamples();if(I.pendingHints){I.pendingHints=false;applyComposerSampleHints({sampleHints:p.sampleHints})}/* v0.10.0: composed-boot sample hints *//* v0.10.0: pull referenced samples into the engine cache (missing → synth fallback + one-shot toast) */$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireLibrary();wireMidi();wireCapture();wireLanes();wireCompose();wireSamples();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();/* composed boot: land on Perform with the arranger running */if(I.composedLoad){try{arrToggle(true)}catch(e){};const f=I.composedLoad;I.composedLoad=null;toast('COMPOSED ✓ '+f.style+' · '+f.totalBars+' bars · '+f.lengthSec.toFixed(0)+'s · seed '+f.seed)}else toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
+try{if(ctx.state==='suspended')ctx.resume()}catch(e){}}
+
+function bootProject(style,resume){let p=null;if(resume)p=loadStored();if(!p&&I.pendingCompose){p=I.pendingCompose;I.pendingCompose=null}if(!p&&I.pendingShare){p=I.pendingShare;I.pendingShare=null}if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;loadProjectObj(p);/* backfill (midiMap/masterVol/sc/fx) — idempotent, sets I.p to the same object */}
+
+/* v0.24.0 REASON KIT warm — the kit list (20 types: 8 reason engines + 12 kit ROM roles) rendered at power-on, idle-sliced so the boot frame never blocks. It runs AFTER the project load so the PROJECT'S kit is the one warmed (the render cache keys on kitId — warming the default kit would miss a stored/pinned kit). The idle callback guards engine loss. */
+function bootWarmKit(){if(!(I.eng&&I.eng.warmRom))return;const WARM=kitWarmTypes((I.p&&I.p.kit)||DEFAULT_KIT);let wi=0;const warmStep=()=>{if(!I.eng||!I.eng.warmRom)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(wi<WARM.length){I.eng.romBuffer(WARM[wi++]);warmStep()}}catch(e){}})};warmStep()}
+
+function bootStart(style){I.upAt=Date.now();I.eng.syncMix(I.p);hydrateProjectSamples();if(I.pendingHints){I.pendingHints=false;applyComposerSampleHints({sampleHints:I.p.sampleHints})}/* v0.10.0: composed-boot sample hints *//* v0.10.0: pull referenced samples into the engine cache (missing → synth fallback + one-shot toast) */$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireLibrary();wireMidi();wireCapture();wireLanes();wireCompose();wireSamples();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();/* composed boot: land on Perform with the arranger running */if(I.composedLoad){try{arrToggle(true)}catch(e){};const f=I.composedLoad;I.composedLoad=null;toast('COMPOSED ✓ '+f.style+' · '+f.totalBars+' bars · '+f.lengthSec.toFixed(0)+'s · seed '+f.seed)}else toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
+
+async function powerOn(style,resume){await bootAudio();bootProject(style,resume);bootWarmKit();bootStart(style)}
 
 /* ── READY SET boot (v0.17.0) — the owner: the user must receive the system
    ORGANIZED and READY TO PERFORM, never empty. Every genre button composes a
@@ -65,20 +79,26 @@ I.pendingCompose=r.project;I.composedLoad=r.form;await powerOn(style,false)}catc
 (function boot(){const sp=$('stylePicker');
 /* HERO — the one-press entrance: a complete arranged set, playing now */
 const hero=document.createElement('button');hero.className='heroBtn';hero.textContent='▶ ENTER — READY SET · FULL-ON · 3:00 ARRANGED';hero.title='Boots a COMPLETE deterministic set: intro→build→drop→break→riser→drop2→outro, scenes + transitions + arranger + a preseeded song album. Press PLAY-grade ready — not empty.';hero.onclick=()=>composeBoot('FULL-ON',3,424242);sp.appendChild(hero);
-const SET_SEEDS={'FULL-ON':424242,'DARK-PSY':90210,'PROGRESSIVE':74747,'FOREST':1337,'HI-TECH':99999,'PSYTRANCE':5150,'GOA':1994,'TECHNO':80808,'TRANCE':31337};
-Object.keys(COMPOSER_STYLES).forEach(st=>{const b=document.createElement('button');b.textContent='⚡ '+st+' SET';b.title='READY SET — a complete arranged '+COMPOSER_STYLES[st].bpm+' BPM '+st+' set (3 min, deterministic seed '+SET_SEEDS[st]+') with scenes, transitions and the arranger pre-built. Not empty — ready to perform.';b.onclick=()=>composeBoot(st,3,SET_SEEDS[st]);sp.appendChild(b)});
+Object.keys(COMPOSER_STYLES).forEach(st=>{const b=document.createElement('button');b.textContent='⚡ '+st+' SET';b.title='READY SET — a complete arranged '+COMPOSER_STYLES[st].bpm+' BPM '+st+' set (3 min, deterministic seed '+READY_SEEDS[st]+') with scenes, transitions and the arranger pre-built. Not empty — ready to perform.';b.onclick=()=>composeBoot(st,3,READY_SEEDS[st]);sp.appendChild(b)});
 const empty=document.createElement('button');empty.textContent='∅ BARE SKETCH';empty.title='The minimal skeleton (no scenes, no arranger) — for sketching from scratch.';empty.onclick=()=>powerOn('EMPTY',false);sp.appendChild(empty);
 /* engine selector — MAIN is the default (zero behavior change); WORKLET is opt-in */
 const ep=$('enginePicker');I.engineSel='main';
-const mkEng=(id,label,title)=>{const b=document.createElement('button');b.textContent=label;b.title=title;b.dataset.eng=id;b.onclick=()=>{I.engineSel=id;Array.from(ep.children).forEach(x=>x.classList.toggle('on',x.dataset.eng===id));$('engNote').textContent=id==='worklet'?'WORKLET — experimental. Honest limitations: '+WORKLET_LIMITATIONS.join(' · '):'MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (19 checks).'};ep.appendChild(b);return b};
+const MAIN_NOTE='MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate — '+MAIN_GATE_COUNT+' CI-asserted checks (run them in the Self-Gate tab).';
+const mkEng=(id,label,title)=>{const b=document.createElement('button');b.textContent=label;b.title=title;b.dataset.eng=id;b.onclick=()=>{I.engineSel=id;Array.from(ep.children).forEach(x=>x.classList.toggle('on',x.dataset.eng===id));$('engNote').textContent=id==='worklet'?'WORKLET — experimental. Honest limitations: '+WORKLET_LIMITATIONS.join(' · '):MAIN_NOTE};ep.appendChild(b);return b};
 mkEng('main','⬤ MAIN (default)','Pooled engine — default').classList.add('on');
 mkEng('worklet','⚙ WORKLET (experimental)','AudioWorklet engine — reduced feature set, reduced self-gate');
-$('engNote').textContent='MAIN — pooled voices + worker-timed scheduler. Default and reference engine; full Self-Gate (19 checks).';
+$('engNote').textContent=MAIN_NOTE;
 try{if(localStorage.getItem(K_MAIN))$('resumeBtn').style.display=''}catch(e){}$('resumeBtn').onclick=()=>powerOn(null,true);
-/* DEMOS: the same READY SET path now (recipes recompose deterministically client-side; loads into memory only) */
-$('bDemoFull').onclick=()=>composeBoot('FULL-ON',3,424242);
-$('bDemoDark').onclick=()=>composeBoot('DARK-PSY',5,90210);
-$('bDemoForest').onclick=()=>composeBoot('FOREST',3,1337);wireCompose();/* power-screen COMPOSE row must be live before boot */
+/* v0.26.0 SHOWCASE demos (roast fix #1): the boot button plays EXACTLY the song
+   data/demos/<file> pins and tests/usability.test.ts certifies — one identity,
+   the 8-minute full-form version, seeds from the READY_SEEDS table. */
+$('bDemoFull').onclick=()=>composeBoot('FULL-ON',8,424242);
+$('bDemoDark').onclick=()=>composeBoot('DARK-PSY',8,90210);
+$('bDemoForest').onclick=()=>composeBoot('FOREST',8,1337);wireCompose();/* power-screen COMPOSE row must be live before boot */
+/* help overlay — backdrop click + close button wired here (v0.26.0 roast fix #6:
+   the two inline onclick= attributes are gone from index.html; the product
+   carries zero inline JS) */
+(function(){const ho=$('helpOverlay');if(ho)ho.onclick=e=>{if(e.target===ho)ho.style.display='none'};const bc=$('bHelpClose');if(bc)bc.onclick=()=>window.__psy6ToggleHelp&&window.__psy6ToggleHelp()})();
 /* help overlay from the shortcut registry (single source of truth) */
 (function(){const hb=$('helpBody');if(!hb)return;hb.innerHTML=helpRows().map(g=>'<div style="margin:6px 0"><div class="mono" style="font-size:9px;color:var(--acc2)">'+g.group.toUpperCase()+'</div>'+g.items.map(it=>'<div style="display:flex;gap:8px;font-size:11px;padding:1px 0"><span class="mono" style="min-width:70px;color:var(--acc)">'+it.key+'</span><span style="color:#fffa">'+it.label+'</span></div>').join('')+'</div>').join('');const b=$('bHelp');if(b)b.onclick=()=>window.__psy6ToggleHelp&&window.__psy6ToggleHelp()})();
 /* share-link consent (v0.4.0): #p= present → banner with LOAD SHARE / DISMISS.
