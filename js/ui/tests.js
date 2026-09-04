@@ -1410,7 +1410,6 @@ const cOver=bandShare48(cdx,744,920,.02);
    buffer (engine-independent — the glue comp reshapes it downstream BY
    DESIGN). Same law as the audit tool: measure the renderer. */
 const raw48=renderRomPcm('conga',SR48);const rAtk48=rms48(raw48,0,.012),rBody48=rms48(raw48,.05,.08);
-const romLive48=engs48.reduce((s,e)=>s+e.romSpawns,0)>=5&&engs48.every(e=>e.romFallbacks===0);
 const bon=await mk48({type:'bongo',tune:1,decay:1,tone:1,punch:.5},.5);
 const bOver=bandShare48(bon.getChannelData(0),1080,1280,.02);
 const tom=await mk48({type:'tom',tune:1,decay:1},.8),tom2=await mk48({type:'tom',tune:1,decay:1},.8);const tdx=tom.getChannelData(0);
@@ -1421,6 +1420,11 @@ const k1=await mk48({type:'clave',tune:1,tone:1,punch:.8},.2),k0=await mk48({typ
 const kDiff=md48(k1,k0);
 const pk48=Math.min(peak48(cdx),peak48(bon.getChannelData(0)),peak48(tdx),peak48(w1.getChannelData(0)),peak48(k1.getChannelData(0)));
 const det48=Math.max(md48(con,con2),md48(tom,tom2));
+/* romLive48 MUST be computed AFTER every mk48 call — it asserts the SUM
+   over the gate's engines (an early computation sees 2 engines, fails the
+   >=5 spawns law, and the gate reports false while its own evidence line
+   shows 7/0 — the CI bug this line fixes) */
+const romLive48=engs48.reduce((s,e)=>s+e.romSpawns,0)>=5&&engs48.every(e=>e.romFallbacks===0);
 const rawRatio48=rAtk48/Math.max(rBody48,1e-12);
 const ok48=cOver>=.03&&rawRatio48>=1.2&&romLive48&&bOver>=.012&&tEarly>1.4*tLate&&wDiff>1e-3&&kDiff>1e-3&&pk48>.05&&det48<1e-6;
 gate('G48','percussion ROM v3: conga membrane-band(744-920Hz) share>=.03 through the engine + ROM raw strike-leads-body RMS(0-12ms)/RMS(50-80ms)>=1.2 + ROM path live (spawns>=5, fallbacks=0), bongo band(1080-1280Hz) share>=.012, tom bend-band(200-320)>1.4x glide-band(80-130), cowbell tone tilt audible md>1e-3, clave punch accent audible md>1e-3, all peak>.05, determinism<1e-6',ok48,'cOver '+cOver.toFixed(3)+' | raw atk/body '+rawRatio48.toFixed(2)+' | rom sp/fb '+engs48.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs48.reduce((s,e)=>s+e.romFallbacks,0)+' | bOver '+bOver.toFixed(3)+' | tom '+tEarly.toExponential(1)+'/'+tLate.toExponential(1)+'='+(tEarly/Math.max(tLate,1e-12)).toFixed(2)+' | w '+wDiff.toExponential(1)+' | k '+kDiff.toExponential(1)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','percussion v3',false,'ERR '+e.message)}}
