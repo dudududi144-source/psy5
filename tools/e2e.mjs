@@ -157,9 +157,17 @@ class CDP {
     });
   }
   async eval(expr) {
-    const r = await this.send('Runtime.evaluate', {
-      expression: expr, returnByValue: true, awaitPromise: true,
-    });
+    /* v0.26.0: liveness guard — if the browser died (OOM under memory
+       pressure, crash), ws.send never resolves and waitFor's own timeout
+       would never fire (it only checks BETWEEN evals). Race every eval
+       against a hard ceiling so the driver fails honestly instead of
+       hanging forever. */
+    const r = await Promise.race([
+      this.send('Runtime.evaluate', {
+        expression: expr, returnByValue: true, awaitPromise: true,
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('eval stalled (browser dead?) — ' + expr.slice(0, 60))), 120000)),
+    ]);
     if (r.exceptionDetails) throw new Error('eval: ' + (r.exceptionDetails.exception?.description || r.exceptionDetails.text));
     return r.result && 'value' in r.result ? r.result.value : undefined;
   }
