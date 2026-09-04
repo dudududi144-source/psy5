@@ -53,8 +53,20 @@ reproducible with the command shown next to it.
   bootStart; behavior identical, the same gates assert the same boot.
 - **Standing debt (documented)** — doc-number docgen, new kit sound design,
   worklet feature parity.
-- **Tests**: 657 → **665** across 52 files (gates-manifest reconciliation
-  suite + demo coherence guards). `verify` GREEN. SW `psy6-v0.26.0`.
+- **Harness honesty (found by this run's own verification loop)** — three
+  infra specimens fixed: (1) the `readyState==='complete'` boot race
+  (about:blank is also 'complete' — both harnesses now wait for the real
+  app marker); (2) a dead browser stalled the driver forever (every eval
+  now races a 120 s ceiling); (3) gate evidence is STREAMED —
+  `window.__psy6Gates` is assigned after every gate and the driver keeps
+  the last node-side snapshot, so a browser death at suite end can no
+  longer destroy 30+ minutes of earned evidence (observed 3× on a 4 GB
+  box; the old post-verdict collection eval was the exact stall point).
+  Sandbox e2e with v0.26.0: 4-chunk union covers all 49 CI-asserted ids —
+  A1 25/25, A2 16/16 (+2 unreached), A3 3/3, B 7/7 — zero failures.
+- **Tests**: 657 → **666** across 52 files (gates-manifest reconciliation
+  suite + demo coherence guards + kit canonical-lookup guards). `verify`
+  GREEN. SW `psy6-v0.26.0`.
 
 ## [0.25.0] — Run 24: STRATIFICATION II — no more lonely options
 
