@@ -1472,7 +1472,7 @@ const cr=await mk49(CRS,3.4),cr2=await mk49(CRS,3.4);const crx=cr.getChannelData
    Measured (bun, renderReasonPcm renderer): mid/early .084–.360 per kit,
    1.5–12k share .977+ — the engine render keeps the peak+determinism evidence. */
 const crRaw=renderReasonPcm('crash',kitPatch('psy-classic','crash'),SR49,0,2);
-const crEarly=rms49(crRaw,.05,.3),crMid=rms49(crRaw,1.0,2.0),crTop=bandShare49(crRaw,4000,12000,.05);/* window .05s in — offset 0 lands ON the strike (low-HF), the wash lives from .05 */
+const crEarly=rms49(crRaw,.05,.3),crMid=rms49(crRaw,1.0,2.0),crTop=bandShare49(crRaw,4000,SR49/2-100,.05);/* window .05s in (past the strike); band 4k→Nyquist — the ring-mod wash concentrates ABOVE 12k (4-12k alone = .30, 4k+ = .82 measured; the v0.23 modal bank was mid-heavy, this engine is brighter by design) */
 const rv=await mk49({type:'revcym',tune:1,decay:1,tone:1,punch:.6},2.2);const rvx=rv.getChannelData(0);
 const rvLo=rms49(rvx,.05,.3),rvHi=rms49(rvx,1.0,1.45),rvCut=rms49(rvx,1.66,1.96);
 const AGS={type:'agogo',tune:1,decay:1,tone:1.2,punch:.4};
@@ -1483,7 +1483,7 @@ const tbPing=bandShare49(tbx,700,1000,0),tbLow=bandShare49(tbx,150,300,0),tbCrac
 const pk49=Math.min(peak49(crx),peak49(rvx),peak49(agx),peak49(tbx));
 const det49=Math.max(md49(cr,cr2),md49(ag,ag2));
 const ok49=crMid>=.06*crEarly&&crTop>=.60&&rvHi>3*rvLo&&rvCut<1e-3&&agUp>=.03&&agMid>=.08*agEarly&&tbPing>tbLow&&tbCrack>=.03&&pk49>.05&&det49<1e-6;
-gate('G49','voices: crash REASON-renderer mid-ring>=.06*early + 4-12k share>=.60 (measured .084-.36 / .977+; engine render carries peak+det), revcym swell>3x low + hard cut(<1e-3 after), agogo upper-mode share>=.03 + mid ring>=.08*early, timbale ping>low + crack share>=.03, all peak>.05, determinism<1e-6',ok49,'cr '+crMid.toExponential(1)+'/'+crEarly.toExponential(1)+'='+(crMid/Math.max(crEarly,1e-12)).toFixed(3)+' top='+crTop.toFixed(2)+' | rv '+rvHi.toExponential(1)+'/'+rvLo.toExponential(1)+'='+(rvHi/Math.max(rvLo,1e-12)).toFixed(1)+' cut='+rvCut.toExponential(1)+' | ag '+agUp.toFixed(3)+' mid='+(agMid/Math.max(agEarly,1e-12)).toFixed(3)+' | tb '+tbPing.toFixed(3)+'>'+tbLow.toFixed(3)+' crack='+tbCrack.toFixed(3)+' | pk='+pk49.toFixed(2)+' | det='+det49.toExponential(1))}catch(e){gate('G49','new voices v0.15',false,'ERR '+e.message)}}
+gate('G49','voices: crash REASON-renderer mid-ring>=.06*early + 4k-to-Nyquist share>=.60 (measured .084-.36 / .82; engine render carries peak+det), revcym swell>3x low + hard cut(<1e-3 after), agogo upper-mode share>=.03 + mid ring>=.08*early, timbale ping>low + crack share>=.03, all peak>.05, determinism<1e-6',ok49,'cr '+crMid.toExponential(1)+'/'+crEarly.toExponential(1)+'='+(crMid/Math.max(crEarly,1e-12)).toFixed(3)+' top='+crTop.toFixed(2)+' | rv '+rvHi.toExponential(1)+'/'+rvLo.toExponential(1)+'='+(rvHi/Math.max(rvLo,1e-12)).toFixed(1)+' cut='+rvCut.toExponential(1)+' | ag '+agUp.toFixed(3)+' mid='+(agMid/Math.max(agEarly,1e-12)).toFixed(3)+' | tb '+tbPing.toFixed(3)+'>'+tbLow.toFixed(3)+' crack='+tbCrack.toFixed(3)+' | pk='+pk49.toFixed(2)+' | det='+det49.toExponential(1))}catch(e){gate('G49','new voices v0.15',false,'ERR '+e.message)}}
 /* G50 — TRANSITIONS v1 (offline — CI-asserted, v0.16.0 P1):
    the owner's field report: transitions between built sections "don't go
    smoothly from one to the next". scene.trans (riser/revcym/impact/cut +
