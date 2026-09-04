@@ -165,6 +165,15 @@ feature.)
 **FIXED (v0.26.0).** See finding 3 — shared manifest + a 20-second bun test
 that reconciles it against the runtime source.
 
+**Postscript — the class keeps scoring.** Applying this run's fixes surfaced
+a THIRD live specimen in the harness itself: `waitFor(readyState ===
+'complete')` also passes on `about:blank`, so on a slow box the driver's
+first clicks could fire before `Page.navigate` committed — the boot evals
+hit a blank document and the run died with a null `#stylePicker button`.
+Fast CI cores hid the race for 24 releases. Both harnesses (e2e +
+ui-evidence) now wait for the REAL app marker (a `#stylePicker` button,
+which only exists after the module booted).
+
 ## 10. The docs require hand-syncing numbers every release, and the release checklist is the only machine that knows
 
 **Evidence.** README/ARCHITECTURE carry test counts (657/51), library size

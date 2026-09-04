@@ -214,7 +214,7 @@ async function main() {
     cdp = await pageCDP(la.ws);
     await cdp.send('Page.enable');
     await cdp.send('Page.navigate', { url: base });
-    await waitFor(cdp, `document.readyState==='complete'`, 20000, 250, 'page load');
+    await waitFor(cdp, `document.readyState==='complete'&&!!document.querySelector('#stylePicker button')`, 20000, 250, 'app DOM + module boot'); /* v0.26.0: navigation-commit race fix — about:blank is also 'complete'; wait for the REAL app marker (the roast's own harness was not immune) */
     await sleep(300);
 
     // boot MAIN engine exactly like a human: engine button (MAIN is default) + style button

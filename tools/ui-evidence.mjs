@@ -147,7 +147,7 @@ async function main() {
     cdp = await pageCDP(la.ws);
     await cdp.send('Page.enable');
     await cdp.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html` });
-    await waitFor(cdp, `document.readyState==='complete'`, 20000, 250, 'page load');
+    await waitFor(cdp, `document.readyState==='complete'&&!!document.querySelector('#stylePicker button')`, 20000, 250, 'app DOM + module boot'); /* v0.26.0: navigation-commit race fix — about:blank is also 'complete'; wait for the REAL app marker (the roast's own harness was not immune) */
     await sleep(300);
 
     /* 1. power screen composition */
