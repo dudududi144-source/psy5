@@ -3,6 +3,125 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.23.0] — Run 22: PERCUSSION ROM v3 — the synth-quality ceiling breaker
+
+> Owner (instruction 13, 4th time on sounds): "עדיין יש קונגה וקראשים
+> וצלילים נוראיים בתופים… יש עדיין בכל מיני מקומות צלילים שהורסים את כל
+> הדינימקיה וההרמוניה… אני רוצה שיפור מקיף משמעותי מאוד באיכות וודא שהכל
+> רץ בלי בעיה ובלי לאגים ותקיעות" — congas/crashes still terrible; sounds
+> in various places destroying the dynamics and harmony; comprehensive
+> quality improvement; everything running without lags or stuck states.
+
+### Diagnosis — why 3 rebuilds of the synth voices still read "cheap"
+The pooled DrumVoice renders percussion with ≤2 oscillators + a noise tap.
+Physics doesn't negotiate:
+- **Membranes** (conga/bongo/darbuka) ring with the measured circular-membrane
+  mode ladder — 1.0, 1.02 (the near-degenerate beat partner), 1.475, 2.09,
+  2.33, 2.63, 3.01, 3.36, 3.76 ×f0 — each mode with its OWN decay (highs die
+  first). Two sines = a beep. No envelope fixes that; the partials are
+  missing.
+- **Metals** (crash/triangle/cowbell) live on dense inharmonic stacks. The
+  crash used the hat's 6 squares → hollow ring; the **triangle was literally
+  bandpass noise** (no ring at all); the **cowbell was two RAW squares with
+  no filter** — the harshness that kept cutting through the mix.
+- **Loudness** was per-recipe folklore — a crash at vel·0.5 + wash next to a
+  clave at vel·0.7 lands wherever it lands → the "dynamics destroyers".
+
+### The fix — `foundation/dsp/perc-rom.mjs` (render ONCE, play like a sampler)
+- **13 types** (`ROM_TYPES`): conga, bongo, darbuka, crash, revcym, triangle,
+  tambourine, shaker, agogo, timbale, cowbell, clave, rim. Each renders ONCE
+  per (type, sampleRate) into a Float32Array → AudioBuffer cache:
+  - membranes: the full 9-mode ladder with per-mode decay + seeded slap
+    transient (BP noise 1.9 kHz) + snap touch (3.4 kHz) + shell resonance;
+    darbuka = dum (LP'd deep membrane) + tek (metallic band 3.2 kHz);
+  - crash: **20-square inharmonic bank** (10 ratios × detuned beating
+    partners, seeded per-partial phase) through the crash corners
+    (BP 8.6 k → HP 4.6 k) + shimmer wash + splash transient + two-stage
+    envelope (hold 12 %, then decay) — 3.0 s;
+  - revcym: the same bank as a 2.6-power swell with a HARD cut at 92 %;
+  - triangle: stretched near-harmonic ring (n·f0·(1+0.0009n²), 9 partials)
+    + the 5.5 kHz "ting" beat pair + strike;
+  - cowbell: the 808 recipe (560:845) **finally band-passed at 1.9 kHz**
+    with the real two-stage env;
+  - tambourine (jingle stack 6.2–30 k + head thump), shaker (swept BP
+    6.4→4.8 k, shaped attack), agogo (1:1.506 bell), timbale (shell modes +
+    2.6 k rim crack), clave (1:2.63 wood), rim (wood + wire buzz).
+- **Anti-"dynamics destroyer" family law**: every buffer is RMS-leveled to
+  its spec target (measured band 0.062–0.105, crest preserved), peaks
+  ≤ 0.97 — `bun tools/rom-audit.mjs` prints the table, **13/13 PASS**.
+- **Determinism**: mulberry32 seeded from fnv1a(type) — same type + sr →
+  byte-identical PCM (pinned). Zero DOM/AudioContext/wall-clock in the
+  module (bun-testable headless).
+
+### Engine integration (`js/engine.js`) — pool discipline moved ZERO
+- `trigger()` routes `ROM_TYPES` hits **BEFORE any pooled voice is selected**
+  — a ROM hit neither consumes nor steals a DrumVoice; it plays through its
+  own **8-voice RomVoice pool** (pooled env gain + pooled tilt highshelf;
+  the per-hit BufferSource is the one unavoidable allocation, GC-reaped —
+  the same law as the sample path).
+- Per-hit semantics preserved: `tune` → playbackRate (classic sampler pitch,
+  clamp .25–4), `tone` → highshelf tilt ±9 dB @ 3.2 kHz, `punch` → 30 ms
+  attack overdrive, `decay<0.95` → env fade at the window. `drumDurEst` is
+  UNTOUCHED (the 25-type table stays bit-exact — steal semantics, busyUntil
+  windows, G44 discipline all pin to it).
+- **Click-free pooling for ANY rate**: a 15 ms safety fade is ALWAYS
+  scheduled at min(bufferDur/rate, durEst·1.15+.02) — even a pitch-down
+  conga ring that outlives its window fades, never cuts.
+- `opts.rom=false` = the exact pre-v0.23.0 synth path (bit-for-bit, for the
+  neutral A/B and the gates). Render failure → counted legacy fallback
+  (`romFallbacks`), never silence.
+- `warmRom` + `main.js` power-on warm loop (idle-sliced): all 13 buffers
+  render at boot (~150 ms total, spread across idle slices) — the lazy
+  first-hit render (~1–40 ms) is the documented exception the owner should
+  never meet.
+- `loadSnapshot` carries the honest counters: romSpawns/romRenders/
+  romFallbacks/romSteals + pools.rom. `killAll` panics the ROM pool.
+- **Offline bounce inherits everything** (same PooledEngine in the
+  OfflineAudioContext) — WAV renders get the ROM too.
+- Worklet engine: documented split, never faked — the experimental worklet
+  keeps its V_PERC synth for the 13 types (WORKLET_LIMITATIONS entry).
+
+### The bug the browser caught (and why this release is safer for it)
+The first integration exported `ROM_TYPES` as an **Array** while the engine
+routes hits through `ROM_TYPES.has()` on EVERY drum event — the first live
+audition threw on all 13 types (a wrong-container throw inside the scheduler
+tick = exactly the "stuck" class the owner keeps reporting). Fixed as a Set
++ regression pin (`typeof ROM_TYPES.has === 'function'`). **The caught-live
+bug never reached a release commit.**
+
+### Evidence
+- `bun test` — **561/561 GREEN** (18 new ROM gates: render/window/loudness
+  laws, 44.1 kHz parity, recipe pins — the membrane ladder, the cymbal bank,
+  the 808 cowbell, clave 1:2.63, agogo 1:1.506 — integration pins, manifest
+  integrity).
+- `bun run verify` — GREEN.
+- `bun tools/rom-audit.mjs` — 13/13 PASS (peak ≤ 0.97, RMS within ±1.5 dB of
+  spec, buffer ≤ drumDurEst window, byte-deterministic).
+- Browser (real AudioContext, REAL device): boot warms 13/13 (fallbacks 0);
+  all 13 types audition through the RomVoice pool, errs []; the Full-On
+  arrangement fires **40 natural ROM spawns** in the live groove with 0
+  steals, LOAD 20 %, latency 42 ms; offline render of all 13 types through
+  the full engine graph → peak 0.589 / RMS 0.09 / 0 fallbacks; tune
+  0.7→1.3 measurably re-pitches the conga buffer (ZC 250→294).
+- In-page SELF-GATE battery (same session, before the sandbox's known
+  Chrome OOM ended it early): **28 gates run, 28 PASS, 0 FAIL** — including
+  G1 genre renders, G14 every-event-voiced, G15 overload discipline, G23
+  all-styles composer bounces, G29 master chain — every render exercising
+  the ROM path. The authoritative full 50-gate battery runs in CI.
+- `samples/manifest.json`: **12 ghost entries removed** (28 → 16; every
+  listed file now exists — the browser could 404 on six kicks/claps/hats
+  and six nord/md files that were never committed).
+
+### Honest limits
+- The ROM buffers are MONO (the pan/send stage stereoizes); per-hit `decay`
+  can shorten but not lengthen a ring (buffers are decay=1 renders; decay>1
+  keeps the natural tail inside the longer window — documented).
+- The worklet engine keeps its reduced synth set for the 13 types (opt-in
+  experimental path; documented in WORKLET_LIMITATIONS).
+- First-hit lazy render remains the hot-path exception (~1–40 ms/type) for
+  anyone who beats the boot warm loop; monitoring quality on real speakers
+  remains the owner's judgment.
+
 ## [0.22.0] — Run 21: PADS v3 "LIVE GRID" — the pad surface rebuilt from the pure layer out
 
 > Owner verdict on the old pads, with a screenshot: "סאונדים מתחת לכל ביקורת

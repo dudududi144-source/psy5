@@ -255,9 +255,34 @@ absolute "zero dropouts" guarantee** — GC-pause risk is minimised by design
 moves rendering onto the audio thread, but real-time audio depends on the
 host machine. The Self-Gate (15/15 MAIN, 3/3 WORKLET) is the regression
 harness; it does not certify a host.
-Memory: 20 SynthVoice + 24 DrumVoice (pre-allocated), 0 runtime allocations
-in the `process()`/trigger hot path
+Memory: 20 SynthVoice + 24 DrumVoice + 8 RomVoice (pre-allocated), 0 runtime
+allocations in the `process()`/trigger hot path (the ROM path's per-hit
+BufferSource is the same GC-reaped exception as the sample path)
 CPU: Scheduler < 1ms, Voice trigger < 0.1ms, UI render < 8ms
+
+### PERCUSSION ROM (v0.23.0) — 13 types rendered, not synthesized per hit
+The owner flagged the synth percussion 4× (conga/crash/triangle/cowbell
+"below criticism", "destroying the dynamics"). The pooled 2-osc+noise
+DrumVoice has a physics ceiling: a membrane needs its 9-mode ladder (with
+the 1.02 beat partner), a cymbal needs a dense inharmonic bank. Those
+partials don't fit a per-hit budget — so they render ONCE:
+
+  foundation/dsp/perc-rom.mjs   pure, deterministic, DOM-free
+    renderRomPcm(type, sr) -> Float32Array
+    - membranes: 9-mode ladder + seeded slap/snap/shell transients
+    - cymbals: 20-square inharmonic bank + wash + splash, two-stage env
+    - RMS-leveled per spec (family loudness law), peak ≤ 0.97
+  js/engine.js
+    trigger() -> ROM_TYPES.has(type) BEFORE pool selection (a ROM hit
+    neither consumes nor steals a DrumVoice) -> 8-voice RomVoice pool
+    (pooled env gain + tilt highshelf; per-hit BufferSource only)
+    tune -> playbackRate · tone -> tilt · punch -> attack · decay<.95 ->
+    window fade; 15 ms safety fade at min(buffer, durEst·1.15+.02)
+    warmRom(): 13 buffers rendered at power-on (idle-sliced)
+    opts.rom=false = exact pre-v0.23.0 synth path (neutral A/B)
+  Offline bounce inherits the ROM (same PooledEngine in the offline ctx).
+  drumDurEst is UNTOUCHED — steal semantics/busyUntil windows move zero.
+  Audit: `bun tools/rom-audit.mjs` (13/13 PASS — loudness + window laws).
 
 ## 10. Deployment
 
