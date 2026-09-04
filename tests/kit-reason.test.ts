@@ -353,23 +353,34 @@ describe('kit-reason ports — kits 1–3 match kit-builtin.ts', () => {
 
 /* ── 7 · STYLE_KIT covers exactly data/styles.json ─────────────────────── */
 
-describe('kit-reason STYLE_KIT — the 5 styles from data/styles.json', () => {
+describe('kit-reason STYLE_KIT — all 9 styles from data/styles.json (v0.26.0 roast fix #4)', () => {
   const stylesJson = JSON.parse(readFileSync(join(ROOT, 'data/styles.json'), 'utf8'))
   const names = stylesJson.styles.map((s) => s.name)
+  /* the five NATIVE styles: the kit declares the style back. The four
+     classic-family/adjacent styles (psytrance/goa/trance/techno — added to the
+     composer in v0.13.1) map onto the family kit whose key center and groove
+     they extend — documented in STYLE_KIT and the roast. */
+  const NATIVE = ['full-on', 'darkpsy', 'progressive', 'forest', 'hi-tech']
   test('every style name from styles.json has a kit mapping', () => {
-    expect(names.length).toBe(5)
+    expect(names.length).toBe(9)
     for (const name of names) {
       expect(typeof STYLE_KIT[name]).toBe('string')
       expect(KIT_IDS).toContain(STYLE_KIT[name])
     }
   })
-  test('STYLE_KIT has exactly the 5 styles — no extras, no gaps', () => {
+  test('STYLE_KIT has exactly the 9 styles — no extras, no gaps', () => {
     expect(Object.keys(STYLE_KIT).sort()).toEqual([...names].sort())
   })
-  test('each mapped kit declares its style back', () => {
-    for (const name of names) {
+  test('each NATIVE style is served by the kit that declares it back', () => {
+    for (const name of NATIVE) {
       expect(REASON_KITS[STYLE_KIT[name]].style).toBe(name)
     }
+  })
+  test('the classic-family styles have deliberate kit decisions (never DEFAULT_KIT fallback)', () => {
+    expect(STYLE_KIT['psytrance']).toBe('psy-classic')
+    expect(STYLE_KIT['goa']).toBe('psy-classic')
+    expect(STYLE_KIT['trance']).toBe('psy-classic')
+    expect(STYLE_KIT['techno']).toBe('progressive')
   })
 })
 

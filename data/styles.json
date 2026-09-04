@@ -1,40 +1,127 @@
 {
-  "description": "Style definitions for the PSY family. Each style defines typical tempo range, energy, and characteristic scales.",
+  "description": "Style definitions for the PSY family. Each style defines typical tempo range, energy, and characteristic scales. v0.26.0: all NINE shipped composer styles documented (was 5 \u2014 the roast, finding #4: the data file had frozen on a younger product).",
   "styles": [
     {
       "name": "full-on",
-      "tempoRange": [140, 148],
+      "tempoRange": [
+        140,
+        148
+      ],
       "typicalEnergy": 0.8,
-      "scales": ["phrygian-dominant", "harmonic-minor", "minor"],
+      "scales": [
+        "phrygian-dominant",
+        "harmonic-minor",
+        "minor"
+      ],
       "description": "Classic Israeli psytrance. Driving bass, melodic leads, high energy."
     },
     {
       "name": "darkpsy",
-      "tempoRange": [148, 160],
+      "tempoRange": [
+        148,
+        160
+      ],
       "typicalEnergy": 0.9,
-      "scales": ["phrygian-dominant", "double-harmonic", "diminished"],
+      "scales": [
+        "phrygian-dominant",
+        "double-harmonic",
+        "diminished"
+      ],
       "description": "Dark psychedelic. Faster, more dissonant, atmospheric."
     },
     {
       "name": "progressive",
-      "tempoRange": [125, 138],
+      "tempoRange": [
+        125,
+        138
+      ],
       "typicalEnergy": 0.6,
-      "scales": ["minor", "dorian", "major-pentatonic"],
+      "scales": [
+        "minor",
+        "dorian",
+        "major-pentatonic"
+      ],
       "description": "Slower, groove-oriented, melodic."
     },
     {
       "name": "forest",
-      "tempoRange": [150, 165],
+      "tempoRange": [
+        150,
+        165
+      ],
       "typicalEnergy": 0.85,
-      "scales": ["phrygian", "locrian", "whole-tone"],
+      "scales": [
+        "phrygian",
+        "locrian",
+        "whole-tone"
+      ],
       "description": "Organic, atmospheric, minor-key focused."
     },
     {
       "name": "hi-tech",
-      "tempoRange": [160, 180],
+      "tempoRange": [
+        160,
+        180
+      ],
       "typicalEnergy": 0.95,
-      "scales": ["phrygian-dominant", "diminished", "whole-tone"],
+      "scales": [
+        "phrygian-dominant",
+        "diminished",
+        "whole-tone"
+      ],
       "description": "Fast, technical, maximum energy."
+    },
+    {
+      "name": "psytrance",
+      "tempoRange": [
+        138,
+        148
+      ],
+      "typicalEnergy": 0.8,
+      "scales": [
+        "phrygian",
+        "minor",
+        "harmonic-minor"
+      ],
+      "description": "Modern classic psytrance. The straight-12/8 rolling bass at 142 BPM; rides the classic-family kit."
+    },
+    {
+      "name": "goa",
+      "tempoRange": [
+        138,
+        145
+      ],
+      "typicalEnergy": 0.82,
+      "scales": [
+        "harmonic-minor",
+        "phrygian-dominant"
+      ],
+      "description": "Goa trance lineage \u2014 melodic minor-dominant colors at 140 BPM; rides the classic-family kit."
+    },
+    {
+      "name": "techno",
+      "tempoRange": [
+        126,
+        136
+      ],
+      "typicalEnergy": 0.65,
+      "scales": [
+        "minor",
+        "phrygian"
+      ],
+      "description": "Club techno at 132 BPM \u2014 mechanical groove, tighter melodic content; rides the progressive-family kit."
+    },
+    {
+      "name": "trance",
+      "tempoRange": [
+        136,
+        142
+      ],
+      "typicalEnergy": 0.75,
+      "scales": [
+        "minor"
+      ],
+      "description": "Uplifting trance at 138 BPM \u2014 driving, bright, major-adjacent lift; rides the classic-family kit."
     }
   ]
 }

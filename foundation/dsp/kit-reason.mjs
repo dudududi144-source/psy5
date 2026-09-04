@@ -569,12 +569,24 @@ export const KIT_IDS = Object.freeze([
 export const DEFAULT_KIT = 'psy-classic';
 
 /* Every data/styles.json style name covered — the composer's kit selector. */
+/* v0.26.0 (roast fix #4): ALL NINE shipped composer styles are kit-governed.
+   Before this map, psytrance/goa/techno/trance silently fell through to
+   DEFAULT_KIT — a quarter of the genre surface with no kit decision behind it.
+   Mapping law: the five NATIVE styles ride the kit that declares them; the
+   classic-family styles (psytrance/goa/trance — 138-142 BPM, the psy-classic
+   key center and character) ride 'psy-classic'; TECHNO (132 BPM, mechanical
+   groove) rides 'progressive' — its closest tempo/groove family. No new kit
+   sound design was commissioned in v0.26.0 (documented in the roast). */
 export const STYLE_KIT = Object.freeze({
   'full-on': 'psy-classic',
   'darkpsy': 'dark-forest',
   'progressive': 'progressive',
   'forest': 'forest-organic',
   'hi-tech': 'hi-tech',
+  'psytrance': 'psy-classic',
+  'goa': 'psy-classic',
+  'techno': 'progressive',
+  'trance': 'psy-classic',
 });
 
 /* The warm loop slices: engine core first (kick,snare,clap,hatC,hatO,tom,
