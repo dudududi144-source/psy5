@@ -3,6 +3,68 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.20.0] — Run 20j: GROOVES 4→13 + SCALES 5→13 + FILLS 5→8 + the SCALE picker (the three loneliest choice axes got fat)
+
+> Owner directive (verbatim): "אוי ואבוי חשוב לדחוף מיד שלא נאבד את העבודה
+> הקשה" — the fear was unfounded (remote == local, verified `git
+> ls-remote`), and the standing v0.19.0 directive ("שפר משמעותית… חסרים
+> הרבה אופציות") kept driving: the three choice axes that were thinnest
+> grew, and one control that NEVER existed shipped.
+
+### GROOVES 4→13 — the feel vocabulary
+- Nine new groove templates join Straight / MPC 54% / Psy Push / Humanize,
+  same pure `(track, step, rng, sd, tick) → seconds` contract, deterministic
+  through the caller's per-bar seeded rng, applied before the probability
+  gate: **MPC 58%** (heavier swing), **Shuffle 62%** (breaks-feel swing),
+  **Psy Glide** (bass ahead of the grid — the flying-bass lock),
+  **Lazy Bass** (bass behind the grid — the modern psy drag),
+  **HH Lift** (even 16th hats pushed +ticks), **Perc Drag** (perc lane
+  late — organic humanization), **Push 16ths** (all odd 16ths +, KICK
+  excluded — the sacred zone holds), **Laid Back** (everything behind),
+  **Drunk** (seeded ±5-tick chaos).
+- Track-scoping is asserted by test (glide/lazy touch only the bass,
+  hhlift only even hats, perc-drag only perc, push16 never the kick);
+  every template stays inside the step (|off| < sd) across tracks/steps/
+  trials; the picker derives from `Object.keys(GROOVES)` (zero UI drift
+  possible).
+
+### SCALES 5→13 — three foundation voices were UNWIRED (+ five new)
+- The foundation table already carried phrygianDominant, doubleHarmonic
+  and minorPentatonic — the device exposed only 5 of the 8. All three are
+  wired now, plus five NEW foundation scales: **lydian** (#4 dream),
+  **mixolydian**, **hungarianMinor** (dark-exotic), **melodicMinor**,
+  **majorPentatonic** (uplifting Goa arps).
+- Additive-only discipline held: the legacy five keys stay byte-identical
+  (pinned), every device scale aliases the foundation table (never
+  re-implemented — pinned), composer styles untouched (the 9 whole-project
+  hashes did not move), every scale ascending + in-range (pinned).
+
+### THE SCALE PICKER — a control that never existed
+- `p.scale` was ONLY settable at project creation; the live pads
+  (CHORD/NOTE), evolution mutations and melodic lanes all read it, but the
+  user could not change it. The header now carries **Scale** (next to
+  Groove), derived from the vocabulary itself (the FOREST-filter
+  discipline: a future scale can never silently vanish), wired through
+  pushHist (undo-honest), driving pads/evolution immediately.
+
+### FILLS 5→8 — three arrivals, the last modulo hardcode dies
+- **STUTTER** — last-beat tuned 8th perc stutter (the glitch breath),
+  **HOVER** — the anti-fill: one hit then dissolve into the pre-drop
+  vacuum, **SPIRAL** — perc/snare alternating accel (quarters → 8ths,
+  rising). The legacy five layouts stay byte-identical (pinned);
+  `fillEvents` modulo now generalizes over `FILL_NAMES.length` (the %5
+  hardcode is gone).
+
+### Battery
+- bun **533/533** across 45 files (the new `tests/v020.test.ts` adds 19:
+  groove determinism/bounds/scoping/stepEvents-path, scale byte-identity
+  + foundation-alias + validity, fill layout shapes, header/index.html
+  picker wiring; the v018/v019 fill pins re-recorded — legacy shapes
+  asserted byte-identical, wrap semantics generalized).
+- `verify` GREEN (sw CACHE_VERSION == CHANGELOG latest, v0.20.0).
+- e2e: full suite asserted on push by CI (60-min window + retry), as
+  released in v0.19.0 (in-page Self-Gate 49/50, G17 realtime info-only).
+
 ## [0.19.0] — Run 20i: COMPOSED TRANSITIONS (the composer finally ships the v0.16 vocabulary) + TRANZ carrier + library 381→423 + fills 3→5 + DJ DOWN
 
 > Owner report (verbatim): "צירפתי קודם שפר משמעותית מה שעשית נתח תבין איך

@@ -4,7 +4,13 @@ export const SCALES={
   naturalMinor:[0,2,3,5,7,8,10], harmonicMinor:[0,2,3,5,7,8,11],
   phrygian:[0,1,3,5,7,8,10], phrygianDominant:[0,1,4,5,7,8,10],
   doubleHarmonic:[0,1,4,5,7,8,11], minorPentatonic:[0,3,5,7,10],
-  major:[0,2,4,5,7,9,11], dorian:[0,2,3,5,7,9,10]
+  major:[0,2,4,5,7,9,11], dorian:[0,2,3,5,7,9,10],
+  /* v0.20.0 — the melodic vocabulary the device exposes grew 5→13 (the
+     owner: "חסרים הרבה אופציות"). Additive-only: every pre-existing key
+     keeps its byte-identical intervals (pinned by the device suite). */
+  lydian:[0,2,4,6,7,9,11], mixolydian:[0,2,4,5,7,9,10],
+  hungarianMinor:[0,2,3,6,7,8,11], melodicMinor:[0,2,3,5,7,9,11],
+  majorPentatonic:[0,2,4,7,9]
 };
 export const PHRASE_ROLES=["STATEMENT","RESPONSE","DEVELOPMENT","BUILD","RELEASE","TRANSITION","RESOLUTION"];
 export const SECTION_ROLES=["establish","statement","variation","development","response","contrast","peak","resolution","transition"];

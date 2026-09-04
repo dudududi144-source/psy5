@@ -20,6 +20,20 @@ const SCALES={
   dorian: FOUNDATION_SCALES.dorian,
   phrygian: FOUNDATION_SCALES.phrygian,
   harmonicMinor: FOUNDATION_SCALES.harmonicMinor, /* v0.7.0 FOREST — darker bias */
+  /* ── v0.20.0 SCALE EXPANSION 5→13 — three foundation scales existed
+     unwired (phrygianDominant / doubleHarmonic / minorPentatonic) plus five
+     new foundation voices. Additive-only: the legacy five keys keep their
+     byte-identical intervals, composer styles are untouched (pin
+     discipline), the new keys are user-facing (scale picker, pads,
+     evolution). */
+  phrygianDominant: FOUNDATION_SCALES.phrygianDominant,
+  doubleHarmonic: FOUNDATION_SCALES.doubleHarmonic,
+  minorPentatonic: FOUNDATION_SCALES.minorPentatonic,
+  lydian: FOUNDATION_SCALES.lydian,
+  mixolydian: FOUNDATION_SCALES.mixolydian,
+  hungarianMinor: FOUNDATION_SCALES.hungarianMinor,
+  melodicMinor: FOUNDATION_SCALES.melodicMinor,
+  majorPentatonic: FOUNDATION_SCALES.majorPentatonic,
 };
 /* v0.17.0 — ALL EIGHT macros are real. The first four shipped earlier;
    4..7 were dead UI until this run (the owner: "רק כמה פונקציות בודדות"
@@ -57,7 +71,21 @@ const GROOVES={
 straight:{label:'Straight',off:(t,s,rng,sd,tick)=>0},
 mpc54:{label:'MPC 54%',off:(t,s,rng,sd,tick)=>(s%2===1)?((0.54+0.04*rng())-0.5)*sd:0},
 'psy-push':{label:'Psy Push',off:(t,s,rng,sd,tick)=>(t===4&&s%2===1)?(6+2*rng())*tick:0},
-humanize:{label:'Humanize',off:(t,s,rng,sd,tick)=>((rng()+rng()+rng()-1.5)/1.5)*0.03*sd}
+humanize:{label:'Humanize',off:(t,s,rng,sd,tick)=>((rng()+rng()+rng()-1.5)/1.5)*0.03*sd},
+/* ── v0.20.0 GROOVE EXPANSION 4→13 — the feel vocabulary the owner kept
+   asking for ("חסרים הרבה אופציות"). Same contract as the legacy four:
+   pure (t,step,rng,sd,tick) → seconds, deterministic through the caller's
+   seeded rng, applied BEFORE the probability gate. Track map: 0 KICK,
+   1 SNARE, 2 HATS, 3 PERC, 4 BASS, 5 LEAD, 6 PAD, 7 ARP. */
+mpc58:{label:'MPC 58%',off:(t,s,rng,sd,tick)=>(s%2===1)?((0.58+0.04*rng())-0.5)*sd:0},
+shuffle62:{label:'Shuffle 62%',off:(t,s,rng,sd,tick)=>(s%2===1)?((0.62+0.03*rng())-0.5)*sd:0},
+'psy-glide':{label:'Psy Glide',off:(t,s,rng,sd,tick)=>(t===4)?(-4-2*rng())*tick:0},
+'lazy-bass':{label:'Lazy Bass',off:(t,s,rng,sd,tick)=>(t===4)?(9+3*rng())*tick:0},
+hhlift:{label:'HH Lift',off:(t,s,rng,sd,tick)=>(t===2&&s%2===0)?(3+2*rng())*tick:0},
+'perc-drag':{label:'Perc Drag',off:(t,s,rng,sd,tick)=>(t===3)?(5+4*rng())*tick:0},
+'push16':{label:'Push 16ths',off:(t,s,rng,sd,tick)=>(s%2===1&&t!==0)?(4+2*rng())*tick:0},
+'laid-back':{label:'Laid Back',off:(t,s,rng,sd,tick)=>(-2-2*rng())*tick},
+drunk:{label:'Drunk',off:(t,s,rng,sd,tick)=>((rng()+rng()-1))*5*tick}
 };
 /* ── tap tempo (v0.17.0) — PURE: keep the taps inside the window, average
    the deltas, clamp to the transport range. Returns {count,bpm} — bpm is
@@ -65,21 +93,28 @@ humanize:{label:'Humanize',off:(t,s,rng,sd,tick)=>((rng()+rng()+rng()-1.5)/1.5)*
    apply). DOM-free so the Bun suite owns the math. */
 function tapTempo(taps,now,windowMs){const w=windowMs||2500;const t=(Array.isArray(taps)?taps:[]).filter(x=>now-x>=0&&now-x<w);t.push(now);if(t.length<2)return{count:t.length,bpm:null};const d=[];for(let i=1;i<t.length;i++)d.push(t[i]-t[i-1]);const avg=d.reduce((a,b)=>a+b,0)/d.length;if(!(avg>0))return{count:t.length,bpm:null};return{count:t.length,bpm:clamp(Math.round(60000/avg),40,300)}}
 
-/* ── FILL VARIANTS (v0.18.0, five since v0.19.0) — the FILL button/`f` key
-   cycles the deterministic layouts. Offsets are in STEPS (×sd at trigger
-   time), track indexes are the canonical drum lanes (3 = perc, 1 = snare).
-   CLASSIC (perc 8ths crescendo) · ROLL (16-hit 32nd machine-gun) ·
+/* ── FILL VARIANTS (v0.18.0, five since v0.19.0, EIGHT since v0.20.0) —
+   the FILL button/`f` key cycles the deterministic layouts. Offsets are in
+   STEPS (×sd at trigger time), track indexes are the canonical drum lanes
+   (3 = perc, 1 = snare).
+   CLASSIC (perc 8ths crescendo) · ROLL (16-hit machine-gun) ·
    TOMLINE (tuned toms + snare) · SNARE16 (full-bar accelerating 16th snare
-   roll + perc accents) · CLIMB (rising-tune perc sweep).
+   roll + perc accents) · CLIMB (rising-tune perc sweep) ·
+   STUTTER (v0.20.0 — last-beat tuned 8th stutter, the glitch breath) ·
+   HOVER (v0.20.0 — the anti-fill: one hit then dissolve, a pre-drop vacuum)
+   · SPIRAL (v0.20.0 — perc/snare alternating accel: quarters → 8ths).
    Pure — bun-owned; the trigger path (PERF.fill) only maps these onto
    eng.trigger. tune rides the parameter lock (the drum voice reads
    tune from the merged lock — the same mechanism step locks use). */
-const FILL_NAMES=['CLASSIC','ROLL','TOMLINE','SNARE16','CLIMB'];
-function fillEvents(type){const t=((type|0)%5+5)%5;const out=[];
+const FILL_NAMES=['CLASSIC','ROLL','TOMLINE','SNARE16','CLIMB','STUTTER','HOVER','SPIRAL'];
+function fillEvents(type){const t=((type|0)%FILL_NAMES.length+FILL_NAMES.length)%FILL_NAMES.length;const out=[];
 if(t===1){for(let k=0;k<16;k++)out.push({track:3,off:k*.5,vel:.35+.6*k/15,lock:{}})}
 else if(t===2){for(let k=0;k<8;k++)out.push({track:3,off:k*.5,vel:.55+.04*k,lock:{tune:Math.round((0.8+0.6*k/7)*1000)/1000}});for(let k=0;k<4;k++)out.push({track:1,off:k,vel:.5,lock:{}})}
 else if(t===3){for(let k=0;k<16;k++)out.push({track:1,off:k,vel:.3+.65*k/15,lock:{}});out.push({track:3,off:12,vel:.6,lock:{}});out.push({track:3,off:14,vel:.7,lock:{}})}
 else if(t===4){for(let k=0;k<8;k++)out.push({track:3,off:k*1.5,vel:.4+.06*k,lock:{tune:Math.round((0.7+0.09*k)*1000)/1000}})}
+else if(t===5){for(let k=0;k<8;k++)out.push({track:3,off:12+k*.5,vel:.7,lock:{tune:Math.round((0.9+0.04*(k%4))*1000)/1000}})}
+else if(t===6){out.push({track:3,off:0,vel:.85,lock:{}});out.push({track:1,off:12,vel:.5,lock:{}});out.push({track:3,off:14,vel:.35,lock:{tune:.75}})}
+else if(t===7){for(let k=0;k<8;k++)out.push({track:k%2?3:1,off:k,vel:.35+.06*k,lock:{}});for(let k=0;k<8;k++)out.push({track:k%2?1:3,off:8+k*.5,vel:.55+.05*k,lock:{}})}
 else{for(let k=0;k<8;k++)out.push({track:3,off:k*.5,vel:.5+.05*k,lock:{}})}
 return out}
 

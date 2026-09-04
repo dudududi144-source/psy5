@@ -76,9 +76,9 @@ describe('preset batch v0.18 — richer variety, purely additive', () => {
   })
 })
 
-describe('fill variants — five deterministic layouts', () => {
-  test('FILL_NAMES exactly CLASSIC/ROLL/TOMLINE/SNARE16/CLIMB', () => {
-    expect(FILL_NAMES).toEqual(['CLASSIC', 'ROLL', 'TOMLINE', 'SNARE16', 'CLIMB'])
+describe('fill variants — legacy five layouts (pinned byte-identical since v0.19.0)', () => {
+  test('FILL_NAMES legacy five come first, byte-identical order (v0.20.0 appends STUTTER/HOVER/SPIRAL)', () => {
+    expect(FILL_NAMES.slice(0, 5)).toEqual(['CLASSIC', 'ROLL', 'TOMLINE', 'SNARE16', 'CLIMB'])
   })
   test('CLASSIC (0): 8 × 8th-note perc hits, velocity crescendo .5→.85', () => {
     const ev = fillEvents(0)
@@ -132,9 +132,9 @@ describe('fill variants — five deterministic layouts', () => {
       for (const e of a) { expect(e.vel).toBeGreaterThan(0); expect(e.vel).toBeLessThanOrEqual(1) }
     }
   })
-  test('type wraps modulo 5 (negative safe)', () => {
-    expect(JSON.stringify(fillEvents(5))).toBe(JSON.stringify(fillEvents(0)))
-    expect(JSON.stringify(fillEvents(-1))).toBe(JSON.stringify(fillEvents(4)))
+  test('type wraps modulo FILL_NAMES.length (negative safe) — generalized in v0.20.0', () => {
+    expect(JSON.stringify(fillEvents(FILL_NAMES.length))).toBe(JSON.stringify(fillEvents(0)))
+    expect(JSON.stringify(fillEvents(-1))).toBe(JSON.stringify(fillEvents(FILL_NAMES.length - 1)))
   })
 })
 

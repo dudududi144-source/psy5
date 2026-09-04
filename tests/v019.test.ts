@@ -173,9 +173,9 @@ describe('TRANZ carrier + genre contract + DJ DOWN (v0.19.0)', () => {
     expect(libFilter('drum', 'ALL').filter((x: any) => x.type === 'downlifter').length).toBeGreaterThanOrEqual(6)
   })
 
-  test('fill vocabulary is five layouts, all deterministic and engine-safe', () => {
-    expect(FILL_NAMES.length).toBe(5)
-    for (let t = 0; t < 7; t++) {
+  test('fill vocabulary is eight layouts (v0.20.0), legacy five untouched, all deterministic and engine-safe', () => {
+    expect(FILL_NAMES.length).toBe(8)
+    for (let t = 0; t < 8; t++) {
       const a = fillEvents(t), b = fillEvents(t)
       expect(JSON.stringify(a)).toBe(JSON.stringify(b))
       for (const e of a) {
