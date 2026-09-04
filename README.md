@@ -41,10 +41,10 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 561 tests across 47 files — 561 pass / 0 fail (539848 expect() calls)
+bun test             # 650 tests across 50 files — 650 pass / 0 fail (543480 expect() calls)
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
-bun tools/rom-audit.mjs  # PERCUSSION ROM loudness+window audit (v0.23.0) — 13/13 PASS
+bun tools/rom-audit.mjs  # PERCUSSION ROM + REASON kit audit (v0.24.0) — 13/13 + 48/48 kit×type PASS
 ```
 
 Suite breakdown (all runnable with `bun test`):
@@ -87,6 +87,9 @@ Suite breakdown (all runnable with `bun test`):
 | `tests/usability.test.ts` | 7 | shortcut registry (no collisions, taskbook bindings), demo recipes recompose + boot |
 | `tests/song.test.ts` | 12 | v0.6.0 song render: phase rules == live-scheduler oracle, frame-count formula (pinned number), sections/fills, schedule determinism, duration guard, cancel contract |
 | `tests/pwa.test.ts` | 10 | v0.6.0 PWA: SW CACHE_VERSION == CHANGELOG latest, network-first + cleanup + claim pieces, manifest/icon integrity, deterministic icon generator |
+| `tests/reason-port.test.ts` | 24 | v0.24.0 REASON engines: determinism, duration law (≤ drumDurEst window), loudness law (RMS ≈ patch.rms, peak ≤ .97), spectral sanity, perc-rom opts A/B (default byte-identical), SVF/biquad smoke |
+| `tests/kit-reason.test.ts` | 27 | v0.24.0 kit library: 6 kits × (8 engine + 12 rom roles) completeness, f0 windows + just-ratio consonance, loudness bands, port fidelity vs psyreason kit-builtin, STYLE_KIT coverage, accessors, warm list |
+| `tests/reason-wiring.test.ts` | 36 | v0.24.0 runtime wiring: routing classification (every drum type kit-governed/legacy/FX), rootMul math, choke config, snapshot round-trip, warm list, UI selector presence |
 
 ## Self-Gate in CI
 

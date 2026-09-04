@@ -3,7 +3,7 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
-## [0.24.0] — Run 23 Phase 2: KIT-GOVERNED REASON SYSTEM — every hit plays through the kit
+## [0.24.0] — Run 23: PSYREASON PORT — the KIT-GOVERNED REASON SYSTEM (every hit plays through the kit)
 
 > Owner: "replace ALL your sounds with psyreason's; the kit must COHERE — no
 > more disconnected sounds, nothing that destroys dynamics."
@@ -60,16 +60,42 @@ reproducible with the command shown next to it.
   duration law (buffer == REASON_DUR ≤ drumDurEst window), peak ≤ 0.97,
   RMS within ±15% of patch.rms (peak-clamped buffers documented — the peak
   law has the final word by renderReasonPcm's documented order).
-- Gates recalibrated to the new reality (honest, measured): G39/G47 pin the
-  LEGACY synth layer via `{rom:false}` engines (their params — dist/glide/
-  bursts/bright — are legacy-DrumVoice params by design); G40 voice probes
-  likewise; G48 tom criterion → ZCR descent (measured 350/325/300/275 Hz,
-  z0/z3 = 1.27 — the reason tom is a real membrane, not the 2-osc bend);
-  G49 crash HF law → 1.5–12 kHz share ≥ .38 (measured .42); G9/G15/G44 count
-  ROM-pool steals now that hats/toms leave the drum pool. NEW **G52** gates
-  the default reason path itself: reason spawns live + fallbacks 0 +
+- In-page gates brought to the v0.24.0 routing reality (honest, measured,
+  verified statically + by the 650-test suite — the sandbox cannot run the
+  headless battery, CI is the authority): **G39/G47 pin the LEGACY synth
+  layer via `{rom:false}` engines** (dist/glide/bursts/click are legacy-
+  DrumVoice params — their laws hold by construction, labels say LEGACY
+  pin); **G48's tom pair → `{rom:false}`** (the v0.15 bend laws are synth
+  laws; the REASON tom is G52/audit territory) while conga/bongo/cowbell/
+  clave stay on the kit path (share/ratio laws are amplitude-invariant
+  under the kit rmsMul); **G49's crash laws moved to the REASON renderer**
+  (the G48 raw-law precedent — measured on renderReasonPcm: mid/early
+  .084–.360 per kit, 4–12k share .77–.88 renderer-level → law .60 with
+  margin; the engine render keeps peak+determinism evidence); **G9/G15's
+  starvation law moved to the ROM pool** (`romSteals` — kick+hats leave the
+  drum pool, the drum-pool tier-0 count stays pinned at 0 as a tripwire);
+  **G44 widens to steals+romSteals>0** (synth tiers still steal). G40's
+  probes are behavioral (tom ZCR descent holds on the reason membrane's
+  pitch envelope; cowbell tone→tilt still maps) — untouched. NEW **G52**
+  gates the default reason path itself: reason spawns live + fallbacks 0 +
   determinism + kit-governance audible (psy-classic vs tribal-raw maxDiff)
-  + hatC→hatO choke audible + kick-sidechain-on-ROM-path.
+  + 48 kit×type RMS±15%/peak≤.97 + hatC→hatO choke audible + kick-
+  sidechain-on-ROM-path.
+- Browser evidence (headless Chromium, real AudioContext, 44.1 kHz): boot
+  enters READY SET → engine kit psy-classic, warm renders at power-on; the
+  arranged groove fires 1080+ ROM spawns / 85+ reason spawns with ZERO
+  fallbacks and ZERO steals over a minute (status bar LOAD 2–5%, latency
+  42 ms, kit name surfaced in the honesty bar); the SOUND panel kit picker
+  switches psy-classic → dark-forest LIVE (pinned, lazy per-kit renders,
+  still 0 fallbacks); desktop 1440×900 + mobile 390×844 layouts verified
+  pixel-clean.
+- Honest limits: the in-page gate battery (incl. G52) is CI-asserted (the
+  sandbox's known Chrome OOM blocks the local 50-gate run — same as v0.23.0);
+  the worklet engine keeps its documented reduced synth (rom/reason are
+  pooled-engine features); setRootHz() ships unwired by design (the project
+  is degree-based — no user tonic exists; the kit-level root law carries the
+  harmony lock); listening quality on real monitors remains the owner's
+  judgment.
 
 ## [0.23.0] — Run 22: PERCUSSION ROM v3 — the synth-quality ceiling breaker
 

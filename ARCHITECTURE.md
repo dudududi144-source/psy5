@@ -284,6 +284,53 @@ partials don't fit a per-hit budget — so they render ONCE:
   drumDurEst is UNTOUCHED — steal semantics/busyUntil windows move zero.
   Audit: `bun tools/rom-audit.mjs` (13/13 PASS — loudness + window laws).
 
+### REASON KIT SYSTEM (v0.24.0) — every hit plays through ONE kit
+The owner's verdict after three sound runs: the individual sounds got good,
+but "there is no connection between them" — and the order: replace the
+sounds with the sibling project's (psyreason's) real engines and SURPASS it.
+v0.24.0 makes the KIT the instrument:
+
+  foundation/dsp/reason-engines.mjs   pure, deterministic, DOM-free
+    the psyreason devices/redrum engines ported verbatim in loop structure:
+    kick = click(HP noise) + body(pitch-drop sine) + punch(FM-style
+    reinforcement) -> resonant biquad LP -> DOUBLE tanh -> 4× oversample;
+    snare = pitch-drop tone + band-passed wire noise (resonant LP on the
+    tone); hat = ring-mod of two squares + noise texture -> HP; cymbal =
+    ring-mod bank + ride ping; clap = 3-tap seeded burst + palm tail;
+    tom = membrane pitch-drop. Banks: 3 velocity layers × 2 round-robin
+    variants, layers differ in TIMBRE (+1.5 dB drive/layer, the ported
+    LAYER_DRIVE_DB law); renderReasonPcm() = the ONE engine entry —
+    RMS-normalized to patch.rms, peak ≤ .97, fades, byte-deterministic.
+  foundation/dsp/kit-reason.mjs   the cohesion layer (pure data)
+    6 kits (psy-classic / dark-forest / progressive ported+extended from
+    psyreason's kit-builtin; hi-tech / forest-organic / tribal-raw PSY6
+    originals — more kits than the reference project). A kit is ONE
+    instrument: rootHz key center, pitched percussion locked to just
+    ratios of the root (conga = 2×root octave, tom = 1×, bongo/darbuka/
+    rim/cowbell/clave/agogo/timbale = documented musical intents), every
+    role leveled to the family loudness law, hat-exclusive choke + cymbal
+    max-poly, STYLE_KIT pairing (all 5 styles covered).
+  js/engine.js wiring
+    trigger() routes REASON_TYPES ∪ ROM_TYPES BEFORE pool selection;
+    engine types render renderReasonPcm(type, kitPatch(kit, type), sr,
+    variant, 2); kit ROM types render renderRomPcm(type, sr, {rootMul,
+    rmsMul, variant}) with rmsMul = kitRms/romSpec.rms; per-type 2-variant
+    round-robin (anti-machine-gun); REASON_SHARED/ROM_SHARED module caches;
+    kitChoke applied on the RomVoice pool (hatC kills busy hatO voices,
+    cymbal maxPoly steals the oldest); kick fires sidechain ON the ROM path
+    (the v0.24.0 BUG GUARD — the early-return used to skip the duck).
+  state/UI: kit + kitPinned persist; the SOUND panel exposes the kit
+    picker (auto = follow style); loading a style/demo re-kits the engine
+    unless the user pinned. setRootHz() is available but intentionally
+    unwired (the project is degree-based — no user tonic exists; the
+    kit-level root law carries the harmony lock).
+  opts.rom=false = exact pre-v0.24.0 path (neutral A/B preserved).
+  Gates: G52 (offline — CI): reason liveness (spawns ≥3, fallbacks 0),
+  kit governance audible, 48 kit×type RMS±15%/peak≤.97, determinism 0,
+  hatC→hatO choke audible, kick-sidechain-on-ROM-path.
+  Audit: `bun tools/rom-audit.mjs` (13 ROM + 48 kit×type PASS).
+
+
 ## 10. Deployment
 
 Option A: npx serve . (local dev server) — the device is native ES
