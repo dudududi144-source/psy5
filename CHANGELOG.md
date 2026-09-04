@@ -3,6 +3,56 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.22.0] — Run 21: PADS v3 "LIVE GRID" — the pad surface rebuilt from the pure layer out
+
+> Owner verdict on the old pads, with a screenshot: "סאונדים מתחת לכל ביקורת
+> זה לא עובד" — 16 pads ALL reading "Trance" (the label was
+> `presetName.split(' ')[0]`), half of them DEAD (the `i % tracks.length`
+> map landed pads on synth tracks and `padHit` silently refused), every
+> card a blank rectangle. This run replaces the whole pad surface; the
+> environment was lost mid-run and the repo is the single source of truth
+> (fresh clone off `4963c71`, remote verified with ls-remote).
+
+### The repair — pure first (`js/model.js`)
+- **`padKit(p, mode)`** — the ONE pad-grid builder (DOM-free, bun-owned):
+  - **DRUM**: one pad per REAL drum track, then musical VARIANT pads fill
+    the grid to 16 — 16 distinct recipes (`+OCT −OCT TIGHT LONG PUNCH DARK
+    BRITE SUB +5TH −5TH GATE WASH SNAP DEEP AIR HOLLOW`) riding the per-hit
+    parameter lock (the exact mechanism step locks use). ZERO dead pads for
+    any kit size; a set with no drum voices yields honest 'empty' markers
+    (the UI toasts the Sound-tab fix — the established dj() convention).
+  - **`padLabel`**: the genre word is stripped ("Trance Punch Kick" →
+    "PUNCH KICK"); "Trance"×16 can never happen again (bun-pinned).
+  - **SCALE**: 16 pads = two octaves of the project scale with REAL note
+    names (root 33 minor → A3, B3, C4…). **CHORD**: diatonic triads with
+    correct quality symbols (natural minor: Am, B°, C, Dm, Em, F, G).
+- **`PAD_GLYPHS`** — 25 per-type envelope silhouettes (every `drumDurEst`
+  branch covered, bun-verified against the switch itself). Rendered as SVG
+  polylines inside the pads: every pad shows the SHAPE of its sound — the
+  blank-card era is over.
+
+### The surface (`js/ui/perform.js`, `css/app.css`)
+- `renderPads` rebuilds from `padKit` with a signature gate (the rAF loop
+  renders free); voice pads show label + glyph + type + track no.; variant
+  pads carry the accent-tinted modifier tag; SCALE/CHORD pads show the big
+  note/chord name + roman degree. Honest tooltips everywhere.
+- `padHit` consumes the pad map: DRUM always fires (voice or variant lock);
+  SCALE/CHORD fall back to the first synth track instead of the hard-coded
+  index 4 (which silently died when track 4 wasn't a synth); offline/stale
+  states answer with toasts, never silence.
+
+### Playability
+- **Keys 1-8 + y u i o p j k l** — the full 16-pad grid playable from the
+  keyboard (registry-validated, collision-tested, help overlay renders it).
+- Pads record while REC is armed (recHit on the mapped track) — variants
+  record onto their base track.
+
+### Gates
+- `bun test`: 543/543 GREEN (new `tests/pads-v022.test.ts`: zero-dead-pad
+  contract for 4 styles, clamp-range locks, identity uniqueness, note-name
+  math, chord qualities, glyph coverage, honest empties).
+- `node tools/verify.mjs`: GREEN.
+
 ## [0.21.0] — Run 20k: THROW TOOLS (ECHO THROW + MUFFLE) — the two classic DJ performance moves, quantized release
 
 > Standing owner directive: playability ("יוכל בפועל לשחק תוך כדי תנועה") —

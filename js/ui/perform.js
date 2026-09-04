@@ -1,5 +1,5 @@
 import { $, I, pushHist, after, PERF, recHit, toast } from '../state.js';
-import { SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, FILL_NAMES, LIMITS } from '../model.js';
+import { M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, FILL_NAMES, LIMITS, PAD_GRID, padKit, padGlyph } from '../model.js';
 import { addTrackToProject } from '../presets.js';
 import { sceneAdd, sceneDuplicate, sceneClear, sceneMove, sceneRename, sceneSetColor, sceneSetBars, sceneToggleFill, sceneSetFollow, sceneSetTrans, sceneSetMix, captureSceneMix, FOLLOW_MODES } from '../scenes.js';
 
@@ -127,8 +127,65 @@ function renderScenes() {
     w.appendChild(add);
   }
 }
-function renderPads(){const pm=$('padModes');if(!pm.children.length)['DRUM','SCALE','CHORD'].forEach(m=>{const b=document.createElement('button');b.textContent=m;b.onclick=()=>{I.padMode=m;renderPads()};pm.appendChild(b)});[...pm.children].forEach(b=>b.classList.toggle('on',b.textContent===I.padMode));const g=$('pads');if(!g.children.length)for(let i=0;i<16;i++){const b=document.createElement('button');b.className='pad';b.addEventListener('pointerdown',e=>{e.preventDefault();padHit(i);b.classList.add('hit');setTimeout(()=>b.classList.remove('hit'),110)});g.appendChild(b)}[...g.children].forEach((b,i)=>{if(I.padMode==='DRUM'){const t=I.p.tracks[i%I.p.tracks.length];b.innerHTML='<span class="lb">'+(t?t.name.split(' ')[0]:'—')+'</span><span class="tg2">'+(t?t.kind:'')+'</span>'}else{b.innerHTML='<span class="lb">'+['I','II','III','IV','V','VI','VII','VIII'][i%8]+'</span><span class="tg2">'+(I.padMode==='CHORD'?'chord':'note')+'</span>'}})}
-function padHit(i){const vel=(+$('padVel').value)/100;if(I.padMode==='DRUM'){const t=i%I.p.tracks.length;const tr=I.p.tracks[t];if(tr&&tr.kind==='drum'&&I.eng){I.eng.trigger(tr,I.ctx.currentTime,{vel,note:48,lock:{}},0);recHit(t,null,vel)}}else{const sc=SCALES[I.p.scale]||SCALES.minor;const deg=i;const idx=deg%sc.length,oct=Math.floor(deg/sc.length);const note=I.p.root+24+sc[idx]+12*oct;let ti=I.p.selTrack;if(I.p.tracks[ti].kind==='drum')ti=4;const tr=I.p.tracks[ti];if(I.padMode==='CHORD'){[0,2,4].forEach((k,j)=>{const dd=(idx+k)%sc.length,oo=Math.floor((idx+k)/sc.length);const n=I.p.root+24+sc[dd]+12*(oct+oo);I.eng.trigger(tr,I.ctx.currentTime,{vel:j===0?vel:vel*.75,note:n,lock:{}},0)});recHit(ti,note,vel)}else{I.eng.trigger(tr,I.ctx.currentTime,{vel,note,lock:{}},0);recHit(ti,note,vel)}}}
+/* v0.22.0 PADS v3 — the LIVE GRID. The old surface was below criticism
+   (owner's screenshot): 16 pads ALL reading "Trance" (name.split(' ')[0] of
+   the preset name) and half of them DEAD (i%tracks.length landed on synth
+   tracks; padHit refused to fire). Everything now comes from the pure
+   padKit (model.js): DRUM = one pad per real drum voice + musical VARIANT
+   pads (+OCT/-OCT/TIGHT/LONG/PUNCH/DARK/BRITE/SUB parameter locks — the
+   same mechanism step locks use) → every pad always plays, each with a
+   distinct label and an envelope GLYPH (SVG silhouette of the sound).
+   SCALE/CHORD = real note names. Signature-gated like the scene bank —
+   the rAF loop may call this on every dirty frame for free. */
+let padSig='';
+function renderPads(){
+  const pm=$('padModes');
+  if(!pm.children.length)['DRUM','SCALE','CHORD'].forEach(m=>{const b=document.createElement('button');b.textContent=m;b.onclick=()=>{I.padMode=m;renderPads()};pm.appendChild(b)});
+  [...pm.children].forEach(b=>b.classList.toggle('on',b.textContent===I.padMode));
+  const g=$('pads');
+  if(!g.children.length)for(let i=0;i<PAD_GRID;i++){const b=document.createElement('button');b.className='pad';b.addEventListener('pointerdown',e=>{e.preventDefault();padHit(i);b.classList.add('hit');setTimeout(()=>b.classList.remove('hit'),110)});g.appendChild(b)}
+  const map=padKit(I.p,I.padMode);I.padMap=map;
+  const sig=I.padMode+'#'+I.p.scale+'#'+I.p.root+'#'+map.map(m=>m.label+'~'+(m.track!=null?m.track:'x')+'~'+(m.lock?JSON.stringify(m.lock):'')).join('|')+'#'+g.children.length;
+  if(sig===padSig)return;
+  padSig=sig;
+  [...g.children].forEach((b,i)=>{
+    const m=map[i];if(!m)return;
+    if(m.mode==='empty'){b.className='pad empty';b.title='No drum voice in this set — Sound tab → drum preset → ASSIGN';b.innerHTML='<span class="lb">—</span><span class="tg2">empty</span>';return}
+    if(I.padMode==='DRUM'){
+      const isVar=m.mode==='variant';
+      b.className='pad'+(isVar?' var':'');
+      b.title=(isVar?'VARIANT — ':'')+(m.label||'')+' ('+(m.sub||'')+')'+(isVar?' · parameter lock: '+JSON.stringify(m.lock):'')+' · trigger live, records while REC is armed';
+      b.innerHTML='<span class="lb">'+m.label+'</span>'
+        +'<svg class="gl" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"><polyline points="'+padGlyph(m.glyph)+'"/></svg>'
+        +'<span class="tg">'+m.sub+'</span>'
+        +'<span class="tg2">'+(isVar?m.mod:m.track+1)+'</span>';
+    }else{
+      b.className='pad';
+      b.title=(I.padMode==='CHORD'?'CHORD — diatonic triad ':'NOTE — key-locked ')+m.label+' · degree '+m.sub+' · plays through the selected synth track';
+      b.innerHTML='<span class="lb big">'+m.label+'</span><span class="tg2">'+m.sub+'</span>';
+    }
+  });
+}
+function padHit(i){
+  const vel=(+$('padVel').value)/100;
+  if(!I.eng||!I.ctx){toast('ENGINE OFFLINE — power on first');return}
+  const map=(I.padMap&&I.padMap.length===PAD_GRID)?I.padMap:padKit(I.p,I.padMode);
+  const m=map[i];if(!m)return;
+  if(I.padMode==='DRUM'){
+    if(m.mode==='empty'||m.track==null){toast('NO DRUM VOICE in this set — assign one: Sound tab → drum preset → ASSIGN');return}
+    const tr=I.p.tracks[m.track];
+    if(!tr||tr.kind!=='drum'){toast('STALE PAD MAP — tap again');I.padMap=null;return}
+    I.eng.trigger(tr,I.ctx.currentTime,{vel,note:48,lock:m.lock?Object.assign({},m.lock):{}},0);
+    recHit(m.track,null,vel);
+  }else{
+    let ti=I.p.selTrack;
+    if(!(I.p.tracks[ti]&&I.p.tracks[ti].kind==='synth'))ti=I.p.tracks.findIndex(t=>t&&t.kind==='synth');
+    if(ti<0){toast('NO SYNTH VOICE in this set — add one: + TRACK');return}
+    const tr=I.p.tracks[ti];
+    if(m.mode==='chord'){m.notes.forEach((n,j)=>I.eng.trigger(tr,I.ctx.currentTime,{vel:j===0?vel:vel*.75,note:n,lock:{}},0));recHit(ti,m.notes[0],vel)}
+    else{I.eng.trigger(tr,I.ctx.currentTime,{vel,note:m.note,lock:{}},0);recHit(ti,m.note,vel)}
+  }
+}
 function renderTracks(){const w=$('tracks');w.innerHTML='';I.p.tracks.forEach((t,i)=>{const d=document.createElement('div');d.className='trk'+(i===I.selTrack?' sel':'');d.innerHTML='<span class="nm">'+t.name.split(' ')[0]+'</span><span class="ps">'+(t.presetId||'—')+'</span><div class="ms"><button class="mute'+(t.mix.mute?' on':'')+'">M</button><button class="solo'+(t.mix.solo?' on':'')+'">S</button></div><input type="range" min="0" max="100" value="'+Math.round(Math.sqrt(t.mix.vol)*100)+'" style="width:70px">';d.querySelector('.mute').onclick=e=>{e.stopPropagation();pushHist();t.mix.mute=!t.mix.mute;after()};d.querySelector('.solo').onclick=e=>{e.stopPropagation();pushHist();t.mix.solo=!t.mix.solo;after()};const rg=d.querySelector('input');rg.onclick=e=>e.stopPropagation();rg.oninput=e=>{t.mix.vol=Math.pow(+e.target.value/100,2);if(I.eng)I.eng.syncMix(I.p);I.dirty=true};d.onclick=()=>{I.selTrack=i;I.renderDirty=true};w.appendChild(d)});/* +TRACK (UNLIMIT v0.5.0): explicit growth action, capped at LIMITS.MAX_TRACKS */if(I.p.tracks.length<LIMITS.MAX_TRACKS){const add=document.createElement('button');add.className='trkAdd';add.textContent='+ TRACK';add.title='Add a track (up to '+LIMITS.MAX_TRACKS+') — starts with the neutral Init Synth';add.onclick=()=>{pushHist();const t=addTrackToProject(I.p);if(t<0){toast('Track limit reached ('+LIMITS.MAX_TRACKS+')');return}I.selTrack=t;after();toast('TRACK '+(t+1)+' added')};w.appendChild(add)}}
 function renderLayers(){const w=$('layers');w.innerHTML='';[['drums','DRUMS'],['bass','BASS'],['music','MUSIC'],['fx','FX DELAY']].forEach(([k,lb])=>{const b=document.createElement('button');b.textContent=lb;b.style.padding='12px';const muted=k==='drums'?I.p.tracks.slice(0,4).every(t=>t.mix.mute):k==='bass'?I.p.tracks[4].mix.mute:k==='music'?I.p.tracks.slice(5).every(t=>t.mix.mute):I.p.tracks[4].mix.sendA===0;b.classList.toggle('on',muted);b.onclick=()=>PERF.toggleLayer(k);w.appendChild(b)})}
 function renderMacros(){const w=$('macros');w.innerHTML='';/* v0.17.0 — all EIGHT macros, each resolving to real engine state (see resolveMacros v2).

@@ -89,6 +89,7 @@ window.addEventListener('keydown',e=>{
 if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
 if(e.code==='Space'){e.preventDefault();if(['PLAYING','RECORDING','TRANSITIONING'].includes(I.fsm))$('bStop').click();else $('bPlay').click()}
 else if(e.code.startsWith('Digit')){const n=+e.code.slice(5);if(n>=1&&n<=8){if(e.altKey){/* v0.17.0 — Alt+N instant-launches scene N (the live performance jump) */if(I.p&&I.p.scenes[n-1])PERF.launch(n-1,true)}else if(e.shiftKey){I.selTrack=n-1;I.renderDirty=true}else padTrigger(n-1)}}
+else if(!e.altKey&&!e.shiftKey&&'yuiopjkl'.includes(e.key)&&e.key.length===1){/* v0.22.0 PADS v3 — the second pad row: keys y u i o p / j k l trigger pads 9-16 (registry-validated, no collisions) */const idx='yuiopjkl'.indexOf(e.key);if(idx>=0)padTrigger(8+idx)}
 else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();if(!I.p)return;let i=I.p.activeScene;const dir=e.key==='ArrowRight'?1:-1;for(let k=0;k<I.p.scenes.length;k++){i=(i+dir+I.p.scenes.length)%I.p.scenes.length;if(PERF.launch(i).ok)break}}
 else if(e.key==='f')PERF.fill();
 else if(e.key==='v')PERF.variation();

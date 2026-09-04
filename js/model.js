@@ -118,6 +118,133 @@ else if(t===7){for(let k=0;k<8;k++)out.push({track:k%2?3:1,off:k,vel:.35+.06*k,l
 else{for(let k=0;k<8;k++)out.push({track:3,off:k*.5,vel:.5+.05*k,lock:{}})}
 return out}
 
+/* ── PADS v3 (v0.22.0) — the LIVE GRID contract ──
+   The old pad surface was below criticism (the owner, with a screenshot:
+   16 pads all reading "Trance", half of them DEAD — the i%tracks.length map
+   landed on synth tracks and padHit refused to fire). This module is the
+   pure repair, bun-owned like fillEvents:
+
+   DRUM mode  — one pad per REAL drum track (smart label: the preset name
+   minus the leading genre word, "Trance Punch Kick" → "PUNCH KICK"), then
+   VARIANT pads fill the grid to 16 with musical transforms of the kit
+   (+OCT/−OCT/TIGHT/LONG/PUNCH/DARK/BRITE/SUB) riding the per-hit parameter
+   lock — the exact mechanism step locks use. Every one of the 16 pads
+   resolves to a playable drum voice. ZERO dead pads, ever.
+   SCALE mode — 16 pads = two octaves of the project scale, real note names.
+   CHORD mode — diatonic triads with correct quality symbols (m ° + maj).
+   A set with NO drum voices answers honestly (mode 'empty' → the UI toasts
+   the Sound-tab fix — the established dj() convention).
+
+   PAD_GLYPHS: per-type envelope silhouettes (normalized 0..1 points, y up)
+   rendered as SVG polylines — every pad shows the SHAPE of its sound.
+   Pure data + pure functions; no DOM here. */
+const PAD_GRID=16;
+/* leading genre words stripped from preset names for pad labels — the first
+   word of a preset name is (by factory convention) the genre tag */
+const PAD_GENRE_WORDS=new Set(['psy','trance','techno','prog','progressive','goa','dark','full-on','hi-tech','forest','init','tranz','noise','fx']);
+function padLabel(tr){
+  const nm=String((tr&&tr.name)||'').trim();
+  if(!nm)return '—';
+  const words=nm.split(/\s+/);
+  const base=(words.length>=2&&PAD_GENRE_WORDS.has(words[0].toLowerCase()))?words.slice(1).join(' '):nm;
+  return base.toUpperCase().slice(0,18);
+}
+function padType(tr){const sd=(tr&&tr.sound)||{};return String(sd.type||tr.type||'kick')}
+/* variant recipes — musical transforms over the kit's drum tracks to fill
+   the grid. SIXTEEN recipes: with D drum tracks the grid needs 16−D ≤ 15
+   variants, so every (recipe, track) pair is distinct for ANY kit size —
+   no two pads ever share an identity. Values land in the SAME clamp ranges
+   the engine and the preset validators use (tune 0.4..2.2, decay 0.15..3,
+   punch 0..1, tone 0.4..1.9). */
+const PAD_VARIANTS=[
+  {tag:'+OCT', mod:s=>({tune:Math.min(2.2,Math.max(.4,(s.tune||1)*2))})},
+  {tag:'-OCT', mod:s=>({tune:Math.min(2.2,Math.max(.4,(s.tune||1)*.5))})},
+  {tag:'TIGHT',mod:s=>({decay:Math.max(.15,Math.min(3,(s.decay||1)*.4))})},
+  {tag:'LONG', mod:s=>({decay:Math.max(.15,Math.min(3,(s.decay||1)*2.2))})},
+  {tag:'PUNCH',mod:s=>({punch:1})},
+  {tag:'DARK', mod:s=>({tone:Math.min(1.9,Math.max(.4,(s.tone||1)*.55))})},
+  {tag:'BRITE',mod:s=>({tone:Math.min(1.9,Math.max(.4,(s.tone||1)*1.5))})},
+  {tag:'SUB',  mod:s=>({tune:Math.min(2.2,Math.max(.4,(s.tune||1)*.72)),decay:Math.max(.15,Math.min(3,(s.decay||1)*1.5))})},
+  {tag:'+5TH', mod:s=>({tune:Math.min(2.2,Math.max(.4,(s.tune||1)*1.498))})},
+  {tag:'-5TH', mod:s=>({tune:Math.min(2.2,Math.max(.4,(s.tune||1)*.667))})},
+  {tag:'GATE', mod:s=>({decay:Math.max(.15,Math.min(3,(s.decay||1)*.25))})},
+  {tag:'WASH', mod:s=>({decay:Math.max(.15,Math.min(3,(s.decay||1)*2.8))})},
+  {tag:'SNAP', mod:s=>({punch:.8,decay:Math.max(.15,Math.min(3,(s.decay||1)*.55))})},
+  {tag:'DEEP', mod:s=>({tune:Math.min(2.2,Math.max(.4,(s.tune||1)*.81)),decay:Math.max(.15,Math.min(3,(s.decay||1)*1.35))})},
+  {tag:'AIR',  mod:s=>({tone:Math.min(1.9,Math.max(.4,(s.tone||1)*1.35)),decay:Math.max(.15,Math.min(3,(s.decay||1)*.8))})},
+  {tag:'HOLLOW',mod:s=>({tone:Math.min(1.9,Math.max(.4,(s.tone||1)*.7)),tune:Math.min(2.2,Math.max(.4,(s.tune||1)*.89))})},
+];
+const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI'];
+const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const padNoteName=n=>NOTE_NAMES[((n%12)+12)%12]+(Math.floor(n/12)-1);
+const padChordName=(n1,n2,n3)=>NOTE_NAMES[((n1%12)+12)%12]+padChordQuality(n1,n2,n3);
+function padChordQuality(n1,n2,n3){const a=n2-n1,b=n3-n2;return (a===3&&b===3)?'°':(a===3&&b===4)?'m':(a===4&&b===3)?'':(a===4&&b===4)?'+':''}
+/* padKit(p, mode) — the ONE pad-grid builder. Returns exactly 16 entries:
+   DRUM   {mode:'voice'|'variant'|'empty', track, label, sub, lock, glyph}
+   SCALE  {mode:'scale', note, label, sub}          sub = roman degree
+   CHORD  {mode:'chord', notes:[n1,n2,n3], label, sub}  label = Cm/F/…  */
+function padKit(p,mode){
+  const out=[];
+  if(mode==='SCALE'||mode==='CHORD'){
+    const sc=SCALES[p.scale]||SCALES.minor,root=p.root|0,L=sc.length;
+    for(let i=0;i<PAD_GRID;i++){
+      const idx=i%L,oct=Math.floor(i/L);
+      const n=root+24+sc[idx]+12*oct;
+      if(mode==='SCALE')out.push({mode:'scale',note:n,label:padNoteName(n),sub:ROMAN[i]});
+      else{
+        const ns=[0,2,4].map(k=>root+24+sc[(idx+k)%L]+12*(oct+Math.floor((idx+k)/L)));
+        out.push({mode:'chord',notes:ns,label:padChordName(ns[0],ns[1],ns[2]),sub:ROMAN[i]});
+      }
+    }
+    return out;
+  }
+  /* DRUM */
+  const drums=[];const n=Math.min(p.tracks.length,MAX_TRACKS);
+  for(let t=0;t<n;t++)if(p.tracks[t]&&p.tracks[t].kind==='drum')drums.push(t);
+  for(const ti of drums){if(out.length>=PAD_GRID)break;const tr=p.tracks[ti];
+    out.push({mode:'voice',track:ti,label:padLabel(tr),sub:padType(tr),lock:null,glyph:padType(tr)})}
+  let vi=0;
+  while(out.length<PAD_GRID&&drums.length){
+    const ti=drums[vi%drums.length],tr=p.tracks[ti],v=PAD_VARIANTS[vi%PAD_VARIANTS.length];
+    const lock=v.mod(tr.sound||{});
+    out.push({mode:'variant',track:ti,label:padLabel(tr),mod:v.tag,sub:padType(tr),lock,glyph:padType(tr)});
+    vi++;
+  }
+  while(out.length<PAD_GRID)out.push({mode:'empty',track:null,label:'—',sub:'no drum voice',lock:null,glyph:null});
+  return out;
+}
+/* PAD_GLYPHS — envelope silhouettes per drum type (12-point polylines,
+   x 0..100, y 0..56, y=4 attack peak / y=56 silence). Drawn as SVG in the
+   pad — the visual identity the empty gray cards never had. */
+const PAD_GLYPHS={
+  kick:'0,4 6,10 16,34 30,48 48,53 72,55 100,56',
+  snare:'0,4 8,12 18,26 30,36 44,44 62,50 100,54',
+  clap:'0,4 6,20 12,10 20,28 28,14 38,32 60,44 100,52',
+  hatc:'0,4 8,26 18,46 32,54 100,56',
+  hato:'0,4 8,24 20,36 38,46 60,52 100,55',
+  tom:'0,4 10,16 24,32 42,44 64,51 100,55',
+  rim:'0,4 10,30 20,48 34,54 100,56',
+  glitch:'0,4 8,28 14,10 22,36 30,16 40,40 52,50 74,54 100,55',
+  shaker:'0,22 12,8 24,26 36,12 48,32 62,44 100,54',
+  conga:'0,4 12,14 28,30 46,42 68,50 100,54',
+  bongo:'0,4 14,16 30,34 48,44 70,51 100,55',
+  cowbell:'0,4 10,18 20,14 32,30 46,40 66,48 100,53',
+  clave:'0,4 12,26 24,46 40,53 100,56',
+  zap:'0,4 14,40 28,52 46,55 100,56',
+  boom:'0,4 8,12 20,28 36,42 56,50 80,54 100,55',
+  riser:'0,52 20,46 40,38 60,28 80,16 100,4',
+  impact:'0,4 6,14 16,30 30,42 48,50 72,54 100,55',
+  darbuka:'0,4 12,18 26,32 44,43 66,50 100,54',
+  tambourine:'0,18 10,6 22,22 34,10 46,28 60,40 78,48 100,53',
+  triangle:'0,4 12,14 26,22 42,30 60,38 80,46 100,50',
+  downlifter:'0,4 20,14 40,26 60,38 80,48 100,54',
+  crash:'0,4 6,16 14,28 26,38 42,46 64,51 100,54',
+  revcym:'0,54 20,48 40,40 60,28 80,14 96,4 100,52',
+  agogo:'0,4 14,20 30,36 50,45 72,51 100,55',
+  timbale:'0,4 12,20 26,34 44,44 66,50 100,54',
+};
+const padGlyph=t=>PAD_GLYPHS[String(t||'').toLowerCase()]||PAD_GLYPHS.tom;
+
 function stepEvents(p,s){
 const pat=p.patterns[p.currentPattern];if(!pat)return [];
 const evs=[],sd=60/p.bpm/4,tick=sd/64;
@@ -141,4 +268,4 @@ evs.push({track:t,off,vel:clamp(st.vel,0.05,1),note:st.note,lock});
 return evs;
 }
 
-export { clamp, deep, mulberry32, fnv, barSeed, GROOVES, MAX_TRACKS, MAX_STEPS, MAX_SCENES, SYNTH_VOICES, DRUM_VOICES, SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, tapTempo, FILL_NAMES, fillEvents, gcd, mkStep, mkPattern, mkProject, loopLen, laneEval, stepEvents, LIMITS };
+export { clamp, deep, mulberry32, fnv, barSeed, GROOVES, MAX_TRACKS, MAX_STEPS, MAX_SCENES, SYNTH_VOICES, DRUM_VOICES, SCALES, M_ENERGY, M_DRIVE, M_SPACE, M_MOVE, M_FILTER, M_TIGHT, M_HAUNT, M_FAZE, tapTempo, FILL_NAMES, fillEvents, gcd, mkStep, mkPattern, mkProject, loopLen, laneEval, stepEvents, LIMITS, PAD_GRID, padKit, padLabel, padType, padGlyph, PAD_GLYPHS, padNoteName, padChordQuality };
