@@ -175,6 +175,18 @@ describe('PERCUSSION ROM v3 — engine integration pins', () => {
   test('killAll panics the ROM pool (stop = silence, no stuck tails)', () => {
     expect(ENGINE_SRC).toContain('for(const v of this.romPool){const t=this.ctx.currentTime')
   })
+
+  test('G48 asserts the ROM reality (raw strike-leads-body ≥1.2 + path liveness)', () => {
+    const TESTS_SRC = readFileSync(join(ROOT, 'js/ui/tests.js'), 'utf8')
+    expect(TESTS_SRC).toContain("import { renderRomPcm } from '../../foundation/dsp/perc-rom.mjs'")
+    expect(TESTS_SRC).toContain('rawRatio48>=1.2')
+    expect(TESTS_SRC).toContain('romLive48')
+  })
+
+  test('ROM cache is module-level shared (AudioBuffers are context-independent)', () => {
+    expect(ENGINE_SRC).toContain('const ROM_SHARED=new Map()')
+    expect(ENGINE_SRC).toContain('ab=ROM_SHARED.get(key)')
+  })
 })
 
 describe('PERCUSSION ROM v3 — sample manifest integrity', () => {

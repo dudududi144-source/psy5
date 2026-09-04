@@ -13,6 +13,13 @@ import { ROM_TYPES, renderRomPcm } from '../foundation/dsp/perc-rom.mjs';
    Track index → tier for the 8 factory tracks; ad-hoc (audition) tracks are
    tiered by their preset category/type. */
 const TRACK_TIERS=[0,1,1,1,0,2,3,2];
+/* ROM_SHARED (v0.23.0): AudioBuffers are context-INDEPENDENT (plain PCM — the
+   sample cache already relies on this: "the SAME buffers serve live + offline
+   renders"). The render-once-per-session cache lives at MODULE level, so a
+   second engine (every offline bounce/gate render builds a fresh
+   PooledEngine) reuses the live context's buffers instead of re-rendering
+   the crash bank per context. Keys type@sampleRate. */
+const ROM_SHARED=new Map();
 class PooledEngine{constructor(ctx,opts){opts=opts||{};this.poolSizes={synthVoices:opts.synthVoices!=null?opts.synthVoices:20,drumVoices:opts.drumVoices!=null?opts.drumVoices:24};this.ctx=ctx;this.master=ctx.createGain();this.master.gain.value=.85;const comp=this.comp=ctx.createDynamicsCompressor();comp.threshold.value=-8;comp.knee.value=12;comp.ratio.value=6;comp.attack.value=.003;comp.release.value=.2;const an=this.analyser=ctx.createAnalyser();an.fftSize=256;
 /* ── MASTER SECTION (v0.8.0): EQ3 + glue compressor ──
    Inserted between the mix bus (this.master) and the EXISTING master
@@ -174,7 +181,7 @@ A 15 ms safety fade is ALWAYS scheduled at the reuse boundary
 min(bufferDur/rate, durEst·1.15+.02) → click-free pooling for any tune/
 decay/rate combination, including pitch-down rings that outlive the window. */
 nextRomVoice(when){let v=null;for(let i=0;i<this.romPool.length;i++){const c=this.romPool[i];if(!c.busyUntil||c.busyUntil<=when)return c}/* all busy → steal the SOONEST-to-finish (the drum pool steals by tier; ROM voices are one tier — oldest-lastTrigger loses, honest counter) */for(let i=0;i<this.romPool.length;i++){const c=this.romPool[i];if(v===null||c.busyUntil<v.busyUntil)v=c}if(v)this.romSteals++;return v}
-romBuffer(type){const key=type+'@'+this.ctx.sampleRate;let ab=this.romCache.get(key);if(ab)return ab;try{const pcm=renderRomPcm(type,this.ctx.sampleRate);ab=this.ctx.createBuffer(1,pcm.length,this.ctx.sampleRate);ab.copyToChannel(pcm,0);this.romCache.set(key,ab);this.romRenders++;return ab}catch(e){this.romFallbacks++;return null}}
+romBuffer(type){const key=type+'@'+this.ctx.sampleRate;let ab=this.romCache.get(key);if(ab)return ab;ab=ROM_SHARED.get(key);if(ab){this.romCache.set(key,ab);return ab}try{const pcm=renderRomPcm(type,this.ctx.sampleRate);ab=this.ctx.createBuffer(1,pcm.length,this.ctx.sampleRate);ab.copyToChannel(pcm,0);this.romCache.set(key,ab);ROM_SHARED.set(key,ab);this.romRenders++;return ab}catch(e){this.romFallbacks++;return null}}
 triggerRom(tr,when,vel,lock,type,p){const ab=this.romBuffer(type);if(!ab)return false;const v=this.nextRomVoice(when);if(!v)return false;const cl=(x,a,b)=>x<a?a:(x>b?b:x);const tune=cl(p.tune||1,.25,4),tone=p.tone==null?1:p.tone,punch=cl(p.punch!=null?p.punch:.5,0,1),decay=p.decay==null?1:p.decay;v.connect(this.chains[tr.idx]||this.master);
 /* per-hit BufferSource — the ONE unavoidable allocation (same law as the
    sample path); gain+filter are pooled and never allocated per hit */
