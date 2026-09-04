@@ -363,8 +363,8 @@ describe('REASON PORT — provenance pins (the port is the psyreason DSP)', () =
     expect(patchToKick({ filter: { res: 99 } }, { sampleRate: SR, durationSec: 0.72 }).filterQ).toBeCloseTo(5.0, 5) // clamped
   })
 
-  test('engine.js has no reason wiring yet (Phase 1a = foundation only; the orchestrator wires later)', () => {
-    expect(ENGINE_SRC).not.toContain('reason-engines')
-    expect(ENGINE_SRC).not.toContain('renderReasonPcm')
+  test('engine.js IS reason-wired (Phase 2 v0.24.0 — the kit system routes REASON_TYPES; the 2023-1a pin said the orchestrator wires later — this is that wiring)', () => {
+    expect(ENGINE_SRC).toContain('reason-engines')
+    expect(ENGINE_SRC).toContain('renderReasonPcm')
   })
 })

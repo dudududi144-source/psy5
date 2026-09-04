@@ -142,8 +142,8 @@ describe('PERCUSSION ROM v3 — recipe pins (the physics that un-beep the drums)
 })
 
 describe('PERCUSSION ROM v3 — engine integration pins', () => {
-  test('trigger routes ROM_TYPES BEFORE any pooled voice is touched', () => {
-    expect(ENGINE_SRC).toContain('if(this.romOn&&tr.kind===\'drum\'){const sd0=tr.sound||{};const ty0=sd0.type||tr.type;if(ROM_TYPES.has(ty0)&&this.triggerRom(tr,when,ev.vel,ev.lock||{},ty0,sd0))return}')
+  test('trigger routes ROM/REASON types BEFORE any pooled voice is touched (v0.24.0: REASON_TYPES joined the early route; kick fires sidechain on the ROM path)', () => {
+    expect(ENGINE_SRC).toContain('if(this.romOn&&tr.kind===\'drum\'){const sd0=tr.sound||{};const ty0=sd0.type||tr.type;if((REASON_TYPES.has(ty0)||ROM_TYPES.has(ty0))&&this.triggerRom(tr,when,ev.vel,ev.lock||{},ty0,sd0)){if(ty0===\'kick\')this.sidechain(when,tr.idx);')
     // the ROM branch sits BEFORE the nextVoice selection (no steal/consume)
     expect(ENGINE_SRC.indexOf('if(this.romOn&&tr.kind'))
       .toBeLessThan(ENGINE_SRC.indexOf('const tier=this.tierOfTrack(tr);const v=this.nextVoice(tr,tier,when)'))
@@ -167,9 +167,9 @@ describe('PERCUSSION ROM v3 — engine integration pins', () => {
     expect(ENGINE_SRC).toContain('romSpawns:this.romSpawns,romRenders:this.romRenders,romFallbacks:this.romFallbacks,romSteals:this.romSteals,romOn:this.romOn')
   })
 
-  test('warmRom exists and main.js warms at power-on (idle-sliced)', () => {
+  test('warmRom exists and main.js warms at power-on (idle-sliced, kitWarmTypes since v0.24.0)', () => {
     expect(ENGINE_SRC).toContain('warmRom(types){')
-    expect(MAIN_SRC).toContain('v0.23.0 PERCUSSION ROM warm')
+    expect(MAIN_SRC).toContain('v0.24.0 REASON KIT warm')
   })
 
   test('killAll panics the ROM pool (stop = silence, no stuck tails)', () => {
@@ -185,7 +185,9 @@ describe('PERCUSSION ROM v3 — engine integration pins', () => {
 
   test('ROM cache is module-level shared (AudioBuffers are context-independent)', () => {
     expect(ENGINE_SRC).toContain('const ROM_SHARED=new Map()')
-    expect(ENGINE_SRC).toContain('ab=ROM_SHARED.get(key)')
+    // v0.24.0: reason renders share the same module-level law under REASON_SHARED
+    expect(ENGINE_SRC).toContain('const REASON_SHARED=new Map()')
+    expect(ENGINE_SRC).toContain('(isRe?REASON_SHARED:ROM_SHARED).set(key,ab)')
   })
 })
 

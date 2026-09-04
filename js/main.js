@@ -9,7 +9,7 @@ import { renderLanes, wireLanes, drawPlayhead, populateParamSelect } from './ui/
 import { wireCompose } from './ui/compose.js';
 import { helpRows } from './shortcuts.js';
 import { arrToggle } from './arranger.js';
-import { renderLib, renderSynthEd, wireSound } from './ui/sound.js';
+import { renderLib, renderSynthEd, wireSound, syncKitSel } from './ui/sound.js';
 import { renderSamples, wireSamples, hydrateProjectSamples, applyComposerSampleHints } from './ui/samples.js';
 import { renderMixer } from './ui/mix.js';
 import { wireTests } from './ui/tests.js';
@@ -19,6 +19,7 @@ import { wireCapture } from './ui/capture.js';
 import { wireArranger } from './ui/arranger.js';
 import { startSched } from './scheduler.js';
 import { PooledEngine, prepInsertDSP } from './engine.js';
+import { kitWarmTypes, DEFAULT_KIT, STYLE_KIT } from '../foundation/dsp/kit-reason.mjs';
 import { mkWorkletEngine, WORKLET_LIMITATIONS } from './worklet-engine.js';
 import { buildStyle } from './presets.js';
 import { parseShareHash, decodeShare } from './share.js';
@@ -26,7 +27,7 @@ import { SYNTH_VOICES, DRUM_VOICES } from './model.js';
 
 function renderAll(){if(!I.p)return;renderHeader();/* v0.16.1 PERF — per-tab rendering: hidden tabs used to rebuild on EVERY render (the 345-row preset list, the whole mixer, the seq grid — all display:none!). Hidden-tab content renders on switch (wireHeader forces a full render) and stays live while visible. */
 const tabOn=t=>{const el=$('tab-'+t);return !!(el&&el.classList.contains('on'))};
-renderScenes();renderPads();renderMacros();renderTracks();renderLayers();renderMidi();renderLibrary();
+renderScenes();renderPads();renderMacros();renderTracks();renderLayers();renderMidi();renderLibrary();syncKitSel();/* v0.24.0: the KIT select mirrors state.kit/kitPinned on every render */
 if(tabOn('seq')){renderSeq();renderLanes();populateParamSelect()}
 if(tabOn('sound')){renderLib();renderSynthEd()}
 if(tabOn('mix'))renderMixer();
@@ -38,19 +39,15 @@ function renderLoop(){requestAnimationFrame(renderLoop);if(I.p&&I.sched.on){rend
 /* v0.13.0 P3 — LOAD chip: engine telemetry + output latency, painted at 4 Hz
    (textContent only on change — no layout churn). Red on pool pressure or a
    growing tier-0 starvation counter. */
-setInterval(()=>{const el=$('loadMeter');if(!el)return;if(!I.eng||I.engine!=='main'||!I.eng.loadSnapshot){el.textContent='LOAD —';return}const l=I.eng.loadSnapshot();const cap=l.pools.synth+l.pools.drum;const load=cap?l.active/cap:0;const txt='LOAD '+(load*100).toFixed(0)+'% · '+l.synth+'/'+l.drum+'/'+l.samples+' · ST'+l.steals+' · T0'+l.tier0StealAttempts+' · '+l.latencyMs+'ms';if(el.textContent!==txt)el.textContent=txt;el.style.color=(load>=.75||l.tier0StealAttempts>0)?'#ff5d5d':(load>=.4?'#ffb84f':'')},250);
+setInterval(()=>{const el=$('loadMeter');if(!el)return;if(!I.eng||I.engine!=='main'||!I.eng.loadSnapshot){el.textContent='LOAD —';return}const l=I.eng.loadSnapshot();const cap=l.pools.synth+l.pools.drum;const load=cap?l.active/cap:0;const txt='LOAD '+(load*100).toFixed(0)+'% · '+l.synth+'/'+l.drum+'/'+l.samples+' · ST'+l.steals+' · T0'+l.tier0StealAttempts+' · '+l.latencyMs+'ms · RK'+l.reasonSpawns+'/'+l.reasonFallbacks+' · '+l.kitId;if(el.textContent!==txt)el.textContent=txt;el.style.color=(load>=.75||l.tier0StealAttempts>0)?'#ff5d5d':(load>=.4?'#ffb84f':'')},250);
 setInterval(()=>{if(!I.eng||!I.eng.analyser)return;const an=I.eng.analyser;if(!I._md)I._md=new Uint8Array(an.frequencyBinCount);an.getByteTimeDomainData(I._md);let pk=0;for(const v of I._md){const a=Math.abs(v-128)/128;if(a>pk)pk=a}const cv=$('meter'),g=cv.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,cv.width,cv.height);g.fillStyle=pk>.9?'#ff5d5d':'#4fd6c0';g.fillRect(0,8,pk*cv.width,10)},150);
 
 async function powerOn(style,resume){const AC=window.AudioContext||window.webkitAudioContext;const ctx=new AC({latencyHint:'interactive'});I.ctx=ctx;try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
 /* engine A/B (PSY6): MAIN pooled engine = default + reference · WORKLET = opt-in experimental */
 if(I.engineSel==='worklet'){try{I.eng=await mkWorkletEngine(ctx);I.engine='worklet'}catch(e){I.engine='main';I.eng=new PooledEngine(ctx);toast('WORKLET BOOT FAILED → MAIN ENGINE')}}else{I.engine='main';I.eng=new PooledEngine(ctx)}/* v0.13.0: preload the psy-dsp worklet module (MOOG insert) best-effort — live playback gets the real ladder; unloadable → honest per-track biquad fallback (counted) */
-/* v0.23.0 PERCUSSION ROM warm — render the 13 ROM buffers NOW at power-on
-   (idle-sliced so the boot frame never blocks): the first-hit lazy render is
-   the documented ~1–40 ms exception, and the owner should never meet it. */
-if(I.eng&&I.eng.warmRom){const WARM=['conga','shaker','crash','bongo','clave','rim','agogo','timbale','cowbell','triangle','tambourine','darbuka','revcym'];let wi=0;const warmStep=()=>{if(!I.eng||!I.eng.warmRom)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(wi<WARM.length){I.eng.romBuffer(WARM[wi++]);warmStep()}}catch(e){}})};warmStep()}
 try{prepInsertDSP(ctx)}catch(e){}
 try{if(ctx.state==='suspended')ctx.resume()}catch(e){}
-let p=null;if(resume)p=loadStored();if(!p&&I.pendingCompose){p=I.pendingCompose;I.pendingCompose=null}if(!p&&I.pendingShare){p=I.pendingShare;I.pendingShare=null}if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;loadProjectObj(p);/* backfill (midiMap/masterVol/sc/fx) — idempotent, sets I.p to the same object */I.upAt=Date.now();I.eng.syncMix(p);hydrateProjectSamples();if(I.pendingHints){I.pendingHints=false;applyComposerSampleHints({sampleHints:p.sampleHints})}/* v0.10.0: composed-boot sample hints *//* v0.10.0: pull referenced samples into the engine cache (missing → synth fallback + one-shot toast) */$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireLibrary();wireMidi();wireCapture();wireLanes();wireCompose();wireSamples();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();/* composed boot: land on Perform with the arranger running */if(I.composedLoad){try{arrToggle(true)}catch(e){};const f=I.composedLoad;I.composedLoad=null;toast('COMPOSED ✓ '+f.style+' · '+f.totalBars+' bars · '+f.lengthSec.toFixed(0)+'s · seed '+f.seed)}else toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
+let p=null;if(resume)p=loadStored();if(!p&&I.pendingCompose){p=I.pendingCompose;I.pendingCompose=null}if(!p&&I.pendingShare){p=I.pendingShare;I.pendingShare=null}if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;loadProjectObj(p);/* backfill (midiMap/masterVol/sc/fx) — idempotent, sets I.p to the same object *//* v0.24.0 REASON KIT warm — the kit list (20 types: 8 reason engines + 12 kit ROM roles) rendered NOW at power-on, idle-sliced so the boot frame never blocks. It runs AFTER the project load so the PROJECT'S kit is the one warmed (the render cache keys on kitId — warming the default kit would miss a stored/pinned kit). The idle callback guards engine loss. */if(I.eng&&I.eng.warmRom){const WARM=kitWarmTypes((I.p&&I.p.kit)||DEFAULT_KIT);let wi=0;const warmStep=()=>{if(!I.eng||!I.eng.warmRom)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(wi<WARM.length){I.eng.romBuffer(WARM[wi++]);warmStep()}}catch(e){}})};warmStep()}I.upAt=Date.now();I.eng.syncMix(p);hydrateProjectSamples();if(I.pendingHints){I.pendingHints=false;applyComposerSampleHints({sampleHints:p.sampleHints})}/* v0.10.0: composed-boot sample hints *//* v0.10.0: pull referenced samples into the engine cache (missing → synth fallback + one-shot toast) */$('power').style.display='none';$('app').style.display='block';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireLibrary();wireMidi();wireCapture();wireLanes();wireCompose();wireSamples();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();/* composed boot: land on Perform with the arranger running */if(I.composedLoad){try{arrToggle(true)}catch(e){};const f=I.composedLoad;I.composedLoad=null;toast('COMPOSED ✓ '+f.style+' · '+f.totalBars+' bars · '+f.lengthSec.toFixed(0)+'s · seed '+f.seed)}else toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
 
 /* ── READY SET boot (v0.17.0) — the owner: the user must receive the system
    ORGANIZED and READY TO PERFORM, never empty. Every genre button composes a
@@ -60,6 +57,8 @@ let p=null;if(resume)p=loadStored();if(!p&&I.pendingCompose){p=I.pendingCompose;
    ∅ BARE SKETCH keeps the old minimal buildStyle boot for sketching. */
 async function composeBoot(style,minutes,seed){try{toast('COMPOSING '+style+' — '+minutes+' MIN…');
 const r=compose(style,minutes,seed);
+/* v0.24.0 KIT HOOK — a composed set follows its style's kit unless the user PINNED one in the Sound tab (the pin rides the live project and carries over). */
+if(I.p&&I.p.kitPinned&&kitWarmTypes(I.p.kit).length){r.project.kit=I.p.kit;r.project.kitPinned=true}else{r.project.kit=STYLE_KIT[String(style).toLowerCase()]||DEFAULT_KIT;r.project.kitPinned=false}
 try{readyAlbum(r.project,style,seed,minutes)}catch(e){/* album is enrichment — never blocks the boot */}
 I.pendingCompose=r.project;I.composedLoad=r.form;await powerOn(style,false)}catch(e){toast('COMPOSE FAILED — '+e.message)}}
 

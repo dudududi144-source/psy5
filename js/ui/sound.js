@@ -1,4 +1,4 @@
-import { $, I, pushHist, toast, after } from '../state.js';
+import { $, I, pushHist, toast, after, saveProject } from '../state.js';
 import { deep } from '../model.js';
 import { libFind, libFilter, libCount, assignPresetToTrack } from '../presets.js';
 import { autoRecMove } from '../state.js';
@@ -6,6 +6,7 @@ import { SOUND_IDS, paramApply, ensureIns } from '../params.js';
 import { ensureVoice } from '../samplestore.js';
 import { freezeTrack } from '../bounce.js';
 import { importChannelsAsSample } from './samples.js';
+import { KIT_IDS, DEFAULT_KIT, STYLE_KIT, kitMeta, kitWarmTypes } from '../../foundation/dsp/kit-reason.mjs';
 
 /* v0.16.1 PERF — sig-gated preset list: the 345-row rebuild only happens when the filter/query/selection/assignment actually changed. */
 let libSig='';
@@ -48,6 +49,19 @@ return}const fields=[['cutoff','Cutoff',60,14000],['res','Reso x100',1,220],['at
 
  [['fenv','FEnv x1',0,16],['penv','PitchEnv st',0,48],['sub','Sub x100',0,100],['fdec2','FDec ms',10,2000],['pdec2','PDec ms',10,600]].forEach(([f,lb,mn,mx])=>{const d=document.createElement('div');const src=f==='fdec2'?'fdec':f==='pdec2'?'pdec':f==='sub'?'sub':f;const val=t.sound[src]!=null?t.sound[src]:(src==='fenv'?3:0);let disp=Math.round(val);if(src==='sub')disp=Math.round(val*100);if(src==='fdec'||src==='pdec')disp=Math.round(val*1000);d.innerHTML='<label for="v2_'+f+'">'+lb+'</label><input id="v2_'+f+'" type="range" min="'+mn+'" max="'+mx+'" value="'+disp+'" title="v0.13.0 synth param — default = legacy v0.12.0 behavior">';d.querySelector('input').oninput=e=>{let v=+e.target.value;if(src==='sub')v/=100;if(src==='fdec'||src==='pdec')v/=1000;t.sound[src]=v;I.dirty=true};w.appendChild(d)});['wave1','wave2'].forEach(f=>{const d=document.createElement('div');d.innerHTML='<label for="wv_'+f+'">'+f.toUpperCase()+'</label><select id="wv_'+f+'">'+['sawtooth','square','triangle','sine'].map(w=>'<option'+(w===t.sound[f]?' selected':'')+'>'+w+'</option>').join('')+'</select>';d.querySelector('select').onchange=e=>{t.sound[f]=e.target.value;I.dirty=true};w.appendChild(d)})}
 
-function wireSound(){$('libCat').innerHTML=['all','drum','bass','lead','pad','pluck','arp','fx','synth'].map(c=>'<option>'+c+'</option>').join('');/* v0.19.0 FIX: the genre list was HARDCODED and had drifted — FOREST (a first-class genre since its own voices shipped) was unfilterable. Derived from the library itself now: every genre that owns presets appears, and a future genre can never go missing again. */const gset=[...new Set(libFilter('all','ALL').map(x=>x.genre).filter(g=>g!=='ANY'))];$('libGenre').innerHTML=['ALL',...gset,'ANY'].map(g=>'<option>'+g+'</option>').join('');$('libCat').onchange=renderLib;$('libGenre').onchange=renderLib;if($('libQ'))$('libQ').oninput=renderLib;$('bAud').onclick=()=>{if(!I.selLib)return toast('select a preset');const pr=libFind(I.selLib);if(!pr)return;if(pr.cat==='drum'){const tr={idx:0,kind:'drum',sound:pr,type:pr.type};I.eng.trigger(tr,I.ctx.currentTime,{vel:.9,note:48,lock:{}},0)}else{const tr={idx:I.selTrack,kind:'synth',sound:pr};I.eng.trigger(tr,I.ctx.currentTime,{vel:.9,note:I.p.root+24,lock:{}},0)}};$('bAssign').onclick=()=>{if(!I.selLib)return toast('select a preset');const pr=libFind(I.selLib);if(!pr)return;pushHist();assignPresetToTrack(I.p,I.selTrack,pr);I.p.tracks[I.selTrack].base=deep({sound:I.p.tracks[I.selTrack].sound,mix:{sendA:I.p.tracks[I.selTrack].mix.sendA,sendB:I.p.tracks[I.selTrack].mix.sendB,vol:I.p.tracks[I.selTrack].mix.vol}});after();toast('assigned '+pr.id)};}
+/* v0.24.0 KIT SELECTOR — the whole drum kit follows the REASON kit system.
+   'auto' = follow the project style (STYLE_KIT); an explicit kit = PINNED
+   (survives save/load + compose until unpinned). Both paths call
+   eng.setKit + re-warm the new kit's 20 buffers (idle-sliced — never the
+   hot path) and save the snapshot. syncKitSel mirrors state → select (no
+   DOM write unless the value drifted) and is called from renderAll. */
+let _kitWarmStop=false;
+function warmKit(kit){if(!I.eng||!I.eng.romBuffer)return;const list=kitWarmTypes(kit);let wi=0;const step=()=>{if(_kitWarmStop)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(!I.eng)return;if(wi<list.length){I.eng.romBuffer(list[wi++]);step()}}catch(e){}})};step()}
+function syncKitSel(){const s=$('kitSel'),p=I.p;if(!s||!p)return;const v=(p.kitPinned&&kitMeta(p.kit))?p.kit:'auto';if(s.value!==v)s.value=v}
+function wireKitSel(){const row=$('libCat')&&$('libCat').parentElement;if(!row||$('kitSel'))return;const s=document.createElement('select');s.id='kitSel';s.setAttribute('aria-label','drum kit');s.title='the drum KIT — every kit is one instrument (all voices tuned to the kit root, leveled to the family loudness law). auto = follow the project style; an explicit kit is PINNED (persists through save/load and compose)';s.innerHTML='<option value="auto">KIT auto (follow style)</option>'+KIT_IDS.map(id=>{const m=kitMeta(id);return '<option value="'+id+'">'+(m?m.name:id)+'</option>'}).join('');row.appendChild(s);
+s.onchange=()=>{const p=I.p;if(!p)return;pushHist();_kitWarmStop=true;_kitWarmStop=false;if(s.value==='auto'){p.kitPinned=false;p.kit=STYLE_KIT[String(p.style||'').toLowerCase()]||DEFAULT_KIT}else{p.kitPinned=true;p.kit=s.value}
+if(I.eng&&I.eng.setKit){I.eng.setKit(p.kit);warmKit(p.kit)}I.dirty=true;syncKitSel();saveProject();const m=kitMeta(p.kit);toast('KIT → '+(m?m.name:p.kit)+(p.kitPinned?' (pinned)':' (follows style)'))}}
 
-export { renderLib, renderSynthEd, wireSound };
+function wireSound(){$('libCat').innerHTML=['all','drum','bass','lead','pad','pluck','arp','fx','synth'].map(c=>'<option>'+c+'</option>').join('');/* v0.19.0 FIX: the genre list was HARDCODED and had drifted — FOREST (a first-class genre since its own voices shipped) was unfilterable. Derived from the library itself now: every genre that owns presets appears, and a future genre can never go missing again. */const gset=[...new Set(libFilter('all','ALL').map(x=>x.genre).filter(g=>g!=='ANY'))];$('libGenre').innerHTML=['ALL',...gset,'ANY'].map(g=>'<option>'+g+'</option>').join('');$('libCat').onchange=renderLib;$('libGenre').onchange=renderLib;if($('libQ'))$('libQ').oninput=renderLib;wireKitSel();$('bAud').onclick=()=>{if(!I.selLib)return toast('select a preset');const pr=libFind(I.selLib);if(!pr)return;if(pr.cat==='drum'){const tr={idx:0,kind:'drum',sound:pr,type:pr.type};I.eng.trigger(tr,I.ctx.currentTime,{vel:.9,note:48,lock:{}},0)}else{const tr={idx:I.selTrack,kind:'synth',sound:pr};I.eng.trigger(tr,I.ctx.currentTime,{vel:.9,note:I.p.root+24,lock:{}},0)}};$('bAssign').onclick=()=>{if(!I.selLib)return toast('select a preset');const pr=libFind(I.selLib);if(!pr)return;pushHist();assignPresetToTrack(I.p,I.selTrack,pr);I.p.tracks[I.selTrack].base=deep({sound:I.p.tracks[I.selTrack].sound,mix:{sendA:I.p.tracks[I.selTrack].mix.sendA,sendB:I.p.tracks[I.selTrack].mix.sendB,vol:I.p.tracks[I.selTrack].mix.vol}});after();toast('assigned '+pr.id)};}
+
+export { renderLib, renderSynthEd, wireSound, syncKitSel };

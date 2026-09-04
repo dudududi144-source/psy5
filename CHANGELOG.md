@@ -3,6 +3,74 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.24.0] — Run 23 Phase 2: KIT-GOVERNED REASON SYSTEM — every hit plays through the kit
+
+> Owner: "replace ALL your sounds with psyreason's; the kit must COHERE — no
+> more disconnected sounds, nothing that destroys dynamics."
+
+### The wiring (js/engine.js v0.24.0)
+- **Routing law** — `trigger()` resolves every drum type through the kit system
+  BEFORE any pooled voice is selected (extends the v0.23.0 ROM early-return):
+  the 8 REASON_TYPES (kick/snare/clap/hatO/hatC/tom/crash/ride) render via
+  `renderReasonPcm(type, kitPatch(kitId, type), sr, variant, 2)` — layer 2 is
+  the unity loudness layer, so patch.rms IS the mixed level; the 12
+  KIT_ROM_ROLES render via `renderRomPcm(type, sr, {rootMul, rmsMul, variant})`
+  with `rmsMul = kitRomSpec(kit,type).rms / romSpec(type).rms` clamped [0.5,2]
+  and `rootMul` from the live root override; the 6 legacy synth/FX types
+  (zap/boom/glitch/riser/impact/downlifter) keep the exact DrumVoice path.
+  `opts.rom===false` disables BOTH rom classes → the exact pre-v0.24.0 path.
+- **2-variant round-robin** per type (`this._rrType`, advanced on SUCCESS only)
+  anti-machine-guns repeated hits; the variant is part of the cache key.
+- **Render-once caches**: `REASON_SHARED` (keys `R:<type>:<kit>:<variant>:<layer>@<sr>`)
+  beside `ROM_SHARED` (kit ROM keys `K:<type>:<kit>:<variant>:<rootMul%>@<sr>`)
+  — AudioBuffers are context-independent, offline bounces reuse live buffers.
+- **KIT CHOKE** (`kitChoke(kitId)`): hatC + hatExclusive → every OTHER busy
+  hatO RomVoice ramps to .0001 over 25 ms; crash/ride at maxPoly → the OLDEST
+  same-type voice fades 60 ms. Time-anchored (cancel ≥ when, re-anchor from
+  the hit's stored sustain `v.amp`) — value-continuous offline.
+- **Sidechain bug guard** — kick now routes through the ROM path; the
+  early-return used to skip the duck. The duck fires on the ROM path
+  (`v0.24.0 BUG GUARD` comment pins it; gate G11 covers it end-to-end).
+- **Kit/root APIs**: `setKit(id)` (refuses unknown kits), `setRootHz(hz)`
+  (20..500 Hz, 0 = kit root), `rootMul()` (clamp [.5,2] around kitRootHz),
+  `rmsRatio(type)`. New RomVoice fields lastType/lastTrack/amp; killAll clears
+  them. Honest counters: reason hits increment romSpawns AND reasonSpawns
+  (fallbacks likewise both); loadSnapshot + the LOAD chip carry
+  reasonSpawns/reasonRenders/reasonFallbacks/kitId.
+- **Boot warm** (main.js): the power-on idle-sliced warm loop now warms
+  `kitWarmTypes(project.kit)` — 20 types, AFTER the project load so the
+  PROJECT's kit is the one warmed (cache keys on kitId). Sound-tab kit changes
+  re-warm the new kit the same way.
+- **State** (state.js): `p.kit='psy-classic'` + `p.kitPinned=false` backfill in
+  loadProjectObj (invalid id → DEFAULT_KIT); loadProjectObj is the ONE
+  kit-apply point (fresh boot, resume, share, compose paths).
+- **UI** (ui/sound.js): KIT select in the Sound tab — `auto (follow style)` +
+  the 6 kits by name; auto → unpinned + STYLE_KIT[style]; explicit → pinned;
+  both setKit + warm + save. `syncKitSel` mirrors state on every render.
+- **Composer style hook** (main.js composeBoot + ui/compose.js both compose
+  paths): a composed set takes `STYLE_KIT[style] || DEFAULT_KIT` unless the
+  user pinned a kit — the pin carries across compose.
+
+### Evidence
+- `tests/reason-wiring.test.ts` — kit patch resolution (8 roles × 6 kits),
+  rootMul math, the FULL routing classification table (26 types pinned so a
+  future type cannot silently fall out of kit governance), warm list (20,
+  kick first), state round-trip, choke config.
+- `tools/rom-audit.mjs` — new kit×type REASON table: all 6 kits × 8 types,
+  duration law (buffer == REASON_DUR ≤ drumDurEst window), peak ≤ 0.97,
+  RMS within ±15% of patch.rms (peak-clamped buffers documented — the peak
+  law has the final word by renderReasonPcm's documented order).
+- Gates recalibrated to the new reality (honest, measured): G39/G47 pin the
+  LEGACY synth layer via `{rom:false}` engines (their params — dist/glide/
+  bursts/bright — are legacy-DrumVoice params by design); G40 voice probes
+  likewise; G48 tom criterion → ZCR descent (measured 350/325/300/275 Hz,
+  z0/z3 = 1.27 — the reason tom is a real membrane, not the 2-osc bend);
+  G49 crash HF law → 1.5–12 kHz share ≥ .38 (measured .42); G9/G15/G44 count
+  ROM-pool steals now that hats/toms leave the drum pool. NEW **G52** gates
+  the default reason path itself: reason spawns live + fallbacks 0 +
+  determinism + kit-governance audible (psy-classic vs tribal-raw maxDiff)
+  + hatC→hatO choke audible + kick-sidechain-on-ROM-path.
+
 ## [0.23.0] — Run 22: PERCUSSION ROM v3 — the synth-quality ceiling breaker
 
 > Owner (instruction 13, 4th time on sounds): "עדיין יש קונגה וקראשים
