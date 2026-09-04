@@ -3,6 +3,42 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.21.0] — Run 20k: THROW TOOLS (ECHO THROW + MUFFLE) — the two classic DJ performance moves, quantized release
+
+> Standing owner directive: playability ("יוכל בפועל לשחק תוך כדי תנועה") —
+> the Perform layer gains the two moves every psy DJ reaches for, with the
+> honest-state discipline this repo is built on. (v0.20.0 itself — grooves
+> 4→13, scales 5→13 + the SCALE picker, fills 5→8 — shipped GREEN: bun
+> 533/533, verify GREEN, ui-evidence GREEN, CI Gates full suite SUCCESS.)
+
+### ECHO THROW (`g` / Perform button)
+- Slams the master delay feedback to its ceiling (0.8 — the `delayFbClamp`
+  max) so whatever is playing smears into dark analog-style repeats (the
+  loop's lowpass shapes them). RELEASE: press the SAME tool again, or let
+  the armed barHook auto-release after 2 bar boundaries. The release
+  restores the exact pre-throw value.
+### MUFFLE (`h` / Perform button)
+- Pulls the master EQ high/mid shelves down (−12/−9 dB, the registry
+  clamps) — the DJ veil for builds and breaks. Same arm/release contract.
+### State discipline
+- Momentary by design: NO pushHist, NO automation write — the release
+  restores the exact pre-throw values, so project state is net-identical
+  unless the user SAVES mid-throw (documented behavior). The scheduler
+  fires barHooks only while playing: a stopped transport holds the throw
+  until the next play — exactly how a held DJ move behaves.
+- Zero engine change: both throws write REAL project state the engine
+  already reads on syncMix (delay feedback + master EQ) — the offline
+  renderers, the worklet path and every gate remain untouched.
+- Shortcut registry grew (g/h — collision-tested like every entry); the
+  stale 'f' label (5 layouts) now reads the real 8.
+
+### Battery
+- bun **533/533** (45 files) · `verify` GREEN (v0.21.0) · ui-evidence
+  **16/16** (adds the THROW arm/slam/release-restore checks driven through
+  the REAL keyboard dispatcher in the booted device).
+- CI Gates on v0.20.0 (2ecb6f3): **full e2e suite SUCCESS** (the release
+  box historically runs in-page 49/50 with G17 realtime info-only).
+
 ## [0.20.0] — Run 20j: GROOVES 4→13 + SCALES 5→13 + FILLS 5→8 + the SCALE picker (the three loneliest choice axes got fat)
 
 > Owner directive (verbatim): "אוי ואבוי חשוב לדחוף מיד שלא נאבד את העבודה

@@ -190,6 +190,16 @@ async function main() {
     ck('dj: READY SET carries a riser voice (q fires honestly)', dj.has === true, 'riser carrier=' + dj.has);
     ck('fill: button cycles into a named variant', dj.f0 === '⚡ FILL' && /ROLL|TOMLINE|CLASSIC/.test(dj.f1), dj.f0 + ' → ' + dj.f1);
 
+    /* 6. v0.21.0 THROW tools — arm → slammed state → release → exact restore */
+    const th = await cdp.eval(`(()=>{const w=window.__psy6;const f0=w.p.fx.delayFb,hi0=w.p.master.eqHigh,mi0=w.p.master.eqMid;window.dispatchEvent(new KeyboardEvent('keydown',{key:'g',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keydown',{key:'h',bubbles:true}));const armed={fb:w.p.fx.delayFb,hi:w.p.master.eqHigh,mi:w.p.master.eqMid,hooks:w.barHooks.length};window.dispatchEvent(new KeyboardEvent('keydown',{key:'g',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keydown',{key:'h',bubbles:true}));const rel={fb:w.p.fx.delayFb,hi:w.p.master.eqHigh,mi:w.p.master.eqMid,hooks:w.barHooks.length};return JSON.stringify({f0,hi0,mi0,armed,rel})})()`);
+    const tj = JSON.parse(th);
+    ck('throw: ECHO+MUFFLE arm — delayFb 0.8, eqHigh −12, eqMid −9, hooks armed',
+       tj.armed.fb === 0.8 && tj.armed.hi === -12 && tj.armed.mi === -9 && tj.armed.hooks >= 2,
+       JSON.stringify(tj.armed));
+    ck('throw: second press releases BOTH to the exact pre-throw values, hooks released',
+       tj.rel.fb === tj.f0 && tj.rel.hi === tj.hi0 && tj.rel.mi === tj.mi0 && tj.rel.hooks === tj.armed.hooks - 2,
+       JSON.stringify({f0: tj.f0, rel: tj.rel}));
+
     ok = checks.every(c => c.ok);
   } catch (e) {
     ck('fatal', false, String(e && e.message || e));
