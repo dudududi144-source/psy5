@@ -4,7 +4,16 @@ import { DEFAULTS } from './limits.js';
 
 /* ============ factory presets ============ */
 const LIB={drum:[],bass:[],lead:[],pad:[],pluck:[],arp:[],fx:[],synth:[],texture:[]};
-function DP(id,name,genre,p){LIB.drum.push(Object.assign({id,name,genre,cat:'drum',engine:'DRUM',type:'kick',tune:1,decay:1,tone:1,punch:0},p))}
+/* v0.29.0 KICK DIMS (psyreason dceec3e/719211c — "expressive kick synthesis +
+   kick preset variety"): every kick preset carries three EXTRA synthesis
+   dimensions — body/subk/sat (0..1) — seeded deterministically from the
+   preset id (FNV-1a → mulberry32) over psyreason's WIDE DECORRELATED
+   ranges (body .15–.85, subk .25–.85, sat .15–.85), so two kick presets
+   never render the same kit patch. The runtime bridge is applyKickDims
+   (kit-reason.mjs → engine.js romBuffer); explicit p.body/p.subk/p.sat
+   always win. Deterministic: same id = same dims, forever. */
+function kickDims(id){let h=2166136261;for(let i=0;i<id.length;i++){h^=id.charCodeAt(i);h=Math.imul(h,16777619)}const r=mulberry32(h>>>0);return {body:+(0.15+r()*0.7).toFixed(2),subk:+(0.25+r()*0.6).toFixed(2),sat:+(0.15+r()*0.7).toFixed(2)}}
+function DP(id,name,genre,p){if((p.type||'kick')==='kick'&&p.body==null&&p.subk==null&&p.sat==null)Object.assign(p,kickDims(id));LIB.drum.push(Object.assign({id,name,genre,cat:'drum',engine:'DRUM',type:'kick',tune:1,decay:1,tone:1,punch:0},p))}
 function SP(cat,id,name,genre,p){LIB[cat].push(Object.assign({id,name,genre,cat,engine:'SYNTH',
 wave1:'sawtooth',wave2:'sawtooth',oct2:0,detune:8,cutoff:1500,res:3,fType:'lowpass',
 atk:0.005,dec:0.3,sus:0.6,rel:0.2,gate:0.6,lfoRate:0,lfoDepth:0,lfoDest:'off',poly:6},p))}

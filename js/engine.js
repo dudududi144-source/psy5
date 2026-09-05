@@ -6,7 +6,7 @@ import { planDuck, nextState, duckParams } from '../foundation/dsp/sidechain.mjs
 import { delaySecondsFor, delayFbClamp, delayDivClamp, irChannel, irChannelShaped, irVariantFor, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../foundation/dsp/sends.mjs';
 import { ROM_TYPES, renderRomPcm, romSpec } from '../foundation/dsp/perc-rom.mjs';
 import { REASON_TYPES, renderReasonPcm } from '../foundation/dsp/reason-engines.mjs';
-import { DEFAULT_KIT, kitPatch, kitRomSpec, kitRootHz, kitChoke, isReasonEngineType, isKitRomType } from '../foundation/dsp/kit-reason.mjs';
+import { DEFAULT_KIT, kitPatch, kitRomSpec, kitRootHz, kitChoke, isReasonEngineType, isKitRomType, applyKickDims } from '../foundation/dsp/kit-reason.mjs';
 
 /* ============ POOLED audio engine ============ */
 /* Priority tiers for voice stealing (PSY6):
@@ -208,8 +208,13 @@ setKit(kitId){if(!kitPatch(kitId,'kick'))return false;this.kitId=kitId;return tr
 setRootHz(hz){this.rootHz=hz>20&&hz<500?hz:0}
 rootMul(){return this.rootHz>0?Math.min(2,Math.max(.5,this.rootHz/kitRootHz(this.kitId))):1}
 rmsRatio(type){const ks=kitRomSpec(this.kitId,type),base=romSpec(type);if(!ks||!base||!(ks.rms>0)||!(base.rms>0))return 1;return Math.min(2,Math.max(.5,ks.rms/base.rms))}
-romBuffer(type){const sr=this.ctx.sampleRate,variant=this._rrType.get(type)||0,isRe=isReasonEngineType(type),isKr=isKitRomType(type);if(!isRe&&!isKr)return null;/* legacy synth/FX types keep the DrumVoice path */let key,pcm;try{if(isRe){const patch=kitPatch(this.kitId,type);if(!patch)throw new Error('no kit patch');key='R:'+type+':'+this.kitId+':'+variant+':2@'+sr;pcm=renderReasonPcm(type,patch,sr,variant,2)}else{const rm=this.rootMul();key='K:'+type+':'+this.kitId+':'+variant+':'+Math.round(rm*100)+'@'+sr;pcm=renderRomPcm(type,sr,{rootMul:rm,rmsMul:this.rmsRatio(type),variant})}}catch(e){if(isRe)this.reasonFallbacks++;this.romFallbacks++;return null}/* per-engine cache → module-shared cache (AudioBuffers are context-independent); reason renders land in REASON_SHARED, kit ROM renders in ROM_SHARED */let ab=this.romCache.get(key);if(ab)return ab;ab=isRe?REASON_SHARED.get(key):ROM_SHARED.get(key);if(ab){this.romCache.set(key,ab);return ab}try{ab=this.ctx.createBuffer(1,pcm.length,sr);ab.copyToChannel(pcm,0)}catch(e){if(isRe)this.reasonFallbacks++;this.romFallbacks++;return null}this.romCache.set(key,ab);(isRe?REASON_SHARED:ROM_SHARED).set(key,ab);if(isRe)this.reasonRenders++;else this.romRenders++;return ab}
-triggerRom(tr,when,vel,lock,type,p){const ab=this.romBuffer(type);if(!ab)return false;const v=this.nextRomVoice(when);if(!v)return false;const cl=(x,a,b)=>x<a?a:(x>b?b:x);const tune=cl(p.tune||1,.25,4),tone=p.tone==null?1:p.tone,punch=cl(p.punch!=null?p.punch:.5,0,1),decay=p.decay==null?1:p.decay;v.connect(this.chains[tr.idx]||this.master);
+/* v0.29.0 KICK DIMS — optional preset-level kick shaping (applyKickDims, kit-reason.mjs):
+   kickDims = {body,subk,sat,punch} (each 0..1) lifted from the kick PRESET
+   into the kit patch. The cache key carries a quantized dims signature so
+   two presets never share a buffer; NO dims (or all-neutral .5) keeps the
+   legacy ':2@' key exactly — bit-neutral for every pre-v0.29.0 caller. */
+romBuffer(type,kickDims){const sr=this.ctx.sampleRate,variant=this._rrType.get(type)||0,isRe=isReasonEngineType(type),isKr=isKitRomType(type);if(!isRe&&!isKr)return null;/* legacy synth/FX types keep the DrumVoice path */let key,pcm;try{if(isRe){const base=kitPatch(this.kitId,type);if(!base)throw new Error('no kit patch');const cl=(x)=>x==null?null:Math.round(x*100)/100;const hasDims=kickDims&&(kickDims.body!=null||kickDims.subk!=null||kickDims.sat!=null||kickDims.punch!=null)&&!(cl(kickDims.body)===.5&&cl(kickDims.subk)===.5&&cl(kickDims.sat)===.5&&cl(kickDims.punch)===.5);const patch=hasDims?applyKickDims(base,kickDims):base;const sig=hasDims?'d'+cl(kickDims.body)+'_'+cl(kickDims.subk)+'_'+cl(kickDims.sat)+'_'+cl(kickDims.punch):'2';key='R:'+type+':'+this.kitId+':'+variant+':'+sig+'@'+sr;pcm=renderReasonPcm(type,patch,sr,variant,2)}else{const rm=this.rootMul();key='K:'+type+':'+this.kitId+':'+variant+':'+Math.round(rm*100)+'@'+sr;pcm=renderRomPcm(type,sr,{rootMul:rm,rmsMul:this.rmsRatio(type),variant})}}catch(e){if(isRe)this.reasonFallbacks++;this.romFallbacks++;return null}/* per-engine cache → module-shared cache (AudioBuffers are context-independent); reason renders land in REASON_SHARED, kit ROM renders in ROM_SHARED */let ab=this.romCache.get(key);if(ab)return ab;ab=isRe?REASON_SHARED.get(key):ROM_SHARED.get(key);if(ab){this.romCache.set(key,ab);return ab}try{ab=this.ctx.createBuffer(1,pcm.length,sr);ab.copyToChannel(pcm,0)}catch(e){if(isRe)this.reasonFallbacks++;this.romFallbacks++;return null}this.romCache.set(key,ab);(isRe?REASON_SHARED:ROM_SHARED).set(key,ab);if(isRe)this.reasonRenders++;else this.romRenders++;return ab}
+triggerRom(tr,when,vel,lock,type,p){/* v0.29.0: kick presets carrying body/subk/sat dims render their OWN kit-patch variant (neutral .5 = the plain kit sound) */const kd=type==='kick'&&p?{body:p.body,subk:p.subk,sat:p.sat,punch:p.punch}:null;const ab=this.romBuffer(type,kd);if(!ab)return false;const v=this.nextRomVoice(when);if(!v)return false;const cl=(x,a,b)=>x<a?a:(x>b?b:x);const tune=cl(p.tune||1,.25,4),tone=p.tone==null?1:p.tone,punch=cl(p.punch!=null?p.punch:.5,0,1),decay=p.decay==null?1:p.decay;v.connect(this.chains[tr.idx]||this.master);
 /* per-hit BufferSource — the ONE unavoidable allocation (same law as the
    sample path); gain+filter are pooled and never allocated per hit */
 const src=this.ctx.createBufferSource();src.buffer=ab;src.playbackRate.value=tune;src.connect(v.f);
@@ -312,15 +317,24 @@ if(type==='kick'){
    (quadratic law, drive 1 → 6.5); `glide` (0..1, default 0) extends the
    SUB pitch-envelope start multiplier (2.6×f0 extra at 1). Absent/neutral
    values keep every scheduled value bit-identical. */
-const dv=Math.min(Math.max(p.dist||0,0),1);
+/* v0.29.0 DRUM-VOICE KICK DIMS (legacy/fallback path parity — psyreason
+dceec3e): body/subk/sat join tune/decay/tone/punch as independent kick
+dimensions. NEUTRAL-CENTERED: every factor is exactly 1.0 (and sat adds
+zero drive) when the param is ABSENT — the pre-v0.29.0 scheduling is
+bit-identical, pinned by kick-dims-v029.test.ts (absent ≡ explicit .5). */
+const bN=p.body==null?.5:Math.min(Math.max(p.body,0),1);
+const skN=p.subk==null?.5:Math.min(Math.max(p.subk,0),1);
+const stN=p.sat==null?.5:Math.min(Math.max(p.sat,0),1);
+const dv=Math.min(Math.max((p.dist||0)+0.35*Math.max(0,stN-.5),0),1);
 if(dv>0){if(!this.wsDrive){this.wsDrive=this.ctx.createGain();this.wsDrive.gain.value=1;this.connect(this.eng.chains[tr.idx],true)}this.wsDrive.gain.cancelScheduledValues(when);this.wsDrive.gain.setValueAtTime(1+5.5*dv*dv,when)}else if(this.wsDrive){this.wsDrive.gain.cancelScheduledValues(when);this.wsDrive.gain.setValueAtTime(1,when)}
 const gl=Math.min(Math.max(p.glide||0,0),1);
-/* SUB — sine, exponential pitch envelope start→f0 (depth = punch, + glide) */
-const dur=.12+.5*decay;const f0=Math.max(24,45*tune);const start=f0*(2.2+2.2*Math.min(punch,1)+2.6*gl);
+/* SUB — sine, exponential pitch envelope start→f0 (depth = punch, + glide;
+   body deepens the center pitch, subk swells the level) */
+const dur=.12+.5*decay;const f0=Math.max(24,45*tune*(1-.3*(bN-.5)));const start=f0*(2.2+2.2*Math.min(punch,1)+2.6*gl);
 this.osc.type='sine';this.osc.frequency.setValueAtTime(start,when);this.osc.frequency.exponentialRampToValueAtTime(f0,when+.032);
-og.setValueAtTime(vel*(.8-.15*Math.min(Math.max(tone,0),1.6)),when);og.exponentialRampToValueAtTime(.0001,when+dur);
-/* BODY — triangle at f0, tone maps body/sub balance */
-this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(f0,when);og2.setValueAtTime(vel*(.28+.24*Math.min(Math.max(tone,0),1.6)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.45);
+og.setValueAtTime(vel*(.8-.15*Math.min(Math.max(tone,0),1.6))*(1+.3*(skN-.5)),when);og.exponentialRampToValueAtTime(.0001,when+dur);
+/* BODY — triangle at f0, tone maps body/sub balance (bodyN widens level+decay) */
+this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(f0,when);og2.setValueAtTime(vel*(.28+.24*Math.min(Math.max(tone,0),1.6))*(1+.5*(bN-.5)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.45*(1+.4*(bN-.5)));
 /* CLICK — highpassed noise transient, 2–6 ms (punch maps level + corner) */
 this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(3800+1400*Math.min(punch,1),when);this.nFilter.Q.value=.7;ng.setValueAtTime(vel*(.4+.5*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.005);
 }else if(type==='snare'){

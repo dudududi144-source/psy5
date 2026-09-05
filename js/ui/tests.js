@@ -19,7 +19,7 @@ import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
 import { renderRomPcm } from '../../foundation/dsp/perc-rom.mjs';
 import { renderReasonPcm } from '../../foundation/dsp/reason-engines.mjs';
-import { kitPatch, KIT_IDS } from '../../foundation/dsp/kit-reason.mjs';
+import { kitPatch, KIT_IDS, applyKickDims } from '../../foundation/dsp/kit-reason.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
 import { armCapture, captureStop, armSongRecord, captureState, captureResult } from './capture.js';
 import { renderMixer } from './mix.js';
@@ -1627,6 +1627,40 @@ for(let ki=0;ki<KIT_IDS.length;ki++){for(let ri=0;ri<REASON_ROLES52.length;ri++)
 const lawOk52=lawN52===48&&lawWorst52<=.15&&lawPk52<=Math.fround(.97);
 const ok52=liveOk52&&chokeOk52&&duckOk52&&det52===0&&gov52>1e-3&&lawOk52;
 gate('G52','kit-governed reason system: reason path live (spawns>=3, fallbacks=0) + kit governance audible (psy-classic vs tribal-raw kick md>1e-3) + 48 kit×type renders RMS ±15% of patch.rms peak<=.97 + determinism md=0 + hatC→hatO choke tail<40% + kick sidechain fires on the ROM path',ok52,'sp/fb '+live52.eng.romSpawns+'/'+live52.eng.romFallbacks+' rs/rf '+live52.eng.reasonSpawns+'/'+live52.eng.reasonFallbacks+' | gov '+gov52.toExponential(1)+' | law worst '+lawWorst52.toFixed(3)+' pk '+lawPk52.toFixed(2)+' n='+lawN52+' | tailA '+tailA.toExponential(1)+' tailB '+tailB.toExponential(1)+' | duck '+(duckOk52?'fired':'MISSED')+' | det '+det52)}catch(e){gate('G52','kit-governed reason system',false,'ERR '+e.message)}}
+if((window.__psy6GateSkip||[]).includes('G53')){gate('G53','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+/* ── G53 (v0.29.0) KICK DIMS — expressive kick preset surface ────────
+   psyreason dceec3e/719211c port: body/subk/sat are INDEPENDENT kick
+   synthesis dimensions bridged into the kit-governed REASON patch
+   (applyKickDims), seeded per preset in the library (DP auto-dims).
+   Evidence: (a) two extreme dim sets render DISTINCT audio (md>1e-3);
+   (b) same dims twice = md 0 (deterministic); (c) ENGINE-LEVEL
+   neutrality — a preset with the neutral point {body:.5,subk:.5,sat:.5}
+   renders BIT-IDENTICAL audio to a preset with no dims at all (the
+   legacy ':2@' cache key + neutral-centered mapping); (d) level
+   governance holds under dims: renderReasonPcm RMS within ±15% of
+   patch.rms and peak ≤ fround(.97) for BOTH extremes; (e) every kick
+   preset in the library carries body/subk/sat in [0,1] with ≥8 distinct
+   triples (decorrelated — the whole point of the port). */
+const SR53=44100;
+const mkEng53=()=>{const oc=new OfflineAudioContext(1,Math.round(SR53*1),SR53);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',presetId:'g53',name:'g53',sound:{type:'kick',tune:1,decay:1,tone:1,punch:.5},mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});return{oc,eng,tr}};
+const renderKick53=async(sound)=>{const{oc,eng,tr}=mkEng53();tr.sound=Object.assign({type:'kick',tune:1,decay:1,tone:1,punch:.5},sound);eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return oc.startRendering()};
+const pcm53=(buf)=>buf.getChannelData(0);
+const md53=(x,y)=>{let m=0;const n=Math.min(x.length,y.length);for(let i=0;i<n;i++){const d=Math.abs(x[i]-y[i]);if(d>m)m=d}return m};
+const rms53=(x)=>{let s=0;for(let i=0;i<x.length;i++)s+=x[i]*x[i];return Math.sqrt(s/x.length)};
+const DLOW53={body:.15,subk:.4,sat:.25},DHIGH53={body:.85,subk:.85,sat:.85},DNEU53={body:.5,subk:.5,sat:.5};
+const bA=pcm53(await renderKick53(DLOW53)),bB=pcm53(await renderKick53(DHIGH53));
+const bA2=pcm53(await renderKick53(DLOW53));
+const bNeu=pcm53(await renderKick53(DNEU53)),bNone=pcm53(await renderKick53({}));
+const mdAB=md53(bA,bB),mdDet=md53(bA,bA2),mdNeu=md53(bNeu,bNone);
+/* (d) level governance under dims — direct renderer law */
+let law53=0,pk53=0;for(const dims of [DLOW53,DHIGH53]){const base=kitPatch('psy-classic','kick');const pat=applyKickDims(base,Object.assign({punch:.5},dims));const pcm=renderReasonPcm('kick',pat,SR53,0,2);let s=0,pk=0;for(let i=0;i<pcm.length;i++){s+=pcm[i]*pcm[i];const d=Math.abs(pcm[i]);if(d>pk)pk=d}const err=Math.abs(Math.sqrt(s/pcm.length)-pat.rms)/pat.rms;if(err>law53)law53=err;if(pk>pk53)pk53=pk}
+/* (e) library auto-dims — every kick preset carries the three dims */
+const kicks53=libFilter('drum','ALL').filter(x=>x.type==='kick');
+let dimsOk53=kicks53.length>=30,inRange53=true;
+const triples53=new Set();
+for(const k of kicks53){const b=k.body,s=k.subk,t=k.sat;if(typeof b!=='number'||typeof s!=='number'||typeof t!=='number'||b<0||b>1||s<0||s>1||t<0||t>1)inRange53=false;triples53.add(b+'_'+s+'_'+t)}
+const ok53=mdAB>1e-3&&mdDet===0&&mdNeu===0&&law53<=.15&&pk53<=Math.fround(.97)&&dimsOk53&&inRange53&&triples53.size>=8;
+gate('G53','kick dims (v0.29.0 psyreason port): extreme dims audible md>1e-3 + deterministic md=0 + neutral-{.5,.5,.5} ≡ no-dims BIT-IDENTICAL + RMS ±15% peak<=.97 under dims + all '+kicks53.length+' kick presets auto-dimmed with '+triples53.size+' distinct triples',ok53,'md(lo,hi) '+mdAB.toExponential(1)+' | det '+mdDet+' | neutral≡none '+mdNeu+' | law '+law53.toFixed(3)+' pk '+pk53.toFixed(2)+' | kicks '+kicks53.length+' triples '+triples53.size)}catch(e){gate('G53','kick dims',false,'ERR '+e.message)}}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

@@ -397,9 +397,17 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
          (f766049) and the pad-legato gate — whole-project hashes moved.
          v0.19.0 values recorded in CHANGELOG 0.19.0. Determinism re-proven
          (double run byte-identical); harmony invariant re-proven (0 viol). */
-      'FULL-ON': ['e75a885028ab3e9c', 'aadce05d24d240e6', '60f432e4984cbda4'],
-      'DARK-PSY': ['152d23dfd353e848', 'dec249d54cafa297', 'dcdee5361a94aab3'],
-      'PROGRESSIVE': ['379c4af5155af77c', 'fbbd3d7ae927c1f1', '887afecad1e4e719'],
+      /* v0.29.0 RE-PIN: KICK DIMS (psyreason dceec3e/719211c) — DP() now
+         seeds body/subk/sat onto every kick preset, so composed projects
+         carry the dims in tr.sound and whole-project hashes moved.
+         v0.27.0 values (FULL-ON e75a885028ab3e9c/aadce05d24d240e6/
+         60f432e4984cbda4, DARK-PSY 152d23dfd353e848/dec249d54cafa297/
+         dcdee5361a94aab3, PROGRESSIVE 379c4af5155af77c/fbbd3d7ae927c1f1/
+         887afecad1e4e719) recorded here. Determinism re-proven (double run
+         byte-identical); harmony invariant re-proven (0 viol). */
+      'FULL-ON': ['3e7cf22db15cb096', 'af9c375fd3e34ed1', 'e3a4ad78f43ddfa8'],
+      'DARK-PSY': ['cd1456cd06e7ab4d', '8769a2f74414975f', '9b0a969099d911b9'],
+      'PROGRESSIVE': ['632df9863e6c9f2f', '734caf4e8a5743d0', '3666798ae4faeec0'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {

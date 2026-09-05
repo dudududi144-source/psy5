@@ -35,11 +35,11 @@ for (const m of TESTS_SRC.matchAll(/gate\('([A-Za-z0-9-]+)'/g)) {
 }
 
 describe('gates manifest — single source of truth (v0.26.0)', () => {
-  test('the manifest is well-formed: 48 unique ids, G1 expanded per style', () => {
+  test('the manifest is well-formed: 50 unique ids, G1 expanded per style', () => {
     expect(MAIN_GATE_IDS.length).toBe(MAIN_GATE_COUNT)
     expect(new Set(MAIN_GATE_IDS).size).toBe(MAIN_GATE_IDS.length)
     expect(MAIN_GATE_IDS.filter(id => id.startsWith('G1-')).length).toBe(4)
-    expect(MAIN_GATE_COUNT).toBe(49)
+    expect(MAIN_GATE_COUNT).toBe(50)
   })
 
   test('every manifest id is registered by js/ui/tests.js', () => {

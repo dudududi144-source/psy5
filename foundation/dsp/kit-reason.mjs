@@ -630,6 +630,64 @@ export function kitPatch(kitId, role) {
   return patch || null;
 }
 
+/* ── v0.29.0 KICK DIMS — the preset→patch bridge (psyreason re-review #2) ──
+   psyreason dceec3e/719211c made its kicks expressively distinct by treating
+   PUNCH/BODY/SUBK/SAT as four independent synthesis dimensions instead of
+   one fixed recipe. psy5's runtime kick is the kit-governed REASON render,
+   whose rich patch was per-KIT data with no preset-level authoring — every
+   kick preset in a kit rendered the SAME patch (only tune/decay/amp moved).
+   This bridge lifts the three missing dimensions into the patch:
+
+     body 0..1 — depth of the pitch drop  (endHz down, pitch sweep longer)
+     subk  0..1 — sub-tail length         (bodyDecayMs up = longer sub)
+     sat   0..1 — saturation drive        (driveDb ± around the kit value)
+     punch (already a preset param) — transient shape (amount up, ratio down)
+
+   NEUTRAL-CENTERED LAW: every factor is 1.0 (or ±0 dB) when the dimension
+   reads 0.5, so {body:.5,subk:.5,sat:.5} reproduces the EXACT kit patch —
+   pinned by kick-dims-v029.test.ts. The patch is deep-frozen data: a
+   cloned, mutated copy is returned; the kit object is never touched.
+   `patch.rms` is deliberately UNTOUCHED — renderReasonPcm RMS-normalizes
+   to it, so the kit's level governance (G52 ±15%) holds under any dims. */
+const cl01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+export function applyKickDims(patch, dims) {
+  if (!patch || !dims) return patch;
+  const d = dims || {};
+  const has =
+    d.body != null || d.subk != null || d.sat != null ||
+    d.punch != null;
+  if (!has) return patch;
+  const body = cl01(d.body != null ? d.body : 0.5);
+  const subk = cl01(d.subk != null ? d.subk : 0.5);
+  const sat = cl01(d.sat != null ? d.sat : 0.5);
+  const punch = cl01(d.punch != null ? d.punch : 0.5);
+  const out = {
+    ...patch,
+    body: patch.body ? { ...patch.body } : patch.body,
+    punch: patch.punch ? { ...patch.punch } : patch.punch,
+    click: patch.click ? { ...patch.click } : patch.click,
+    filter: patch.filter ? { ...patch.filter } : patch.filter,
+  };
+  if (out.body) {
+    /* EXACT-NEUTRAL FORM: every factor is written as 1 + k·(x−0.5) so the
+       neutral point computes to precisely 1.0 in float64 (a `0.75+0.5·x`
+       layout evaluates to 1 ulp off at x=.5 and would break bit-neutrality
+       — pinned by kick-dims-v029.test.ts). body .5 → ×1.0; .85 → deep. */
+    if (out.body.endHz != null) out.body.endHz = Math.max(18, out.body.endHz * (1 - 0.28 * (body - 0.5)));
+    if (out.body.pitchDecayMs != null) out.body.pitchDecayMs = Math.max(10, out.body.pitchDecayMs * (1 + 0.5 * (body - 0.5)));
+    /* subk .5 → ×1.0 tail (neutral); .85 → 14% longer sub tail */
+    if (out.body.bodyDecayMs != null) out.body.bodyDecayMs = Math.max(40, out.body.bodyDecayMs * (1 + 0.4 * (subk - 0.5)));
+  }
+  if (out.punch) {
+    /* punch .5 → ×1.0 (neutral); higher punch = fatter transient, lower ratio */
+    if (out.punch.amount != null) out.punch.amount = Math.min(1, Math.max(0, out.punch.amount * (1 + 0.6 * (punch - 0.5))));
+    if (out.punch.ratio != null) out.punch.ratio = Math.max(1.05, out.punch.ratio * (1 - 0.36 * (punch - 0.5)));
+  }
+  /* sat .5 → ±0 dB (exact: +5.5·0); ±2.75 dB around the kit drive at the extremes */
+  if (patch.driveDb != null) out.driveDb = Math.max(0, patch.driveDb + 5.5 * (sat - 0.5));
+  return out;
+}
+
 /* kitRomSpec — the kit-governed {f0mul, rms} for one ROM type of one kit.
    Fresh object (the caller may mutate its copy); never the live spec. */
 export function kitRomSpec(kitId, type) {
