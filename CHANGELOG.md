@@ -3,6 +3,71 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.29.0] — Run 28: SOUND PORTS #2 — expressive kicks, stereo pads, 36 FORMS
+
+> Owner: "תמשיך צירפתי לך את הטוקן שוב חשוב לדחוף בסוף כי הסביבה שלך
+> מתאפסת והכל נאבד" — keep going; the environment resets, so the push IS
+> the deliverable.
+
+psyreason re-review #2 (read-only clone of
+`dudududi144-source/psyreason` @ `4e09726`; the local folder died with the
+environment reset — GitHub is the source of truth for BOTH repos). Eight
+new psyreason commits since the v0.28.0 review; the three learnings with
+audible consequences are ported onto psy5's pooled architecture, each with
+its own gate:
+
+- **KICK DIMS — expressive kick synthesis + preset variety** (psyreason
+  `dceec3e` + `719211c`). G53. The runtime kick was the kit-governed
+  REASON render with NO preset-level authoring — every kick preset inside
+  a kit rendered the same patch. `applyKickDims`
+  (foundation/dsp/kit-reason.mjs) lifts three independent dimensions into
+  a CLONE of the frozen patch: body (drop depth), subk (sub-tail length),
+  sat (drive ±) — plus the existing punch (transient). EXACT-NEUTRAL law:
+  every factor is written `1 + k·(x−0.5)` so the neutral point computes to
+  precisely 1.0 in float64 — `{.5,.5,.5}` ≡ the plain kit sound,
+  bit-identical (G53 renders the pair through the FULL engine: md 0).
+  `rms` untouched → the family loudness governance (±15%) holds under any
+  dims. Cache keys carry a quantized dims signature; legacy `:2@` keys
+  preserved. `js/presets.js` DP() seeds body/subk/sat per preset id
+  (FNV-1a → mulberry32) over psyreason's wide decorrelated ranges — all
+  40+ kick presets now render DISTINCT patches. Both warm loops warm the
+  active kick preset's dims variant (no first-hit latency). The legacy
+  DrumVoice fallback kick reads the same dims neutral-centered. Composer
+  byte-pins re-pinned (v0.27.0 values recorded in-place).
+- **PAD SPREAD — spread voicing + alternating stereo + per-style timbre**
+  (psyreason `dc072ca` + `6c8c152` + `4e09726`). G54. The live pad grid's
+  chord grows a FIFTH voice — the 3rd one octave UP (notes[0..3] and the
+  label laws unchanged; the sparkle rides notes[4]) — fired with
+  ALTERNATING per-note stereo through a new optional per-VOICE
+  StereoPanner in SynthVoice (`lock.pan`; absent/0 keeps the exact legacy
+  wiring, bit-neutral; worklet path unchanged/documented). Composer pad
+  beds carry the same octave-up third (chord-tone safe: degree cd+2).
+  PAD TIMBRE: the composed pad voice is tinted per style+seed —
+  detune/cutoff multiply INSIDE the preset's designed envelope, and a new
+  seeded `width` (0.3–0.8) drives the live spread. Deterministic pure
+  function of (styleId, seed), resolved BEFORE the macro base snapshot.
+  Pins re-pinned: pads-v022 (5-note), composer hashes/fingerprint,
+  evolution OFF baseline (4325 → 4357 events), mixsnap fingerprint.
+- **FORM LIBRARY — 36 named role-aware arrangements** (psyreason
+  `5be8271` + `64d29bc`). G55. `FORMS`/`FORM_IDS` in composer.js; every
+  section carries a ROLE mapped onto the canonical behavior machinery;
+  compose(styleId, minutes, seed, label, **formId**) — the form's
+  relative bars scale to the target length via allocateBars; AUTO
+  (null/undefined) is byte-identical to the weighted chains. FOUR NEW
+  SECTION BEHAVIORS with pattern-level role isolation: PERC (drums +
+  busy tribal percussion, full 4-on-floor), ACID (rolling bass + lead,
+  no drums/pad), AMBIENT (pad bed only), HALF (one deep kick per bar,
+  half-time snare +8, no hats) — each with its own mix snapshot. UI: a
+  FORM select on the landing advanced row AND the COMPOSE modal,
+  populated from FORM_IDS.
+- **repo tidying (מסודר)**: `factory-presets.js` deleted (stale legacy
+  copy — zero imports anywhere, would throw if evaluated; verify.mjs
+  standalone list updated). `soundBank.ts` STAYS: it is pinned by
+  synth-v2.test.ts as the engine's type-surface documentation.
+- Gates: 52 ids (G53 kick dims · G54 pad spread · G55 form library).
+- Suite: 707 bun tests pass / 0 fail (+21 new pins across
+  kick-dims-v029 / pads-v029 / forms-v029).
+
 ## [0.28.0] — Run 27: HARMONY UPGRADE — psyreason re-review (it keeps improving), page finally LIVE
 
 > Owner: "צירפתי טוקן שוב חשוב לדחוף בסוף מסודר ולעדכן את הדף" — push

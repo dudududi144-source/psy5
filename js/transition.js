@@ -105,7 +105,7 @@ function transEvents(trans, boundaryStep, sd, findTrack) {
     if (ti >= 0) out.push({ kind, track: ti, absStep: Math.max(0, step | 0), vel, note: 48 });
   };
   if (trans.impact) push('impact', 'impact', B, .9);
-  if (trans.revcym) push('revcym', 'revcym', B - 16, .85);
+  if (trans.revcym) push('riser', 'riser', B - 16, .85); /* v0.30.0: the revcym type is gone from the psy4 kit — the swell role fires the riser (the config key stays for saved projects) */
   if (trans.riser) {
     push('riser', 'riser', B - Math.round(1.6 / sd), .8);           /* main sweep — lands ON the boundary */
     if (trans.riser > 1) push('riser', 'riser', B - 32, .7);        /* stacked under-sweep one bar earlier */
@@ -127,7 +127,7 @@ function planTransLive(trans, boundaryTime, sd, lookaheadBars, findTrack) {
   };
   if (trans.impact) push('impact', 'impact', boundaryTime, .9);
   const bar = 16 * sd;
-  if (trans.revcym && lookaheadBars >= 1) push('revcym', 'revcym', boundaryTime - bar, .85);
+  if (trans.revcym && lookaheadBars >= 1) push('riser', 'riser', boundaryTime - bar, .85);
   if (trans.riser) {
     if (lookaheadBars >= 1) push('riser', 'riser', Math.max(boundaryTime - bar, boundaryTime - 1.6), .8);
     if (trans.riser > 1 && lookaheadBars >= 2) push('riser', 'riser', boundaryTime - 2 * bar, .7);

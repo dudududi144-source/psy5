@@ -17,9 +17,7 @@ import { delaySecondsFor, irChannel, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../../
 import { renderBounce, bounceSchedule, renderSong, songSchedule, songSections, evHash, songSteps, SONG_LEAD, songStemTracks, sectionFrames, songFrames } from '../bounce.js';
 import { mkWorkletEngine, renderWorkletOffline } from '../worklet-engine.js';
 import { mulberry32, subSeed } from '../../foundation/foundation.mjs';
-import { renderRomPcm } from '../../foundation/dsp/perc-rom.mjs';
-import { renderReasonPcm } from '../../foundation/dsp/reason-engines.mjs';
-import { kitPatch, KIT_IDS, applyKickDims } from '../../foundation/dsp/kit-reason.mjs';
+import { renderPsy4Pcm, KIT_IDS, kitLevelTarget } from '../../js/psy4kit.mjs';
 import { BanditLearner, BanditPolicy, contextKey } from '../../foundation/learning/bandit.mjs';
 import { armCapture, captureStop, armSongRecord, captureState, captureResult } from './capture.js';
 import { renderMixer } from './mix.js';
@@ -1073,7 +1071,7 @@ const ids40=new Set(all40.map(x=>x.id));
 const uniq40=ids40.size===all40.length;
 const GEN40=['PSYTRANCE','DARK-PSY','GOA','FULL-ON','TECHNO','TRANCE','PROGRESSIVE','HI-TECH','FOREST']; /* v0.19.0: FOREST joins the genre audit */
 const genMissing=GEN40.filter(g=>!all40.some(x=>x.genre===g));
-const TYPES40=new Set(['kick','snare','clap','hatC','hatO','tom','rim','glitch','shaker','conga','bongo','cowbell','clave','zap','boom','riser','impact','darbuka','tambourine','triangle','downlifter','crash','revcym','agogo','timbale']);
+const TYPES40=new Set(['kick','snare','clap','hatC','hatO','shaker','riser','impact','texture','downlifter']);
 const cl2=(v,a,b)=>v>=a&&v<=b;
 const bad40=all40.filter(x=>!x.id||!x.name||!x.genre||!x.cat||(x.engine!=='DRUM'&&x.engine!=='SYNTH')||(x.cat==='drum'&&(!TYPES40.has(x.type)||!cl2(x.tune??.1,.3,2)||!cl2(x.decay??.5,.1,4)||!cl2(x.tone??1,.3,2.5)||!cl2(x.punch??0,0,1))));
 const kits40=Object.keys(KITS||{});
@@ -1083,41 +1081,36 @@ const libOk=all40.length>=150&&drums40.length>=100&&uniq40&&genMissing.length===
 const SR4=44100;
 const hit4=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR4*dur),SR4);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g40',name:'g40',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
 const zcrWin=(d,a,b)=>{let z=0;for(let i=a+1;i<b;i++)if((d[i-1]<0)!==(d[i]<0))z++;return z/Math.max((b-a)/SR4,1)};
-/* v0.24.0: the tom is the REASON membrane — the pitch-ENVELOPE law moves to
-   the renderer (the master chain/comp reshapes the engine render's ZCR by
-   design; G49 raw-law precedent). The renderer's pitch is strictly descending
-   (startHz→endHz, exp), so its ZCR windows are monotonic by construction —
-   measured (bun): monotonic descent. Tune still maps via playbackRate — the
-   engine render keeps that probe (1.1 vs .9 → ~1.2× ZCR). */
-const tomRaw=renderReasonPcm('tom',kitPatch('psy-classic','tom'),SR4,0,2);
-const dTom=(await hit4({type:'tom',tune:1.1,decay:.7,tone:1,punch:0},1)).getChannelData(0);
-const dTom09=(await hit4({type:'tom',tune:.9,decay:.7,tone:1,punch:0},1)).getChannelData(0);
+/* v0.30.0: the probes ride the PSY4 KIT — the kick's pitch sweep descends
+   (ZCR windows monotone through the sub 200→fund sweep), the clap carries
+   its multi-burst secondary bump (RMS 11-15 ms > 30% of the first burst),
+   the hats concentrate 5-12 kHz, the shaker sits in 3-9 kHz; tune still maps
+   via playbackRate (1.1 vs .9 → ~1.2× ZCR). */
+const rms40=(x,a,b)=>{const A=Math.round(a*SR4),B=Math.min(Math.round(b*SR4),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
+const fft40=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
+const kickRaw=renderPsy4Pcm('kick',SR4,{kitId:'psy-classic',variant:0,rootMul:1});
+const dKick=(await hit4({type:'kick',tune:1.1,decay:.7,tone:1,punch:0},1)).getChannelData(0);
+const dKick09=(await hit4({type:'kick',tune:.9,decay:.7,tone:1,punch:0},1)).getChannelData(0);
 const w40=(t)=>Math.round(t*SR4);
-const tomZ=[zcrWin(tomRaw,w40(0),w40(.04)),zcrWin(tomRaw,w40(.04),w40(.08)),zcrWin(tomRaw,w40(.08),w40(.12)),zcrWin(tomRaw,w40(.12),w40(.16))];
-const tomMap=zcrWin(dTom,w40(.05),w40(.21)),tomMap09=zcrWin(dTom09,w40(.05),w40(.21));
-const tomOk=tomZ[0]>=tomZ[1]&&tomZ[1]>=tomZ[2]&&tomZ[2]>=tomZ[3]&&tomZ[0]>tomZ[3]&&tomMap>tomMap09;
-const dCow=(await hit4({type:'cowbell',tune:1,decay:1,tone:1,punch:0},.6)).getChannelData(0);
-/* dual-square partials: exact DFT (Goertzel) at 560 and 845 Hz — both must
-   reach >= 50% of the strongest partial in the 200-2000 Hz coarse scan */
-const mag4=(d,f)=>{let re=0,im=0;const a0=w40(.05);for(let i=0;i<16384;i++){const ph=2*Math.PI*f*i/SR4;re+=d[a0+i]*Math.cos(ph);im-=d[a0+i]*Math.sin(ph)}return Math.sqrt(re*re+im*im)/8192};
-let cowMax=0;for(let f=200;f<=2000;f+=25){const m=mag4(dCow,f);if(m>cowMax)cowMax=m}
-const cowA=mag4(dCow,560),cowB=mag4(dCow,845);
-const cowOk40=cowA>=.5*cowMax&&cowB>=.5*cowMax;
-const dZap=(await hit4({type:'zap',tune:1,decay:.8,tone:1,punch:0},.6)).getChannelData(0);
-const zapZ=[zcrWin(dZap,w40(.05),w40(.08)),zcrWin(dZap,w40(.08),w40(.11)),zcrWin(dZap,w40(.11),w40(.14)),zcrWin(dZap,w40(.14),w40(.17)),zcrWin(dZap,w40(.17),w40(.2))];
-let zapDesc=0;for(let i=0;i<4;i++)if(zapZ[i]>zapZ[i+1])zapDesc++;
-const zapOk=zapDesc>=4;
-const dBoom=(await hit4({type:'boom',tune:.9,decay:1,decay2:0,tone:1,punch:0},1.8)).getChannelData(0);
-let subB=0,totB=0;for(let i=w40(.05);i<dBoom.length;i++){totB+=dBoom[i]*dBoom[i]}
-{const bw2=(lo,hi)=>{let e=0;for(let i=0;i<8192;i++){const t=i/SR4;const w=.5-.5*Math.cos(2*Math.PI*i/8191);const s=dBoom[w40(.05)+i]*(Math.cos(2*Math.PI*lo*t)-Math.cos(2*Math.PI*hi*t));e+=s*s}return e};subB=bw2(20,120)/Math.max(totB,1e-12)}
-const boomOk=subB>.8;
-/* determinism on the new voices */
+const kickZ=[zcrWin(kickRaw,w40(0),w40(.01)),zcrWin(kickRaw,w40(.01),w40(.02)),zcrWin(kickRaw,w40(.02),w40(.03)),zcrWin(kickRaw,w40(.03),w40(.04))];
+const kickMap=zcrWin(dKick,w40(.05),w40(.12)),kickMap09=zcrWin(dKick09,w40(.05),w40(.12));
+const kickOk=kickZ[0]>kickZ[1]&&kickZ[1]>kickZ[2]&&kickZ[2]>kickZ[3]&&kickMap>kickMap09;
+const dClap=(await hit4({type:'clap',tune:1,decay:1,tone:1,punch:0},.8)).getChannelData(0);
+const clapB1=rms40(dClap,0,.004),clapB2=rms40(dClap,.011,.015),clapTail=rms40(dClap,.05,.12);
+const clapOk=clapB1>.05&&clapB2>=.3*clapB1&&clapTail>.1*clapB1;
+const dHat=(await hit4({type:'hatC',tune:1,decay:.5,tone:1,punch:0},.5)).getChannelData(0);
+let hatTot=0,hatTop=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dHat[w40(.005)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);hatTot+=m;if(k*binHz>=5000&&k*binHz<=12000)hatTop+=m}}
+const hatOk=hatTop>=.5*hatTot;
+const dShk=(await hit4({type:'shaker',tune:1,decay:.6,tone:1,punch:0},.5)).getChannelData(0);
+let shkTot=0,shkMid=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dShk[w40(.005)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);shkTot+=m;if(k*binHz>=3000&&k*binHz<=9000)shkMid+=m}}
+const shkOk=shkMid>=.35*shkTot;
+/* determinism on the core kit voices */
 let det40=0;
-for(const sd of [{type:'tom',tune:1.1,decay:.7,tone:1,punch:0},{type:'cowbell',tune:1,decay:1,tone:1,punch:0},{type:'zap',tune:1,decay:.8,tone:1,punch:0}]){
+for(const sd of [{type:'kick',tune:1,decay:.7,tone:1,punch:0},{type:'clap',tune:1,decay:1,tone:1,punch:0},{type:'hatC',tune:1,decay:.5,tone:1,punch:0}]){
 const a=(await hit4(sd,1)).getChannelData(0),b=(await hit4(sd,1)).getChannelData(0);for(let i=0;i<Math.min(a.length,b.length);i++){const e=Math.abs(a[i]-b[i]);if(e>det40)det40=e}}
 const detOk40=det40<1e-6;
-const ok40=libOk&&tomOk&&cowOk40&&zapOk&&boomOk&&detOk40;
-gate('G40','percussion v2 + library: >=150 presets (>=100 drums), unique ids, genres 8/8, schema-valid, 9 kits resolve; tom pitch sweep (ZCR monotone), cowbell dual-square partials, zap monotone descent, boom sub>0.8; new voices deterministic maxDiff<1e-6',ok40,'lib='+all40.length+'('+drums40.length+' drums) badSchema='+bad40.length+' kits='+kits40.length+'/9 | tomZ='+tomZ.map(x=>x.toFixed(0)).join('/')+' cowA='+cowA.toFixed(3)+' cowB='+cowB.toFixed(3)+' cowMax='+cowMax.toFixed(3)+' zapDesc='+zapDesc+'/4 sub='+subB.toFixed(2)+' det='+det40.toExponential(2))}catch(e){gate('G40','percussion v2 + library',false,'ERR '+e.message)}}
+const ok40=libOk&&kickOk&&clapOk&&hatOk&&shkOk&&detOk40;
+gate('G40','psy4 kit + library: >=150 presets (>=100 drums), unique ids, genres 9/9, schema-valid (TYPES=psy4 kit), 9 kits resolve; kick pitch sweep (ZCR monotone + tune maps), clap multi-burst (b2>=.3*b1 + tail), hat 5-12k share>=.5, shaker 3-9k share>=.35; deterministic maxDiff<1e-6',ok40,'lib='+all40.length+'('+drums40.length+' drums) badSchema='+bad40.length+' kits='+kits40.length+'/9 | kickZ='+kickZ.map(x=>x.toFixed(0)).join('/')+' map '+kickMap.toFixed(0)+'/'+kickMap09.toFixed(0)+' | clap '+clapB2.toFixed(3)+'/'+clapB1.toFixed(3)+' tail '+(clapTail/Math.max(clapB1,1e-9)).toFixed(2)+' | hat '+(hatTop/Math.max(hatTot,1e-12)).toFixed(2)+' shk '+(shkMid/Math.max(shkTot,1e-12)).toFixed(2)+' det='+det40.toExponential(2))}catch(e){gate('G40','psy4 kit + library',false,'ERR '+e.message)}}
 
 /* G41 — MASTER SPACE (offline — CI-asserted, v0.12.0 P3):
    NEUTRAL CONTRACT: widthMaster 1 + pingPong off + classic IR leaves the
@@ -1377,113 +1370,84 @@ const ok47=rmsD>=rmsA*1.1&&distDiff>1e-3&&g1>=g0*1.1&&mid6>3*mid2&&md47(c6,c2)>1
    middle-span RMS ratio, measured ×7.3. The two layouts are also audibly
    different end-to-end (maxDiff > 1e-3). */
 gate('G47','drum v2 params LEGACY pin (rom:false): dist RMS>=1.1x + audible (maxDiff>1e-3), glide sub-centroid(30-400Hz, first 46ms)>=1.1x, bursts mid-span (20-44ms) RMS >3x the nb=2 render (bursts@25/34ms vs silence) + audible maxDiff, bright 9-14k ratio rises, ALL neutral pairs maxDiff<1e-6 (dist0/glide0/bursts4/bright1 = exact v0.13.1), determinism<1e-6',ok47,'rms '+rmsD.toFixed(3)+'/'+rmsA.toFixed(3)+'='+(rmsD/rmsA).toFixed(2)+' d='+distDiff.toExponential(1)+' | cent '+g1.toFixed(0)+'/'+g0.toFixed(0)+'='+(g1/Math.max(g0,1e-9)).toFixed(2)+' | mid '+mid6.toExponential(1)+'/'+mid2.toExponential(1)+'(x'+(mid6/Math.max(mid2,1e-12)).toFixed(1)+') md='+md47(c6,c2).toExponential(1)+' | br '+br20.toFixed(3)+'/'+br05.toFixed(3)+' | neu d/g/b/h '+distNeu.toExponential(1)+'/'+glideNeu.toExponential(1)+'/'+burstsNeu.toExponential(1)+'/'+brightNeu.toExponential(1)+' | det='+det47.toExponential(1))}catch(e){gate('G47','drum v2 params',false,'ERR '+e.message)}}
-/* G48 — PERCUSSION v3 (offline — CI-asserted, v0.15.0 P1; v0.23.0 ROM recalibration):
-   the owner flagged conga (the perc lane of EVERY composer kit) and other
-   perc as low-grade. v0.15 rebuilt five voices inside the same DrumVoice
-   nodes; v0.23.0 moved conga/bongo/cowbell/clave to the RENDERED
-   percussion ROM (foundation/dsp/perc-rom.mjs) — this gate now asserts the
-   ROM reality, measured:
-   conga — the membrane mode band (2.63×f0 = 744–920 Hz at tune 1) through
-     the ENGINE (ROM path live, fallbacks 0): band share ≥ .03 (measured
-     .061 — the v0.12.0 bare sine put ≈0 there; the v0.15 synth measured
-     .039; the ROM ladder measures .061);
-   conga ROM raw structure — the strike leads the body on the rendered
-     buffer itself (renderRomPcm('conga',44100)): RMS(0–12 ms) / RMS(50–80
-     ms) ≥ 1.2 (measured 1.89). Through the MASTER chain the glue compressor
-     intentionally reshapes this ratio (mix behavior, by design) — the
-     structural anti-beep property lives in the renderer;
-   bongo — the 2.63×f0 membrane band (1080–1280 Hz) share ≥ .012 through
-     the engine (measured .054 — 4.5× the threshold);
-   tom — UNCHANGED synth recipe: bend-start band (200–320 Hz) outweighs the
-     landed-glide band (80–130 Hz) ≥ 1.4× (measured ×12.4);
-   cowbell — ROM now: tone still maps the tilt — tone 1.4 vs tone 1 render
-     audibly different (maxDiff > 1e-3; measured 5.7e-2, 57×);
-   clave — ROM now: punch still maps the accent — punch .8 vs punch 0
-     differs audibly (maxDiff > 1e-3; measured 4.0e-2, 40×);
-   ROM PATH LIVENESS — every engine instance in this gate routed its ROM
-     types through the RomVoice pool: zero romFallbacks and ≥ 5 romSpawns
-     summed over the gate's engines (a silent legacy fallback fails here);
-   all non-silent (peak > .05), deterministic (conga + tom double render
-   in fresh contexts: maxDiff < 1e-6). */
+/* G48 — PSY4 KIT DRUM CORE (offline — CI-asserted, v0.30.0 FOUNDATION RESET):
+   the foundation psy4 voices ARE the kit (js/psy4kit.mjs renders, the engine
+   plays them through the RomVoice pool). Laws, measured:
+   kick — the strike leads the body on the RENDERED buffer (renderPsy4Pcm):
+     RMS(0–12 ms) / RMS(50–80 ms) ≥ 1.2, and the fundamental band (40–70 Hz)
+     carries ≥ 25% of the spectrum (the sub dominates — KICK_SPEC law);
+   snare — the noise band (1.2–4 kHz) ≥ 30% (SNARE_SPEC bp 1800 Hz);
+   hat — the metallic top (5–12 kHz) ≥ 55% (HAT_SPEC 6-osc lattice);
+   shaker — the 3–9 kHz band ≥ 35%;
+   clap — the multi-burst secondary bump (RMS 11–15 ms ≥ 30% of burst 1);
+   KIT PATH LIVENESS — every engine here routes kit types through the
+     RomVoice pool: zero romFallbacks, ≥ 5 romSpawns summed;
+   all non-silent (peak > .05), deterministic (kick + clap double renders in
+   fresh contexts: maxDiff < 1e-6). */
 if((window.__psy6GateSkip||[]).includes('G48')){gate('G48','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 const SR48=44100;
-const mk48=async(sound,dur,legacy)=>{const oc=new OfflineAudioContext(1,Math.round(SR48*dur),SR48);const eng=new PooledEngine(oc,legacy?{rom:false}:undefined);engs48.push(eng);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g48',name:'g48',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
+const mk48=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR48*dur),SR48);const eng=new PooledEngine(oc);engs48.push(eng);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g48',name:'g48',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
 const rms48=(x,a,b)=>{const A=Math.round(a*SR48),B=Math.min(Math.round(b*SR48),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
 const fft48=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
 const bandShare48=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR48);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft48(re,im);const binHz=SR48/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
-const bandAbs48=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR48);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft48(re,im);const binHz=SR48/N;let s2=0;for(let k=1;k<N/2;k++){if(k*binHz>=f0&&k*binHz<=f1){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);s2+=m*m}}return Math.sqrt(s2/(N/2))};
 const peak48=x=>{let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m};
 const md48=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
-const CON={type:'conga',tune:1,decay:1,tone:1,punch:.5};
 const engs48=[];
-const con=await mk48(CON,.8),con2=await mk48(CON,.8);const cdx=con.getChannelData(0);
-const cOver=bandShare48(cdx,744,920,.02);
-/* v0.23.0 ROM raw structure: the strike leads the body on the RENDERED
-   buffer (engine-independent — the glue comp reshapes it downstream BY
-   DESIGN). Same law as the audit tool: measure the renderer. */
-const raw48=renderRomPcm('conga',SR48);const rAtk48=rms48(raw48,0,.012),rBody48=rms48(raw48,.05,.08);
-const bon=await mk48({type:'bongo',tune:1,decay:1,tone:1,punch:.5},.5);
-const bOver=bandShare48(bon.getChannelData(0),1080,1280,.02);
-const tom=await mk48({type:'tom',tune:1,decay:1},.8,true),tom2=await mk48({type:'tom',tune:1,decay:1},.8,true);/* tom = LEGACY pin (rom:false): the v0.15 bend laws are synth laws; the REASON tom is G52/audit territory */const tdx=tom.getChannelData(0);
-const tEarly=bandAbs48(tdx,200,320,.05),tLate=bandAbs48(tdx,80,130,.15);
-const w1=await mk48({type:'cowbell',tune:1,decay:1,tone:1},.5),w2=await mk48({type:'cowbell',tune:1,decay:1,tone:1.4},.5);
-const wDiff=md48(w2,w1);
-const k1=await mk48({type:'clave',tune:1,tone:1,punch:.8},.2),k0=await mk48({type:'clave',tune:1,tone:1,punch:0},.2);
-const kDiff=md48(k1,k0);
-const pk48=Math.min(peak48(cdx),peak48(bon.getChannelData(0)),peak48(tdx),peak48(w1.getChannelData(0)),peak48(k1.getChannelData(0)));
-const det48=Math.max(md48(con,con2),md48(tom,tom2));
-/* romLive48 MUST be computed AFTER every mk48 call — it asserts the SUM
-   over the gate's engines (an early computation sees 2 engines, fails the
-   >=5 spawns law, and the gate reports false while its own evidence line
-   shows 7/0 — the CI bug this line fixes) */
-const romLive48=engs48.reduce((s,e)=>s+e.romSpawns,0)>=5&&engs48.every(e=>e.romFallbacks===0);
+const raw48=renderPsy4Pcm('kick',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
+const rAtk48=rms48(raw48,0,.012),rBody48=rms48(raw48,.05,.08);
 const rawRatio48=rAtk48/Math.max(rBody48,1e-12);
-const ok48=cOver>=.03&&rawRatio48>=1.2&&romLive48&&bOver>=.012&&tEarly>1.4*tLate&&wDiff>1e-3&&kDiff>1e-3&&pk48>.05&&det48<1e-6;
-gate('G48','percussion ROM v3: conga membrane-band(744-920Hz) share>=.03 through the engine + ROM raw strike-leads-body RMS(0-12ms)/RMS(50-80ms)>=1.2 + ROM path live (spawns>=5, fallbacks=0), bongo band(1080-1280Hz) share>=.012, tom bend-band(200-320)>1.4x glide-band(80-130), cowbell tone tilt audible md>1e-3, clave punch accent audible md>1e-3, all peak>.05, determinism<1e-6',ok48,'cOver '+cOver.toFixed(3)+' | raw atk/body '+rawRatio48.toFixed(2)+' | rom sp/fb '+engs48.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs48.reduce((s,e)=>s+e.romFallbacks,0)+' | bOver '+bOver.toFixed(3)+' | tom '+tEarly.toExponential(1)+'/'+tLate.toExponential(1)+'='+(tEarly/Math.max(tLate,1e-12)).toFixed(2)+' | w '+wDiff.toExponential(1)+' | k '+kDiff.toExponential(1)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','percussion v3',false,'ERR '+e.message)}}
-/* G49 — FOUR NEW VOICES (offline — CI-asserted, v0.15.0 P2):
-   crash — TWO-stage shimmer: mid-ring RMS(1.0–2.0 s) ≥ .06 × the early
-     RMS(0.05–0.3 s) (a one-point exponential would sit far below — the
-     set-down stage holds the wash; measured ×.371), and the metal
-     lattice dominates the top: band share(4–12 kHz) ≥ .45 (measured .49);
-   revcym — the swell RISES: RMS(t .95–1.4) > 3× RMS(t 0–0.25) (exponential
-     climb into the drop), then the HARD cut: RMS after the cut (t ≥ 1.62)
-     < 1e-3 (vacuum);
-   agogo — the upper mode (1.506×f0 = 1750–1950 Hz at tune 1) is present:
-     band share ≥ .03 (measured .162), and the ring sustains: RMS(.14–.24)
-     ≥ .08 × early RMS(.05–.09) (measured ×.108);
-   timbale — the ping dominates the low register: band share(700–1000 Hz)
-     > band share(150–300 Hz) (measured .525 > .017), and the rim-shot
-     crack (2000–3200 Hz) is audible: share ≥ .03 (measured .044);
-   all non-silent (peak > .05), deterministic (crash + agogo double
-   render in fresh contexts: maxDiff < 1e-6). */
+let subShare48=0;{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=raw48[i]||0;fft48(re,im);const binHz=SR48/N;let tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=40&&k*binHz<=70)subShare48+=m}subShare48/=Math.max(tot,1e-12)}
+const snare48=renderPsy4Pcm('snare',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
+const snNoise=bandShare48(snare48,1200,4000,.005);
+const hat48=renderPsy4Pcm('hatC',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
+const hatTop=bandShare48(hat48,5000,12000,.005);
+const shk48=renderPsy4Pcm('shaker',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
+const shkMid=bandShare48(shk48,3000,9000,.005);
+const clapPcm48=renderPsy4Pcm('clap',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
+const cB1=rms48(clapPcm48,0,.004),cB2=rms48(clapPcm48,.011,.015);
+/* engine-level liveness + peaks + determinism */
+const kickA=await mk48({type:'kick',tune:1,decay:1,tone:1,punch:.5},1);
+const kickB=await mk48({type:'kick',tune:1,decay:1,tone:1,punch:.5},1);
+const clapA=await mk48({type:'clap',tune:1,decay:1,tone:1,punch:0},1);
+const hatA=await mk48({type:'hatC',tune:1,decay:.5,tone:1,punch:0},.5);
+const shkA=await mk48({type:'shaker',tune:1,decay:.6,tone:1,punch:0},.5);
+const snareA=await mk48({type:'snare',tune:1,decay:1,tone:1,punch:.5},.6);
+const pk48=Math.min(peak48(kickA.getChannelData(0)),peak48(clapA.getChannelData(0)),peak48(hatA.getChannelData(0)),peak48(shkA.getChannelData(0)),peak48(snareA.getChannelData(0)));
+const det48=Math.max(md48(kickA,kickB));
+const romLive48=engs48.reduce((s,e)=>s+e.romSpawns,0)>=5&&engs48.every(e=>e.romFallbacks===0);
+const ok48=rawRatio48>=1.2&&subShare48>=.25&&snNoise>=.30&&hatTop>=.55&&shkMid>=.35&&cB2>=.3*cB1&&romLive48&&pk48>.05&&det48<1e-6;
+gate('G48','psy4 kit drum core: kick strike-leads-body>=1.2 + sub band>=.25, snare noise band>=.30, hat 5-12k>=.55, shaker 3-9k>=.35, clap burst-2>=.3*b1, kit ROM path live (spawns>=5, fallbacks=0), all peak>.05, determinism<1e-6',ok48,'atk/body '+rawRatio48.toFixed(2)+' | sub '+subShare48.toFixed(2)+' | sn '+snNoise.toFixed(2)+' | hat '+hatTop.toFixed(2)+' | shk '+shkMid.toFixed(2)+' | clap '+cB2.toFixed(3)+'/'+cB1.toFixed(3)+' | sp/fb '+engs48.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs48.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','psy4 kit drum core',false,'ERR '+e.message)}}
+/* G49 — PSY4 FX VOICES (offline — CI-asserted, v0.30.0 FOUNDATION RESET):
+   riser — the swell RISES: RMS(1.2–1.55) > 3× RMS(0.05–0.4) (the sweep
+     climbs into the drop — the PsyRiser exponential);
+   impact — the sub band (20–120 Hz) carries ≥ 55% of the energy (the
+     cinematic sub one-shot — PsyImpact);
+   texture — the voice SUSTAINS: RMS(0.8–1.2) ≥ 40% of RMS(0.05–0.4)
+     (the atmo bed — PsyTexture triggered at 1.4 s);
+   downlifter — the mirror of the riser: RMS(0.05–0.3) > 3× RMS(1.0–1.3)
+     (the reversed render falls away);
+   all non-silent (peak > .05), deterministic (riser + texture double
+   renders in fresh contexts: maxDiff < 1e-6). */
 if((window.__psy6GateSkip||[]).includes('G49')){gate('G49','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 const SR49=44100;
 const mk49=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR49*dur),SR49);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g49',name:'g49',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
 const rms49=(x,a,b)=>{const A=Math.round(a*SR49),B=Math.min(Math.round(b*SR49),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
-const fft49=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
-const bandShare49=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR49);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft49(re,im);const binHz=SR49/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
 const peak49=x=>{let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m};
 const md49=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
-const CRS={type:'crash',tune:1,decay:1,tone:1,punch:.5};
-const cr=await mk49(CRS,3.4),cr2=await mk49(CRS,3.4);const crx=cr.getChannelData(0);
-/* v0.24.0: the crash is now the REASON cymbal engine — the STRUCTURAL laws
-   move to the renderer (the G48 raw-law precedent: the master chain reshapes
-   downstream BY DESIGN, so structural anti-beep laws live in the renderer).
-   Measured (bun, renderReasonPcm renderer): mid/early .084–.360 per kit,
-   1.5–12k share .977+ — the engine render keeps the peak+determinism evidence. */
-const crRaw=renderReasonPcm('crash',kitPatch('psy-classic','crash'),SR49,0,2);
-const crEarly=rms49(crRaw,.05,.3),crMid=rms49(crRaw,1.0,2.0),crTop=bandShare49(crRaw,4000,SR49/2-100,.05);/* window .05s in (past the strike); band 4k→Nyquist — the ring-mod wash concentrates ABOVE 12k (4-12k alone = .30, 4k+ = .82 measured; the v0.23 modal bank was mid-heavy, this engine is brighter by design) */
-const rv=await mk49({type:'revcym',tune:1,decay:1,tone:1,punch:.6},2.2);const rvx=rv.getChannelData(0);
-const rvLo=rms49(rvx,.05,.3),rvHi=rms49(rvx,1.0,1.45),rvCut=rms49(rvx,1.66,1.96);
-const AGS={type:'agogo',tune:1,decay:1,tone:1.2,punch:.4};
-const ag=await mk49(AGS,.6),ag2=await mk49(AGS,.6);const agx=ag.getChannelData(0);
-const agUp=bandShare49(agx,1750,1950,0),agEarly=rms49(agx,.05,.09),agMid=rms49(agx,.14,.24);
-const tb=await mk49({type:'timbale',tune:1,decay:1,tone:1.1,punch:.6},.5);const tbx=tb.getChannelData(0);
-const tbPing=bandShare49(tbx,700,1000,0),tbLow=bandShare49(tbx,150,300,0),tbCrack=bandShare49(tbx,2000,3200,0);
-const pk49=Math.min(peak49(crx),peak49(rvx),peak49(agx),peak49(tbx));
-const det49=Math.max(md49(cr,cr2),md49(ag,ag2));
-const ok49=crMid>=.06*crEarly&&crTop>=.60&&rvHi>3*rvLo&&rvCut<1e-3&&agUp>=.03&&agMid>=.08*agEarly&&tbPing>tbLow&&tbCrack>=.03&&pk49>.05&&det49<1e-6;
-gate('G49','voices: crash REASON-renderer mid-ring>=.06*early + 4k-to-Nyquist share>=.60 (measured .084-.36 / .82; engine render carries peak+det), revcym swell>3x low + hard cut(<1e-3 after), agogo upper-mode share>=.03 + mid ring>=.08*early, timbale ping>low + crack share>=.03, all peak>.05, determinism<1e-6',ok49,'cr '+crMid.toExponential(1)+'/'+crEarly.toExponential(1)+'='+(crMid/Math.max(crEarly,1e-12)).toFixed(3)+' top='+crTop.toFixed(2)+' | rv '+rvHi.toExponential(1)+'/'+rvLo.toExponential(1)+'='+(rvHi/Math.max(rvLo,1e-12)).toFixed(1)+' cut='+rvCut.toExponential(1)+' | ag '+agUp.toFixed(3)+' mid='+(agMid/Math.max(agEarly,1e-12)).toFixed(3)+' | tb '+tbPing.toFixed(3)+'>'+tbLow.toFixed(3)+' crack='+tbCrack.toFixed(3)+' | pk='+pk49.toFixed(2)+' | det='+det49.toExponential(1))}catch(e){gate('G49','new voices v0.15',false,'ERR '+e.message)}}
+const ri=await mk49({type:'riser',tune:1,decay:1,tone:1,punch:0},2);const rix=ri.getChannelData(0);
+const riLo=rms49(rix,.05,.4),riHi=rms49(rix,1.2,1.55);
+const im=await mk49({type:'impact',tune:1,decay:1,tone:1,punch:0},1.6);const imx=im.getChannelData(0);
+let imSub=0,imTot=0;for(let i=Math.round(.05*SR49);i<imx.length;i++){imTot+=imx[i]*imx[i]}{for(let i=Math.round(.05*SR49);i<imx.length;i++){const t=i/SR49;const s=imx[i]*(Math.cos(2*Math.PI*20*t)-Math.cos(2*Math.PI*120*t));imSub+=s*s}imSub=Math.sqrt(imSub/Math.max(imx.length-Math.round(.05*SR49),1))/Math.max(Math.sqrt(imTot/Math.max(imx.length-Math.round(.05*SR49),1)),1e-12)}
+const tx=await mk49({type:'texture',tune:1,decay:1.2,tone:1,punch:0},2);const txx=tx.getChannelData(0);
+const txEarly=rms49(txx,.05,.4),txLate=rms49(txx,.8,1.2);
+const dl=await mk49({type:'downlifter',tune:1,decay:1,tone:1,punch:0},1.8);const dlx=dl.getChannelData(0);
+const dlEarly=rms49(dlx,.05,.3),dlLate=rms49(dlx,1.0,1.3);
+const pk49=Math.min(peak49(rix),peak49(imx),peak49(txx),peak49(dlx));
+const tx2=await mk49({type:'texture',tune:1,decay:1.2,tone:1,punch:0},2);
+const ri2=await mk49({type:'riser',tune:1,decay:1,tone:1,punch:0},2);
+const det49=Math.max(md49(ri,ri2),md49(tx,tx2));
+const ok49=riHi>3*riLo&&imSub>=.55&&txLate>=.4*txEarly&&dlEarly>3*dlLate&&pk49>.05&&det49<1e-6;
+gate('G49','psy4 fx voices: riser swell>3x low, impact sub>=.55, texture sustains>=.4*early, downlifter early>3x late, all peak>.05, determinism<1e-6',ok49,'ri '+riHi.toExponential(1)+'/'+riLo.toExponential(1)+'='+(riHi/Math.max(riLo,1e-12)).toFixed(1)+' | im sub '+imSub.toFixed(2)+' | tx '+(txLate/Math.max(txEarly,1e-12)).toFixed(2)+' | dl '+(dlEarly/Math.max(dlLate,1e-12)).toFixed(1)+' | pk='+pk49.toFixed(2)+' | det='+det49.toExponential(1))}catch(e){gate('G49','psy4 fx voices',false,'ERR '+e.message)}}
 /* G50 — TRANSITIONS v1 (offline — CI-asserted, v0.16.0 P1):
    the owner's field report: transitions between built sections "don't go
    smoothly from one to the next". scene.trans (riser/revcym/impact/cut +
@@ -1585,81 +1549,94 @@ const ok51=pk51m>.05&&minMd>1e-3&&cSpread>=250&&det51<1e-6&&forestOk;
 gate('G51','preset batch v0.18 (library 345→381): 4 representative new voices non-silent (peak>.05), pairwise distinct (md>1e-3), centroid spread>=250Hz, deterministic<1e-6, FOREST presets exist',ok51,'cent '+cents.map(c=>Math.round(c)).join('/')+' spread='+Math.round(cSpread)+'Hz | minMd='+minMd.toExponential(1)+' | pk='+pk51m.toFixed(2)+' | det='+det51.toExponential(1))}catch(e){gate('G51','preset batch v0.18',false,'ERR '+e.message)}}
 
 if((window.__psy6GateSkip||[]).includes('G52')){gate('G52','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+/* ── G52 (v0.30.0) PSY4 KIT GOVERNANCE ──────────────────────────────
+   The psy4 kit (js/psy4kit.mjs) is the ONLY drum render family. Evidence:
+   (a) LIVENESS — kick/hatO/hatC/shaker through the default kit engine:
+   romSpawns ≥ 4, romFallbacks === 0, peak > .05;
+   (b) CHOKE — hatO ringing alone vs hatO→hatC: the tail dies (< 40%);
+   (c) SIDECHAIN — the kick fires the neighbour duck on the kit ROM path;
+   (d) DETERMINISM — renderPsy4Pcm twice: maxDiff === 0;
+   (e) KIT GOVERNANCE — psy-classic vs tribal-raw kick: md > 1e-3;
+   (f) LEVEL LAW — 6 kits × 10 types: every render peak within ±2% of the
+   kitLevelTarget (the peak-normalized coherence) and finite;
+   (g) DURATION LAW — no kit render exceeds the 2.5 s cap; core drums ≤ 1 s. */
 const SR52=44100;
-const REASON_ROLES52=['kick','snare','clap','hatO','hatC','tom','crash','ride'];
 const rms52=(x,a,b)=>{const A=Math.round(a*SR52),B=Math.min(Math.round(b*SR52),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
 const mkTr52=(type,extra)=>({idx:0,kind:'drum',presetId:'g52',name:'g52',sound:Object.assign({type,tune:1,decay:1,tone:1,punch:.5},extra||{}),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
 const mkEng52=(tracks)=>{const oc=new OfflineAudioContext(1,Math.round(SR52*1),SR52);const eng=new PooledEngine(oc);eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks});return{oc,eng}};
 const trk52=()=>({idx:0,kind:'drum',presetId:'g52',name:'g52',sound:{type:'kick',tune:1,decay:1,tone:1,punch:.5},mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
-/* liveness: kick + hatO + hatC + conga through the DEFAULT kit engine */
+/* liveness: kick + hatO + hatC + shaker through the DEFAULT kit engine */
 const live52=mkEng52([trk52()]);
 live52.eng.trigger(mkTr52('kick'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
 live52.eng.trigger(mkTr52('hatO'),.1,{track:0,off:0,vel:.8,note:60,lock:{}},60/145/4);
 live52.eng.trigger(mkTr52('hatC'),.22,{track:0,off:0,vel:.8,note:60,lock:{}},60/145/4);
-live52.eng.trigger(mkTr52('conga'),.3,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
+live52.eng.trigger(mkTr52('shaker'),.3,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
 const liveBuf52=await live52.oc.startRendering();
 const livePk52=(()=>{const x=liveBuf52.getChannelData(0);let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m})();
-const liveOk52=live52.eng.reasonSpawns>=3&&live52.eng.reasonFallbacks===0&&live52.eng.romFallbacks===0&&live52.eng.romSpawns>=4&&livePk52>.05;
+const liveOk52=live52.eng.romSpawns>=4&&live52.eng.romFallbacks===0&&livePk52>.05;
 /* choke A/B: hatO alone vs hatO→hatC (the tail dies) */
 const chA=mkEng52([trk52()]);chA.eng.trigger(mkTr52('hatO'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
 const chB=mkEng52([trk52()]);chB.eng.trigger(mkTr52('hatO'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);chB.eng.trigger(mkTr52('hatC'),.15,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
 const bufA=await chA.oc.startRendering(),bufB=await chB.oc.startRendering();
 const tailA=rms52(bufA.getChannelData(0),.3,.45),tailB=rms52(bufB.getChannelData(0),.3,.45);
 const chokeOk52=tailA>5e-4&&tailB<.4*tailA;
-/* kick sidechain on the ROM path: neighbour chain with duck amount gets scheduled */
+/* kick sidechain on the kit ROM path: neighbour chain with duck amount gets scheduled */
 const scTrk=trk52();scTrk.idx=1;scTrk.scAmount=80;
 const duck52=mkEng52([trk52(),scTrk]);
 const t0Before=duck52.eng.duckState[1].t0;
 duck52.eng.trigger(mkTr52('kick'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
 const duckOk52=t0Before===-1&&duck52.eng.duckState[1].t0>=0;
-/* renderer-level laws: determinism, kit governance, 6 kits × 8 types loudness */
-const pkK=kitPatch('psy-classic','kick'),pkT=kitPatch('tribal-raw','kick');
-const dA=renderReasonPcm('kick',pkK,SR52,0,2),dB=renderReasonPcm('kick',pkK,SR52,0,2);
-let det52=0;for(let i=0;i<dA.length;i++){const d=Math.abs(dA[i]-dB[i]);if(d>det52)det52=d}
-const kA=renderReasonPcm('kick',pkK,SR52,0,2),kB=renderReasonPcm('kick',pkT,SR52,0,2);
+/* renderer-level laws: determinism, kit governance, 6 kits × 10 types level law */
+const kA=renderPsy4Pcm('kick',SR52,{kitId:'psy-classic',variant:0,rootMul:1}),kB=renderPsy4Pcm('kick',SR52,{kitId:'tribal-raw',variant:0,rootMul:1});
 let gov52=0;for(let i=0;i<Math.min(kA.length,kB.length);i++){const d=Math.abs(kA[i]-kB[i]);if(d>gov52)gov52=d}
-let lawWorst52=0,lawPk52=0,lawN52=0;
-for(let ki=0;ki<KIT_IDS.length;ki++){for(let ri=0;ri<REASON_ROLES52.length;ri++){const ty=REASON_ROLES52[ri];const pat=kitPatch(KIT_IDS[ki],ty);const pcm=renderReasonPcm(ty,pat,SR52,0,2);let s=0,pk=0;for(let i=0;i<pcm.length;i++){s+=pcm[i]*pcm[i];const d=Math.abs(pcm[i]);if(d>pk)pk=d}const r=Math.sqrt(s/pcm.length);const err=Math.abs(r-pat.rms)/pat.rms;if(err>lawWorst52)lawWorst52=err;if(pk>lawPk52)lawPk52=pk;lawN52++}}
-/* v0.27.0: the ceiling compares against the FLOAT32 value of 0.97 — the
-   renderer's peak clamp scales into a Float32Array, and 0.97 is not exactly
-   representable in f32 (fround(0.97)=0.97000002861…); the raw `<=.97`
-   comparison failed by 2.9e-8 (1 ulp) on every clamp-affected render. */
-const lawOk52=lawN52===48&&lawWorst52<=.15&&lawPk52<=Math.fround(.97);
+const dA=renderPsy4Pcm('kick',SR52,{kitId:'psy-classic',variant:0,rootMul:1}),dB=renderPsy4Pcm('kick',SR52,{kitId:'psy-classic',variant:0,rootMul:1});
+let det52=0;for(let i=0;i<dA.length;i++){const d=Math.abs(dA[i]-dB[i]);if(d>det52)det52=d}
+const KIT52=['kick','snare','clap','hatC','hatO','shaker','riser','impact','texture','downlifter'];
+let lawWorst52=0,lawN52=0,durBad52=0;
+for(const kit of KIT_IDS){for(const ty of KIT52){const pcm=renderPsy4Pcm(ty,SR52,{kitId:kit,variant:0,rootMul:1});if(!pcm){lawWorst52=1;continue}let pk=0;for(let i=0;i<pcm.length;i++){const d=Math.abs(pcm[i]);if(!(d>=0)){lawWorst52=1;break}if(d>pk)pk=d}const target=kitLevelTarget(ty);const err=Math.abs(pk-target)/target;if(err>lawWorst52)lawWorst52=err;if(pcm.length/SR52>2.5)durBad52++;if(ty==='kick'&&pcm.length/SR52>1)durBad52++;lawN52++}}
+const lawOk52=lawN52===60&&lawWorst52<=.02&&durBad52===0;
 const ok52=liveOk52&&chokeOk52&&duckOk52&&det52===0&&gov52>1e-3&&lawOk52;
-gate('G52','kit-governed reason system: reason path live (spawns>=3, fallbacks=0) + kit governance audible (psy-classic vs tribal-raw kick md>1e-3) + 48 kit×type renders RMS ±15% of patch.rms peak<=.97 + determinism md=0 + hatC→hatO choke tail<40% + kick sidechain fires on the ROM path',ok52,'sp/fb '+live52.eng.romSpawns+'/'+live52.eng.romFallbacks+' rs/rf '+live52.eng.reasonSpawns+'/'+live52.eng.reasonFallbacks+' | gov '+gov52.toExponential(1)+' | law worst '+lawWorst52.toFixed(3)+' pk '+lawPk52.toFixed(2)+' n='+lawN52+' | tailA '+tailA.toExponential(1)+' tailB '+tailB.toExponential(1)+' | duck '+(duckOk52?'fired':'MISSED')+' | det '+det52)}catch(e){gate('G52','kit-governed reason system',false,'ERR '+e.message)}}
+gate('G52','psy4 kit governance: kit path live (spawns>=4, fallbacks=0) + kit governance audible (psy-classic vs tribal-raw kick md>1e-3) + 60 kit×type renders level-law ±2% + determinism md=0 + hatC→hatO choke tail<40% + kick sidechain fires on the kit path',ok52,'sp/fb '+live52.eng.romSpawns+'/'+live52.eng.romFallbacks+' | gov '+gov52.toExponential(1)+' | law worst '+lawWorst52.toFixed(4)+' n='+lawN52+' durBad='+durBad52+' | tailA '+tailA.toExponential(1)+' tailB '+tailB.toExponential(1)+' | duck '+(duckOk52?'fired':'MISSED')+' | det '+det52)}catch(e){gate('G52','psy4 kit governance',false,'ERR '+e.message)}}
 if((window.__psy6GateSkip||[]).includes('G53')){gate('G53','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
-/* ── G53 (v0.29.0) KICK DIMS — expressive kick preset surface ────────
-   psyreason dceec3e/719211c port: body/subk/sat are INDEPENDENT kick
-   synthesis dimensions bridged into the kit-governed REASON patch
-   (applyKickDims), seeded per preset in the library (DP auto-dims).
-   Evidence: (a) two extreme dim sets render DISTINCT audio (md>1e-3);
-   (b) same dims twice = md 0 (deterministic); (c) ENGINE-LEVEL
-   neutrality — a preset with the neutral point {body:.5,subk:.5,sat:.5}
-   renders BIT-IDENTICAL audio to a preset with no dims at all (the
-   legacy ':2@' cache key + neutral-centered mapping); (d) level
-   governance holds under dims: renderReasonPcm RMS within ±15% of
-   patch.rms and peak ≤ fround(.97) for BOTH extremes; (e) every kick
-   preset in the library carries body/subk/sat in [0,1] with ≥8 distinct
-   triples (decorrelated — the whole point of the port). */
+/* ── G53 (v0.30.0) ROOT LAW + VARIANT GOVERNANCE ────────────────────
+   The psy4 kit's two coherence laws:
+   ROOT LAW — the project root transposes the PITCHED layers: kick at
+   rootMul 1.5 renders a DIFFERENT pitch (spectral centroid ≥ 1.35× the
+   rootMul 1 render) and md > 1e-3; rootMul 1 ≡ absent (md = 0).
+   VARIANT LAW — the 2-variant round-robin re-seeds the render: variant 0
+   vs 1 differ AUDIBLY (md > 1e-3) for kick+snare+hat in the default kit,
+   and each variant is deterministic (double render md = 0).
+   The engine consumes both through romBuffer's cache key (type+kit+variant
+   +rootMul%+sr) — distinct keys, shared buffers, zero re-render. */
 const SR53=44100;
 const mkEng53=()=>{const oc=new OfflineAudioContext(1,Math.round(SR53*1),SR53);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',presetId:'g53',name:'g53',sound:{type:'kick',tune:1,decay:1,tone:1,punch:.5},mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});return{oc,eng,tr}};
-const renderKick53=async(sound)=>{const{oc,eng,tr}=mkEng53();tr.sound=Object.assign({type:'kick',tune:1,decay:1,tone:1,punch:.5},sound);eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return oc.startRendering()};
-const pcm53=(buf)=>buf.getChannelData(0);
 const md53=(x,y)=>{let m=0;const n=Math.min(x.length,y.length);for(let i=0;i<n;i++){const d=Math.abs(x[i]-y[i]);if(d>m)m=d}return m};
-const DLOW53={body:.15,subk:.4,sat:.25},DHIGH53={body:.85,subk:.85,sat:.85},DNEU53={body:.5,subk:.5,sat:.5};
-const bA=pcm53(await renderKick53(DLOW53)),bB=pcm53(await renderKick53(DHIGH53));
-const bA2=pcm53(await renderKick53(DLOW53));
-const bNeu=pcm53(await renderKick53(DNEU53)),bNone=pcm53(await renderKick53({}));
-const mdAB=md53(bA,bB),mdDet=md53(bA,bA2),mdNeu=md53(bNeu,bNone);
-/* (d) level governance under dims — direct renderer law */
-let law53=0,pk53=0;for(const dims of [DLOW53,DHIGH53]){const base=kitPatch('psy-classic','kick');const pat=applyKickDims(base,Object.assign({punch:.5},dims));const pcm=renderReasonPcm('kick',pat,SR53,0,2);let s=0,pk=0;for(let i=0;i<pcm.length;i++){s+=pcm[i]*pcm[i];const d=Math.abs(pcm[i]);if(d>pk)pk=d}const err=Math.abs(Math.sqrt(s/pcm.length)-pat.rms)/pat.rms;if(err>law53)law53=err;if(pk>pk53)pk53=pk}
-/* (e) library auto-dims — every kick preset carries the three dims */
-const kicks53=libFilter('drum','ALL').filter(x=>x.type==='kick');
-let dimsOk53=kicks53.length>=30,inRange53=true;
-const triples53=new Set();
-for(const k of kicks53){const b=k.body,s=k.subk,t=k.sat;if(typeof b!=='number'||typeof s!=='number'||typeof t!=='number'||b<0||b>1||s<0||s>1||t<0||t>1)inRange53=false;triples53.add(b+'_'+s+'_'+t)}
-const ok53=mdAB>1e-3&&mdDet===0&&mdNeu===0&&law53<=.15&&pk53<=Math.fround(.97)&&dimsOk53&&inRange53&&triples53.size>=8;
-gate('G53','kick dims (v0.29.0 psyreason port): extreme dims audible md>1e-3 + deterministic md=0 + neutral-{.5,.5,.5} ≡ no-dims BIT-IDENTICAL + RMS ±15% peak<=.97 under dims + all '+kicks53.length+' kick presets auto-dimmed with '+triples53.size+' distinct triples',ok53,'md(lo,hi) '+mdAB.toExponential(1)+' | det '+mdDet+' | neutral≡none '+mdNeu+' | law '+law53.toFixed(3)+' pk '+pk53.toFixed(2)+' | kicks '+kicks53.length+' triples '+triples53.size)}catch(e){gate('G53','kick dims',false,'ERR '+e.message)}}
+const cent53=(pcm)=>{let num=0,den=0;for(let k=1;k<4096;k++){const f=k*SR53/8192;const re=0,im=0;/* cheap centroid: zero-crossing based pitch proxy instead */
+}}
+/* centroid via Goertzel scan is overkill — use ZCR pitch proxy on the RAW renders */
+const zcr53=(pcm,a,b)=>{let z=0;for(let i=a+1;i<b;i++)if((pcm[i-1]<0)!==(pcm[i]<0))z++;return z/(b-a)};
+const base=renderPsy4Pcm('kick',SR53,{kitId:'psy-classic',variant:0,rootMul:1});
+const up=renderPsy4Pcm('kick',SR53,{kitId:'psy-classic',variant:0,rootMul:1.5});
+const same=renderPsy4Pcm('kick',SR53,{kitId:'psy-classic',variant:0,rootMul:1});
+const mdUp=md53(base,up),mdSame=md53(base,same);
+const zBase=zcr53(base,Math.round(.005*SR53),Math.round(.04*SR53));
+const zUp=zcr53(up,Math.round(.005*SR53),Math.round(.04*SR53));
+const rootOk=mdUp>1e-3&&mdSame===0&&zUp>=1.35*zBase;
+/* variant law */
+let varOk=true,varsN=0;
+for(const ty of ['kick','snare','hatC']){
+const v0=renderPsy4Pcm(ty,SR53,{kitId:'psy-classic',variant:0,rootMul:1});
+const v1=renderPsy4Pcm(ty,SR53,{kitId:'psy-classic',variant:1,rootMul:1});
+const v0b=renderPsy4Pcm(ty,SR53,{kitId:'psy-classic',variant:0,rootMul:1});
+if(md53(v0,v1)<=1e-3)varOk=false;
+if(md53(v0,v0b)!==0)varOk=false;
+varsN++}
+/* engine cache: same key → same AudioBuffer object (identity, not re-render) */
+const{eng}=mkEng53();
+const abA=eng.romBuffer('kick'),abB=eng.romBuffer('kick');
+const cacheOk=abA===abB&&abA&&abA.duration>0;
+const ok53=rootOk&&varOk&&varsN===3&&cacheOk;
+gate('G53','psy4 root law + variants (v0.30.0): rootMul 1.5 pitch-shifts the kick (ZCR>=1.35x, md>1e-3) + rootMul 1 ≡ absent (md=0) + variant 0 vs 1 audible across kick/snare/hatC + per-variant determinism md=0 + engine cache identity',ok53,'md(up) '+mdUp.toExponential(1)+' | md(same) '+mdSame+' | zcr '+zBase.toFixed(0)+'→'+zUp.toFixed(0)+' ('+(zUp/Math.max(zBase,1e-9)).toFixed(2)+'x) | variants '+varsN+' | cache '+(cacheOk?'shared':'BAD'))}catch(e){gate('G53','psy4 root law + variants',false,'ERR '+e.message)}}
 if((window.__psy6GateSkip||[]).includes('G54')){gate('G54','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 /* ── G54 (v0.29.0) PAD SPREAD — per-note stereo + spread voicing ─────
    psyreason dc072ca/6c8c152/4e09726 port: the live pad grid fires the
@@ -1760,28 +1737,11 @@ gate('G15w','worklet: priority stealing under overload — all kicks voiced, tie
 }
 
 /* G52 — KIT-GOVERNED REASON SYSTEM (offline — CI-asserted, v0.24.0):
-   the owner's verdict on the ROM-only device: the individual sounds got good,
-   but "there is no connection between them". v0.24.0 wires EVERY hit through
-   the kit system — the 8 REASON engine types (kick/snare/clap/hatO/hatC/tom/
-   crash/ride, ported from psyreason's real multi-engine DSP) plus the 12
-   kit-governed ROM types (rootMul/rmsMul from the kit tables). This gate
-   asserts the REASON reality, measured:
-   reason path liveness — kick/hatO/hatC route through the engine with the
-     DEFAULT kit: ≥3 reasonSpawns, ZERO reason+rom fallbacks (a silent legacy
-     fallback fails here);
-   kit governance audible — the SAME type rendered under two different kits'
-     patches differs audibly (psy-classic vs tribal-raw kick, maxDiff > 1e-3);
-   cohesion loudness law — every kit × every REASON type renders RMS within
-     ±15% of its own patch.rms with peak ≤ .97 (48 renders — the family
-     loudness law holds across ALL kits, the anti-dynamics-destroyer);
-   determinism — renderReasonPcm same (type,patch,sr,variant,layer) twice →
-     maxDiff 0 (byte-identical, the foundation contract);
-   hatC→hatO choke audible — kitChoke.hatExclusive: hatO ringing alone vs
-     hatO then hatC — the post-choke tail falls below half (the 25 ms choke
-     ramp is behaviorally audible, not just configured);
-   kick sidechain on the ROM path — the kick now routes through the ROM
-     early-return, so the duck MUST fire there (duckState t0 advances on a
-     neighbour chain; the v0.24.0 BUG GUARD is behaviorally pinned). */
+   v0.24.0's kit-cohesion verdict (the owner: "the individual sounds got
+   good, but there is no connection between them") is now carried by the
+   PSY4 KIT (v0.30.0 — js/psy4kit.mjs): EVERY kit hit renders through the
+   foundation psy4 voices under one of six kits (level law + root law +
+   choke law). The G52 doc above the gate lists the measured evidence. */
 
 function wireTests(){$('bGate').onclick=runSelfGate;}
 

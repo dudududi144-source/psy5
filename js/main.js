@@ -20,7 +20,7 @@ import { wireCapture } from './ui/capture.js';
 import { wireArranger } from './ui/arranger.js';
 import { startSched } from './scheduler.js';
 import { PooledEngine, prepInsertDSP } from './engine.js';
-import { kitWarmTypes, DEFAULT_KIT, styleKit } from '../foundation/dsp/kit-reason.mjs';
+import { kitWarmTypes, DEFAULT_KIT, styleKit } from './psy4kit.mjs';
 import { mkWorkletEngine, WORKLET_LIMITATIONS } from './worklet-engine.js';
 import { buildStyle } from './presets.js';
 import { parseShareHash, decodeShare } from './share.js';
@@ -57,7 +57,7 @@ try{if(ctx.state==='suspended')ctx.resume()}catch(e){}}
 function bootProject(style,resume){let p=null;if(resume)p=loadStored();if(!p&&I.pendingCompose){p=I.pendingCompose;I.pendingCompose=null}if(!p&&I.pendingShare){p=I.pendingShare;I.pendingShare=null}if(!p)p=buildStyle(style||'TECHNO',Date.now()%100000);I.p=p;loadProjectObj(p);/* backfill (midiMap/masterVol/sc/fx) — idempotent, sets I.p to the same object */}
 
 /* v0.24.0 REASON KIT warm — the kit list (20 types: 8 reason engines + 12 kit ROM roles) rendered at power-on, idle-sliced so the boot frame never blocks. It runs AFTER the project load so the PROJECT'S kit is the one warmed (the render cache keys on kitId — warming the default kit would miss a stored/pinned kit). The idle callback guards engine loss. */
-function bootWarmKit(){if(!(I.eng&&I.eng.warmRom))return;const WARM=kitWarmTypes((I.p&&I.p.kit)||DEFAULT_KIT);/* v0.29.0: warm the ACTIVE KICK PRESET's dims variant too — the first hit of a dimmed kick preset must never pay the render latency */const kickP=()=>{const t=(I.p&&I.p.tracks||[]).find(x=>x&&x.kind==='drum'&&((x.sound&&x.sound.type)||x.type)==='kick');return (t&&t.sound)||null};let wi=0;const warmStep=()=>{if(!I.eng||!I.eng.warmRom)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(wi<WARM.length){const ty=WARM[wi++];I.eng.romBuffer(ty,ty==='kick'?kickP():null);warmStep()}}catch(e){}})};warmStep()}
+function bootWarmKit(){if(!(I.eng&&I.eng.warmRom))return;const WARM=kitWarmTypes((I.p&&I.p.kit)||DEFAULT_KIT);/* v0.29.0: warm the ACTIVE KICK PRESET's dims variant too — the first hit of a dimmed kick preset must never pay the render latency */const kickP=()=>{const t=(I.p&&I.p.tracks||[]).find(x=>x&&x.kind==='drum'&&((x.sound&&x.sound.type)||x.type)==='kick');return (t&&t.sound)||null};let wi=0;const warmStep=()=>{if(!I.eng||!I.eng.warmRom)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(wi<WARM.length){const ty=WARM[wi++];I.eng.romBuffer(ty);warmStep()}}catch(e){}})};warmStep()}
 
 function bootStart(style){I.upAt=Date.now();I.eng.syncMix(I.p);hydrateProjectSamples();if(I.pendingHints){I.pendingHints=false;applyComposerSampleHints({sampleHints:I.p.sampleHints})}/* v0.10.0: composed-boot sample hints *//* v0.10.0: pull referenced samples into the engine cache (missing → synth fallback + one-shot toast) */$('power').style.display='none';$('app').style.display='flex';wireHeader();wirePerform();wireSeq();wireSound();wireTests();wireCopilot();wireArranger();wireLibrary();wireMidi();wireCapture();wireLanes();wireCompose();wireSamples();renderAll();requestAnimationFrame(renderLoop);I.fsm='PLAYING';startSched();/* composed boot: land on Perform with the arranger running */if(I.composedLoad){try{arrToggle(true)}catch(e){};const f=I.composedLoad;I.composedLoad=null;toast('COMPOSED ✓ '+f.style+' · '+f.totalBars+' bars · '+f.lengthSec.toFixed(0)+'s · seed '+f.seed)}else toast('POWER ON → '+(style||'RESUME')+' · '+(I.engine==='worklet'?'WORKLET ENGINE (experimental — reduced self-gate)':'pooled '+SYNTH_VOICES+' synth + '+DRUM_VOICES+' drum voices'))}
 
@@ -69,12 +69,22 @@ async function powerOn(style,resume){await bootAudio();bootProject(style,resume)
    + a preseeded READY ALBUM) and lands on Perform with the arranger running.
    Pinned seeds → the same set every time per style (replayable, testable).
    ∅ BARE SKETCH keeps the old minimal buildStyle boot for sketching. */
-async function composeBoot(style,minutes,seed){try{toast('COMPOSING '+style+' — '+minutes+' MIN…');
+async function composeBoot(style,minutes,seed){try{
+/* v0.29.0 DOUBLE-COMPOSE FIX (found by the FORM LIBRARY browser check):
+   the landing ADVANCED row (ui/compose.js) pre-composes the user's
+   style/len/seed/FORM into I.pendingCompose and clicks THIS hero to boot —
+   composeBoot then composed AGAIN (AUTO chain, hero's FULL-ON/3/424242)
+   and silently REPLACED it. Since v0.27.0 the advanced row booted the
+   hero's set, not the user's. The documented contract — "powerOn prefers
+   pendingCompose" — is now honored: if pendingCompose is already set,
+   composeBoot boots IT and skips its own compose. */
+if(!I.pendingCompose){toast('COMPOSING '+style+' — '+minutes+' MIN…');
 const r=compose(style,minutes,seed);
 /* v0.24.0 KIT HOOK — a composed set follows its style's kit unless the user PINNED one in the Sound tab (the pin rides the live project and carries over). */
 if(I.p&&I.p.kitPinned&&kitWarmTypes(I.p.kit).length){r.project.kit=I.p.kit;r.project.kitPinned=true}else{r.project.kit=styleKit(style);r.project.kitPinned=false}
 try{readyAlbum(r.project,style,seed,minutes)}catch(e){/* album is enrichment — never blocks the boot */}
-I.pendingCompose=r.project;I.composedLoad=r.form;await powerOn(style,false)}catch(e){toast('COMPOSE FAILED — '+e.message)}}
+I.pendingCompose=r.project;I.composedLoad=r.form}
+await powerOn(style,false)}catch(e){toast('COMPOSE FAILED — '+e.message)}}
 
 (function boot(){const sp=$('stylePicker');
 /* HERO — the one-press entrance: a complete arranged set, playing now */

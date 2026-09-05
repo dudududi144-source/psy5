@@ -93,7 +93,7 @@ else if(!e.altKey&&!e.shiftKey&&'yuiopjkl'.includes(e.key)&&e.key.length===1){/*
 else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();if(!I.p)return;let i=I.p.activeScene;const dir=e.key==='ArrowRight'?1:-1;for(let k=0;k<I.p.scenes.length;k++){i=(i+dir+I.p.scenes.length)%I.p.scenes.length;if(PERF.launch(i).ok)break}}
 else if(e.key==='f')PERF.fill();
 else if(e.key==='v')PERF.variation();
-else if(e.key==='q'||e.key==='w'||e.key==='e'){/* v0.18.0 DJ tools — honest refusal toast via the shared performer helper */djFire(e.key==='q'?'riser':e.key==='w'?'revcym':'impact')}
+else if(e.key==='q'||e.key==='w'||e.key==='e'){/* v0.18.0 DJ tools — honest refusal toast via the shared performer helper */djFire(e.key==='q'?'riser':e.key==='w'?'texture':'impact')}
 else if(e.key==='d')djFire('downlifter');/* v0.19.0 DJ OUT — the riser's mirror */
 else if(e.key==='g'||e.key==='h'){PERF.throwFx(e.key==='g'?'echo':'muffle')}/* v0.21.0 THROW tools — arm/release with auto-release barHooks */
 else if(e.key==='t')PERF.tap();/* v0.17.0 tap tempo */

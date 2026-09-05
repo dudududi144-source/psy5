@@ -330,8 +330,8 @@ describe('UI + composer hooks (the wiring is reachable, not just available)', ()
 })
 
 describe('release pins', () => {
-  test('sw.js CACHE_VERSION bumped to psy6-v0.28.0', () => {
-    expect(SW_SRC).toContain("const CACHE_VERSION = 'psy6-v0.28.0'")
+  test('sw.js CACHE_VERSION bumped to psy6-v0.29.0', () => {
+    expect(SW_SRC).toContain("const CACHE_VERSION = 'psy6-v0.29.0'")
   })
   test('drumDurEst windows UNTOUCHED (pool discipline moved zero)', () => {
     const durEst = PooledEngine.prototype.drumDurEst

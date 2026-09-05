@@ -4,9 +4,7 @@ import { ensureIns } from './params.js';
 import { driveCurve, crushCurve, driveTrim } from '../foundation/dsp/inserts.mjs';
 import { planDuck, nextState, duckParams } from '../foundation/dsp/sidechain.mjs';
 import { delaySecondsFor, delayFbClamp, delayDivClamp, irChannel, irChannelShaped, irVariantFor, IR_SEEDS, IR_LEN_S, IR_DECAY } from '../foundation/dsp/sends.mjs';
-import { ROM_TYPES, renderRomPcm, romSpec } from '../foundation/dsp/perc-rom.mjs';
-import { REASON_TYPES, renderReasonPcm } from '../foundation/dsp/reason-engines.mjs';
-import { DEFAULT_KIT, kitPatch, kitRomSpec, kitRootHz, kitChoke, isReasonEngineType, isKitRomType, applyKickDims } from '../foundation/dsp/kit-reason.mjs';
+import { PSY4_KIT_TYPES, renderPsy4Pcm, DEFAULT_KIT, isPsy4KitId, kitRootHzOf } from './psy4kit.mjs';
 
 /* ============ POOLED audio engine ============ */
 /* Priority tiers for voice stealing (PSY6):
@@ -22,12 +20,11 @@ const TRACK_TIERS=[0,1,1,1,0,2,3,2];
    PooledEngine) reuses the live context's buffers instead of re-rendering
    the crash bank per context. Keys type@sampleRate. */
 const ROM_SHARED=new Map();
-/* REASON_SHARED (v0.24.0): the same law for the REASON engine renders —
-   keys 'R:<type>:<kitId>:<variant>:<layer>@<sampleRate>'. The kit-governed
-   ROM renders keep ROM_SHARED under their own 'K:<type>:<kitId>:<variant>:
-   <rootMul%>@<sr>' keys: kit + root belong in the key because the SAME type
-   renders differently per kit (that IS the cohesion). */
-const REASON_SHARED=new Map();
+/* PSY4_SHARED (v0.30.0): the same context-independence law for the psy4 kit
+   renders — keys 'P4:<type>:<kitId>:<variant>:<rootMul%>@<sampleRate>'.
+   kit + root belong in the key because the SAME type renders differently
+   per kit (that IS the cohesion). One shared cache, one render family. */
+const PSY4_SHARED=new Map();
 class PooledEngine{constructor(ctx,opts){opts=opts||{};this.poolSizes={synthVoices:opts.synthVoices!=null?opts.synthVoices:20,drumVoices:opts.drumVoices!=null?opts.drumVoices:24};this.ctx=ctx;this.master=ctx.createGain();this.master.gain.value=.85;const comp=this.comp=ctx.createDynamicsCompressor();comp.threshold.value=-8;comp.knee.value=12;comp.ratio.value=6;comp.attack.value=.003;comp.release.value=.2;const an=this.analyser=ctx.createAnalyser();an.fftSize=256;
 /* ── MASTER SECTION (v0.8.0): EQ3 + glue compressor ──
    Inserted between the mix bus (this.master) and the EXISTING master
@@ -60,19 +57,14 @@ the wet branch contributes exact zeros), crush 16 = null-curve WaveShaper
 passthrough, filter REMOVED from the chain. The drive transfer curve is
 precomputed ONCE (foundation driveCurve, k=10); AMOUNT is an automatable
 input-trim AudioParam — curve swaps are not time-anchorable, so offline
-renders stay time-correct (foundation/dsp/inserts.mjs header). */const dTrim=ctx.createGain(),dWS=ctx.createWaveShaper(),dWet=ctx.createGain(),dDry=ctx.createGain(),cIn=ctx.createGain(),cWS=ctx.createWaveShaper();dWS.curve=this._driveC||(this._driveC=driveCurve());dWet.gain.value=0;dDry.gain.value=1;input.connect(dTrim);dTrim.connect(dWS);dWS.connect(dWet);dWet.connect(cIn);input.connect(dDry);dDry.connect(cIn);cIn.connect(cWS);cWS.connect(duck);duck.connect(pan);pan.connect(this.master);pan.connect(sA);sA.connect(dIn);pan.connect(sB);sB.connect(rIn);this.chains.push({input,pan,duck,sA,sB,dTrim,dWet,dDry,cWS,insFilt:null,insFSig:'off',cCurved:0});this.scCache.push(null);/* per-chain duck envelope state — preallocated, mutated in place */this.duckState.push({t0:-1,dip:1,attack:0,release:0,end:0})}this.synthPool=[];this.drumPool=[];for(let i=0;i<this.poolSizes.synthVoices;i++)this.synthPool.push(new SynthVoice(ctx,this));for(let i=0;i<this.poolSizes.drumVoices;i++)this.drumPool.push(new DrumVoice(ctx,this));this.spawnCount=0;this._voiceSeq=0;this.stealCount=new Uint32Array(4);this.tier0StealAttempts=0;this.moogSpawns=0;this.moogFallbacks=0;this.dedicated={};/* ── PERCUSSION ROM v3 (v0.23.0) — foundation/dsp/perc-rom.mjs rendered ONCE per (type, sampleRate) into AudioBuffers; ROM_TYPES hits play through a small RomVoice pool (per-hit BufferSource + pooled env gain + pooled tilt filter). opts.rom=false restores the exact pre-v0.23.0 synth path (tests/neutral A/B). Lazy first-hit render is the documented hot-path exception (conga ≈17 ms; the UI warms the factory kit at power-on via warmRom so the cost lands at boot, never mid-groove). */this.romOn=opts.rom!==false;this.romCache=new Map();this.romPool=[];for(let i=0;i<8;i++)this.romPool.push(new RomVoice(ctx,this));this.romSpawns=0;this.romRenders=0;this.romFallbacks=0;this.romSteals=0;this.trackCount=new Uint32Array(MAX_TRACKS);
-/* ── KIT-GOVERNED REASON SYSTEM (v0.24.0): every kit-coherent drum hit
-   renders through the reason system by default. kitId selects the kit
-   (foundation/dsp/kit-reason.mjs — patches, ROM leveling, root, choke);
-   rootHz 0 = the kit's own key center (setRootHz overrides live, clamped
-   to ±2 octaves of the kit root in rootMul). The 8 weak-synth types render
-   via renderReasonPcm (layer 2 = the unity loudness layer), the 12 kit ROM
-   types via renderRomPcm under kitRomSpec leveling + kit-root tuning; the
-   6 legacy synth/FX types (zap/boom/glitch/riser/impact/downlifter) keep
-   the DrumVoice path unchanged. opts.rom=false disables BOTH rom classes →
-   the exact pre-v0.24.0 legacy path. Counters stay honest and additive:
-   reason hits increment romSpawns AND reasonSpawns (same for fallbacks). */
-this.kitId=DEFAULT_KIT;this.rootHz=0;this.reasonSpawns=0;this.reasonRenders=0;this.reasonFallbacks=0;this._rrType=new Map();/* per-type 2-variant round-robin (anti-machine-gun) *//* ── SAMPLE VOICE state (v0.10.0 P2) ── pre-decoded AudioBuffer cache
+renders stay time-correct (foundation/dsp/inserts.mjs header). */const dTrim=ctx.createGain(),dWS=ctx.createWaveShaper(),dWet=ctx.createGain(),dDry=ctx.createGain(),cIn=ctx.createGain(),cWS=ctx.createWaveShaper();dWS.curve=this._driveC||(this._driveC=driveCurve());dWet.gain.value=0;dDry.gain.value=1;input.connect(dTrim);dTrim.connect(dWS);dWS.connect(dWet);dWet.connect(cIn);input.connect(dDry);dDry.connect(cIn);cIn.connect(cWS);cWS.connect(duck);duck.connect(pan);pan.connect(this.master);pan.connect(sA);sA.connect(dIn);pan.connect(sB);sB.connect(rIn);this.chains.push({input,pan,duck,sA,sB,dTrim,dWet,dDry,cWS,insFilt:null,insFSig:'off',cCurved:0});this.scCache.push(null);/* per-chain duck envelope state — preallocated, mutated in place */this.duckState.push({t0:-1,dip:1,attack:0,release:0,end:0})}this.synthPool=[];this.drumPool=[];for(let i=0;i<this.poolSizes.synthVoices;i++)this.synthPool.push(new SynthVoice(ctx,this));for(let i=0;i<this.poolSizes.drumVoices;i++)this.drumPool.push(new DrumVoice(ctx,this));this.spawnCount=0;this._voiceSeq=0;this.stealCount=new Uint32Array(4);this.tier0StealAttempts=0;this.moogSpawns=0;this.moogFallbacks=0;this.dedicated={};/* ── PSY4 KIT ROM (v0.30.0 FOUNDATION RESET) — foundation/psy4 psy4-voices rendered ONCE per (type, kit, variant, sampleRate) into AudioBuffers; every PSY4_KIT_TYPES hit plays through the RomVoice pool (per-hit BufferSource + pooled env gain + pooled tilt filter). opts.rom=false → the legacy DrumVoice synth path (tests/neutral A/B). Lazy first-hit render is the documented hot-path exception; the UI warms the kit at power-on via warmRom so the cost lands at boot, never mid-groove. */this.romOn=opts.rom!==false;this.romCache=new Map();this.romPool=[];for(let i=0;i<8;i++)this.romPool.push(new RomVoice(ctx,this));this.romSpawns=0;this.romRenders=0;this.romFallbacks=0;this.romSteals=0;this.trackCount=new Uint32Array(MAX_TRACKS);
+/* ── PSY4 KIT GOVERNANCE (v0.30.0): every kit-coherent drum/FX hit renders
+   through the psy4 kit (js/psy4kit.mjs — six kits over the foundation
+   psy4-voices, level law, root law). kitId selects the kit; rootHz 0 = the
+   kit's own key center (setRootHz overrides live, clamped to ±2 octaves in
+   rootMul). Unknown kit ids are REFUSED (setKit returns false — never lie
+   about what is playing). */
+this.kitId=DEFAULT_KIT;this.rootHz=0;this._rrType=new Map();/* per-type 2-variant round-robin (anti-machine-gun) *//* ── SAMPLE VOICE state (v0.10.0 P2) ── pre-decoded AudioBuffer cache
 (context-independent — the SAME buffers serve live + offline renders),
 per-track active-voice registry (cap 8, oldest-stolen — pool discipline),
 honest counters for gates/evidence. opts.samples seeds the cache (offline
@@ -152,15 +144,15 @@ Only setValueAtTime + linearRampToValueAtTime are used. Overlapping kicks
 envelope → value-continuous, click-free, always recovers to 1.0. */
 sidechain(when,srcIdx){for(let i=0;i<MAX_TRACKS;i++){if(i===srcIdx)continue;const sc=this.scCache[i];if(!sc)continue;const st=this.duckState[i],g=this.chains[i].duck.gain;const plan=planDuck(st,when,1-sc.amount/100,sc.attack,sc.hold,sc.release,this._plan);g.setValueAtTime(plan.v0,when);g.linearRampToValueAtTime(plan.dip,plan.t1);if(plan.holdT>=0)g.setValueAtTime(plan.dip,plan.holdT);g.linearRampToValueAtTime(1,plan.end);nextState(plan,when,sc.attack,st);this.duckEvents++}}
 tierOfTrack(tr){if(tr.idx!=null&&tr.idx>=0&&tr.idx<8&&(tr.kind==='drum'?tr.idx<4:tr.idx>=4)&&tr.sound&&tr.presetId!==undefined){if(tr.kind==='drum'&&tr.sound.type==='kick')return 0;return TRACK_TIERS[tr.idx]}const pr=tr.sound||{};if(tr.kind==='drum')return (pr.type||tr.type)==='kick'?0:1;if(pr.cat==='bass')return 0;if(pr.cat==='pad'||pr.cat==='fx')return 3;return 2}
-drumDurEst(type,decay){const d=decay||1;switch(type){case 'kick':return .12+.5*d;case 'snare':return .1+.16*d;case 'clap':return .25+.15*d;case 'hatO':return .26+.5*d;case 'hatC':return .03+.05*d;case 'tom':return .22+.35*d;case 'rim':return .045;case 'glitch':return .08+.14*d;case 'shaker':return .04+.07*d;case 'conga':return .15+.25*d;case 'bongo':return .1+.15*d;case 'cowbell':return .12+.08*d;case 'clave':return .05;case 'zap':return .2+.1*d;case 'boom':return .9+.6*d;case 'riser':return 1.65;case 'impact':return 1.1*d+.3;case 'darbuka':return .14+.28*d;case 'tambourine':return .12+.24*d;case 'triangle':return .9+1.6*d;case 'downlifter':return .9+1.1*d;case 'crash':return 1.2+1.8*d;case 'revcym':return .8+.8*d;case 'agogo':return .12+.22*d;case 'timbale':return .1+.2*d;default:return .5}}
+drumDurEst(type,decay){const d=decay||1;switch(type){case 'kick':return .12+.5*d;case 'snare':return .1+.16*d;case 'clap':return .25+.15*d;case 'hatO':return .26+.5*d;case 'hatC':return .03+.05*d;case 'shaker':return .04+.07*d;case 'riser':return 1.65;case 'impact':return 1.1*d+.3;case 'texture':return 1.5;case 'downlifter':return .9+1.1*d;default:return .5}}
 synthDurEst(p,stepDur){const gate=p.gate||.6;const rel=Math.max(p.rel||.15,.02);return stepDur*gate*2+rel}
 nextVoice(tr,tier,when){const pool=tr.kind==='drum'?this.drumPool:this.synthPool;let i,v;for(i=0;i<pool.length;i++){v=pool[i];if(!v.tier0&&(!v.busyUntil||v.busyUntil<=when)){v.lastTrigger=++this._voiceSeq;return v}}if(tier===0){const key=tr.idx+'|'+tr.kind;v=this.dedicated[key];if(!v){for(i=0;i<pool.length;i++)if(!pool[i].tier0){v=pool[i];break}if(!v){v=this.stealOldest(pool,3,when)||this.stealOldest(pool,2,when)||this.stealOldest(pool,1,when)}if(!v)v=pool[0];v.tier0=true;this.dedicated[key]=v}v.lastTrigger=++this._voiceSeq;return v}v=this.stealOldest(pool,3,when)||this.stealOldest(pool,2,when)||this.stealOldest(pool,1,when);if(!v){v=pool[0];if(v.tier0&&tier!==0)this.tier0StealAttempts++}v.lastTrigger=++this._voiceSeq;return v}
 stealOldest(pool,victimTier,when){let victim=null;for(let i=0;i<pool.length;i++){const v=pool[i];if(v.tier0||!v.busyUntil||v.busyUntil<=when||v.tier!==victimTier)continue;if(victim===null||v.lastTrigger<victim.lastTrigger)victim=v}if(victim)this.stealCount[victimTier]++;return victim}
-trigger(tr,when,ev,stepDur){this.spawnCount++;if(tr.idx!=null&&tr.idx<MAX_TRACKS)this.trackCount[tr.idx]++;/* v0.10.0: voiceMode 'sample' + cached buffer → per-hit sample voice; missing buffer → HONEST synth fallback (counted, one-shot toast in the UI) */if(tr.voiceMode==='sample'&&tr.sampleId){const cached=this.sampleCache.get(tr.sampleId);if(cached){this.triggerSample(tr,when,ev,cached);if(tr.kind==='drum'&&((tr.sound&&tr.sound.type)||tr.type)==='kick')this.sidechain(when,tr.idx);return}this.sampleFallbacks++}/* v0.23.0 PERCUSSION ROM — routed BEFORE any pooled voice is selected: a ROM hit must neither consume nor steal a DrumVoice (the 13 types play through their own 8-voice pool). romOn=false → the exact pre-v0.23.0 path. Render failure → counted legacy-synth fallback. */if(this.romOn&&tr.kind==='drum'){const sd0=tr.sound||{};const ty0=sd0.type||tr.type;if((REASON_TYPES.has(ty0)||ROM_TYPES.has(ty0))&&this.triggerRom(tr,when,ev.vel,ev.lock||{},ty0,sd0)){if(ty0==='kick')this.sidechain(when,tr.idx);/* v0.24.0 BUG GUARD: kick now routes through the REASON ROM path — the early-return used to skip the sidechain duck that the DrumVoice path fired. The duck MUST fire on the ROM path too. */return}}const tier=this.tierOfTrack(tr);const v=this.nextVoice(tr,tier,when);v.tier=tier;v.track=tr.idx;/* v.track: ownership for MIDI note-off release (killTrack) — set on every spawn, never read elsewhere */if(tr.kind==='drum'){v.hit(tr,when,ev.vel,ev.lock);const sd=tr.sound||{};if((sd.type||tr.type)==='kick')this.sidechain(when,tr.idx);v.busyUntil=when+this.drumDurEst(sd.type||tr.type,sd.decay)*1.15+.02}else{const p=v.noteOn(tr,when,ev,stepDur);v.busyUntil=when+this.synthDurEst(p,stepDur)}}
+trigger(tr,when,ev,stepDur){this.spawnCount++;if(tr.idx!=null&&tr.idx<MAX_TRACKS)this.trackCount[tr.idx]++;/* v0.10.0: voiceMode 'sample' + cached buffer → per-hit sample voice; missing buffer → HONEST synth fallback (counted, one-shot toast in the UI) */if(tr.voiceMode==='sample'&&tr.sampleId){const cached=this.sampleCache.get(tr.sampleId);if(cached){this.triggerSample(tr,when,ev,cached);if(tr.kind==='drum'&&((tr.sound&&tr.sound.type)||tr.type)==='kick')this.sidechain(when,tr.idx);return}this.sampleFallbacks++}/* v0.30.0 PSY4 KIT ROM — routed BEFORE any pooled voice is selected: a kit hit must neither consume nor steal a DrumVoice (kit types play through their own 8-voice pool). romOn=false → the legacy synth path. Render failure → counted legacy-synth fallback. */if(this.romOn&&tr.kind==='drum'){const sd0=tr.sound||{};const ty0=sd0.type||tr.type;if(PSY4_KIT_TYPES.has(ty0)&&this.triggerRom(tr,when,ev.vel,ev.lock||{},ty0,sd0)){if(ty0==='kick')this.sidechain(when,tr.idx);/* BUG GUARD (v0.24.0, kept): kick routes through the kit ROM path — the early-return must not skip the sidechain duck the DrumVoice path fires. */return}}const tier=this.tierOfTrack(tr);const v=this.nextVoice(tr,tier,when);v.tier=tier;v.track=tr.idx;/* v.track: ownership for MIDI note-off release (killTrack) — set on every spawn, never read elsewhere */if(tr.kind==='drum'){v.hit(tr,when,ev.vel,ev.lock);const sd=tr.sound||{};if((sd.type||tr.type)==='kick')this.sidechain(when,tr.idx);v.busyUntil=when+this.drumDurEst(sd.type||tr.type,sd.decay)*1.15+.02}else{const p=v.noteOn(tr,when,ev,stepDur);v.busyUntil=when+this.synthDurEst(p,stepDur)}}
 /* v0.13.0 P3 — engine LOAD telemetry (pure reads, no allocation beyond the snapshot):
    the header LOAD chip + gate G44 read this; latencyMs = base+output (the
    owner's latency concern, displayed honestly). */
-loadSnapshot(){const now=this.ctx.currentTime;let a=0,d=0;for(const v of this.synthPool)if(v.busyUntil>now)a++;for(const v of this.drumPool)if(v.busyUntil>now)d++;let rv=0;for(const v of this.romPool)if(v.busyUntil>now)rv++;let sv=0;for(const l of this.sampleVoices)for(const v of l)if(v.end>now)sv++;const steals=this.stealCount[1]+this.stealCount[2]+this.stealCount[3];return{active:a+d+rv+sv,synth:a,drum:d,rom:rv,samples:sv,steals,tier0StealAttempts:this.tier0StealAttempts,spawnCount:this.spawnCount,sampleFallbacks:this.sampleFallbacks,moogFallbacks:this.moogFallbacks,romSpawns:this.romSpawns,romRenders:this.romRenders,romFallbacks:this.romFallbacks,romSteals:this.romSteals,romOn:this.romOn,reasonSpawns:this.reasonSpawns,reasonRenders:this.reasonRenders,reasonFallbacks:this.reasonFallbacks,kitId:this.kitId,latencyMs:Math.round(((this.ctx.baseLatency||0)+(this.ctx.outputLatency||0))*1000),pools:{synth:this.poolSizes.synthVoices,drum:this.poolSizes.drumVoices,rom:this.romPool.length}}}
+loadSnapshot(){const now=this.ctx.currentTime;let a=0,d=0;for(const v of this.synthPool)if(v.busyUntil>now)a++;for(const v of this.drumPool)if(v.busyUntil>now)d++;let rv=0;for(const v of this.romPool)if(v.busyUntil>now)rv++;let sv=0;for(const l of this.sampleVoices)for(const v of l)if(v.end>now)sv++;const steals=this.stealCount[1]+this.stealCount[2]+this.stealCount[3];return{active:a+d+rv+sv,synth:a,drum:d,rom:rv,samples:sv,steals,tier0StealAttempts:this.tier0StealAttempts,spawnCount:this.spawnCount,sampleFallbacks:this.sampleFallbacks,moogFallbacks:this.moogFallbacks,romSpawns:this.romSpawns,romRenders:this.romRenders,romFallbacks:this.romFallbacks,romSteals:this.romSteals,romOn:this.romOn,kitId:this.kitId,latencyMs:Math.round(((this.ctx.baseLatency||0)+(this.ctx.outputLatency||0))*1000),pools:{synth:this.poolSizes.synthVoices,drum:this.poolSizes.drumVoices,rom:this.romPool.length}}}
 killAll(){for(const v of this.synthPool){v.panic();v.busyUntil=0}for(const v of this.drumPool){v.panic();v.busyUntil=0}for(const v of this.romPool){const t=this.ctx.currentTime;try{v.g.gain.cancelScheduledValues(t);v.g.gain.setValueAtTime(0,t)}catch(e){}v.busyUntil=0;v.lastType='';v.lastTrack=-1}this.panicSamples()}
 killTrack(idx){/* MIDI note-off: hard-gate the synth voices spawned by track idx (drum one-shots are never released mid-hit) */for(const v of this.synthPool)if(v.track===idx){v.panic();v.busyUntil=0}this.panicSamples(idx)}
 /* ── sample voice (v0.10.0 P2) ──
@@ -204,17 +196,15 @@ nextRomVoice(when){let v=null;for(let i=0;i<this.romPool.length;i++){const c=thi
 /* ── v0.24.0 kit accessors — the live kit/root controls (Sound-tab KIT select,
    composer style hook, root transposes). setKit refuses unknown ids (the
    kit must exist — a silent default would LIE about what is playing). */
-setKit(kitId){if(!kitPatch(kitId,'kick'))return false;this.kitId=kitId;return true}
+setKit(kitId){if(!isPsy4KitId(kitId))return false;this.kitId=kitId;return true}
 setRootHz(hz){this.rootHz=hz>20&&hz<500?hz:0}
-rootMul(){return this.rootHz>0?Math.min(2,Math.max(.5,this.rootHz/kitRootHz(this.kitId))):1}
-rmsRatio(type){const ks=kitRomSpec(this.kitId,type),base=romSpec(type);if(!ks||!base||!(ks.rms>0)||!(base.rms>0))return 1;return Math.min(2,Math.max(.5,ks.rms/base.rms))}
-/* v0.29.0 KICK DIMS — optional preset-level kick shaping (applyKickDims, kit-reason.mjs):
-   kickDims = {body,subk,sat,punch} (each 0..1) lifted from the kick PRESET
-   into the kit patch. The cache key carries a quantized dims signature so
-   two presets never share a buffer; NO dims (or all-neutral .5) keeps the
-   legacy ':2@' key exactly — bit-neutral for every pre-v0.29.0 caller. */
-romBuffer(type,kickDims){const sr=this.ctx.sampleRate,variant=this._rrType.get(type)||0,isRe=isReasonEngineType(type),isKr=isKitRomType(type);if(!isRe&&!isKr)return null;/* legacy synth/FX types keep the DrumVoice path */let key,pcm;try{if(isRe){const base=kitPatch(this.kitId,type);if(!base)throw new Error('no kit patch');const cl=(x)=>x==null?null:Math.round(x*100)/100;const hasDims=kickDims&&(kickDims.body!=null||kickDims.subk!=null||kickDims.sat!=null||kickDims.punch!=null)&&!(cl(kickDims.body)===.5&&cl(kickDims.subk)===.5&&cl(kickDims.sat)===.5&&cl(kickDims.punch)===.5);const patch=hasDims?applyKickDims(base,kickDims):base;const sig=hasDims?'d'+cl(kickDims.body)+'_'+cl(kickDims.subk)+'_'+cl(kickDims.sat)+'_'+cl(kickDims.punch):'2';key='R:'+type+':'+this.kitId+':'+variant+':'+sig+'@'+sr;pcm=renderReasonPcm(type,patch,sr,variant,2)}else{const rm=this.rootMul();key='K:'+type+':'+this.kitId+':'+variant+':'+Math.round(rm*100)+'@'+sr;pcm=renderRomPcm(type,sr,{rootMul:rm,rmsMul:this.rmsRatio(type),variant})}}catch(e){if(isRe)this.reasonFallbacks++;this.romFallbacks++;return null}/* per-engine cache → module-shared cache (AudioBuffers are context-independent); reason renders land in REASON_SHARED, kit ROM renders in ROM_SHARED */let ab=this.romCache.get(key);if(ab)return ab;ab=isRe?REASON_SHARED.get(key):ROM_SHARED.get(key);if(ab){this.romCache.set(key,ab);return ab}try{ab=this.ctx.createBuffer(1,pcm.length,sr);ab.copyToChannel(pcm,0)}catch(e){if(isRe)this.reasonFallbacks++;this.romFallbacks++;return null}this.romCache.set(key,ab);(isRe?REASON_SHARED:ROM_SHARED).set(key,ab);if(isRe)this.reasonRenders++;else this.romRenders++;return ab}
-triggerRom(tr,when,vel,lock,type,p){/* v0.29.0: kick presets carrying body/subk/sat dims render their OWN kit-patch variant (neutral .5 = the plain kit sound) */const kd=type==='kick'&&p?{body:p.body,subk:p.subk,sat:p.sat,punch:p.punch}:null;const ab=this.romBuffer(type,kd);if(!ab)return false;const v=this.nextRomVoice(when);if(!v)return false;const cl=(x,a,b)=>x<a?a:(x>b?b:x);const tune=cl(p.tune||1,.25,4),tone=p.tone==null?1:p.tone,punch=cl(p.punch!=null?p.punch:.5,0,1),decay=p.decay==null?1:p.decay;v.connect(this.chains[tr.idx]||this.master);
+rootMul(){return this.rootHz>0?Math.min(2,Math.max(.5,this.rootHz/kitRootHzOf(this.kitId))):1}
+/* v0.30.0 — the psy4 kit render. One render per (type, kit, variant, root,
+   sampleRate); presets shape the PLAYBACK (tune/tone/punch/decay — the
+   RomVoice path), not the PCM. Root law: the pitched layers follow the
+   project root via rootMul (clamped ±2 oct); unpitched layers don't move. */
+romBuffer(type){const sr=this.ctx.sampleRate,variant=this._rrType.get(type)||0;if(!PSY4_KIT_TYPES.has(type))return null;const rm=this.rootMul();const key='P4:'+type+':'+this.kitId+':'+variant+':'+Math.round(rm*100)+'@'+sr;let ab=this.romCache.get(key);if(ab)return ab;ab=PSY4_SHARED.get(key);if(ab){this.romCache.set(key,ab);return ab}let pcm=null;try{pcm=renderPsy4Pcm(type,sr,{kitId:this.kitId,variant,rootMul:rm})}catch(e){this.romFallbacks++;return null}if(!pcm){this.romFallbacks++;return null}try{ab=this.ctx.createBuffer(1,pcm.length,sr);ab.copyToChannel(pcm,0)}catch(e){this.romFallbacks++;return null}this.romCache.set(key,ab);PSY4_SHARED.set(key,ab);this.romRenders++;return ab}
+triggerRom(tr,when,vel,lock,type,p){const ab=this.romBuffer(type);if(!ab)return false;const v=this.nextRomVoice(when);if(!v)return false;const cl=(x,a,b)=>x<a?a:(x>b?b:x);const tune=cl(p.tune||1,.25,4),tone=p.tone==null?1:p.tone,punch=cl(p.punch!=null?p.punch:.5,0,1),decay=p.decay==null?1:p.decay;v.connect(this.chains[tr.idx]||this.master);
 /* per-hit BufferSource — the ONE unavoidable allocation (same law as the
    sample path); gain+filter are pooled and never allocated per hit */
 const src=this.ctx.createBufferSource();src.buffer=ab;src.playbackRate.value=tune;src.connect(v.f);
@@ -238,12 +228,12 @@ v.lastType=type;v.lastTrack=tr.idx;v.amp=Math.max(amp,.001);this._rrType.set(typ
    hatC + hatExclusive → every OTHER busy hatO voice ramps to silence over
    25 ms (the classic closed-hat chokes the open one); crash/ride → at the
    kit's maxPoly the OLDEST same-type voice fades over 60 ms. */
-const ck=kitChoke(this.kitId);
-if(ck){
-if(type==='hatC'&&ck.hatExclusive){for(let i=0;i<this.romPool.length;i++){const o=this.romPool[i];if(o===v||o.lastType!=='hatO'||!(o.busyUntil>when))continue;const og=o.g.gain;og.cancelScheduledValues(when);og.setValueAtTime(o.amp,when);og.exponentialRampToValueAtTime(.0001,when+.025)}}
-else if(type==='crash'||type==='ride'){const mx=type==='crash'?ck.crashMaxPoly:ck.rideMaxPoly;let n=0,old=null;for(let i=0;i<this.romPool.length;i++){const o=this.romPool[i];if(o===v||o.lastType!==type||!(o.busyUntil>when))continue;n++;if(old===null||o.lastTrigger<old.lastTrigger)old=o}if(old&&n>=mx){const og=old.g.gain;og.cancelScheduledValues(when);og.setValueAtTime(old.amp,when);og.exponentialRampToValueAtTime(.0001,when+.06)}}}
-this.romSpawns++;if(isReasonEngineType(type))this.reasonSpawns++;return true}
-warmRom(types){let n=0;for(let i=0;i<types.length;i++){const t=types[i];/* v0.24.0: the union test — REASON engine types ∪ ROM types ∪ KIT_ROM_ROLES (KIT_ROM_ROLES ⊂ ROM_TYPES, so ROM_TYPES covers the kit ROM family) */if(!REASON_TYPES.has(t)&&!ROM_TYPES.has(t))continue;if(this.romBuffer(t))n++}return n}
+/* v0.30.0 KIT CHOKE — the fixed psy4 kit law: hatC chokes hatO (the classic
+   closed-hat chokes the ringing open one, 25 ms exponential). The crash/ride
+   poly choke died with the cymbal types (vocabulary discipline). */
+if(type==='hatC'){for(let i=0;i<this.romPool.length;i++){const o=this.romPool[i];if(o===v||o.lastType!=='hatO'||!(o.busyUntil>when))continue;const og=o.g.gain;og.cancelScheduledValues(when);og.setValueAtTime(o.amp,when);og.exponentialRampToValueAtTime(.0001,when+.025)}}
+this.romSpawns++;return true}
+warmRom(types){let n=0;for(let i=0;i<types.length;i++){const t=types[i];if(!PSY4_KIT_TYPES.has(t))continue;if(this.romBuffer(t))n++}return n}
 }
 class SynthVoice{constructor(ctx,eng){this.ctx=ctx;this.eng=eng;this.bus=null;this.osc1=ctx.createOscillator();this.osc2=ctx.createOscillator();this.g1=ctx.createGain();this.g2=ctx.createGain();this.filter=ctx.createBiquadFilter();this.filter.type='lowpass';this.vca=ctx.createGain();this.vca.gain.value=0;this.lfo=ctx.createOscillator();this.lfoGain=ctx.createGain();this.lfoGain.gain.value=0;this.osc1.connect(this.g1);this.osc2.connect(this.g2);this.g1.connect(this.filter);this.g2.connect(this.filter);this.filter.connect(this.vca);this.lfo.connect(this.lfoGain);this.osc1.start();this.osc2.start();this.lfo.start()}
 /* v0.29.0 PAD SPREAD — optional per-VOICE StereoPanner (psyreason dc072ca
@@ -262,38 +252,21 @@ connect(bus,usePan){const w=!!usePan;if(this.bus!==bus||this.wiredPan!==w){this.
 noteOn(tr,when,ev,stepDur){/* v0.13.0 P3: per-voice SCRATCH param object — cleared+refilled in place (allocation-light hot path; the object never escapes the call: trigger() consumes it synchronously for synthDurEst) */const p=this._p||(this._p={});for(const k in p)delete p[k];Object.assign(p,tr.sound,ev.lock||{});/* v0.29.0 PAD SPREAD: per-hit pan (−1..1) from the preset or the step lock — 0/absent = the exact legacy center wiring (bit-neutral) */const pan=clamp(p.pan||0,-1,1);this.connect(this.eng.chains[tr.idx],Math.abs(pan)>.001);if(this.panN)this.panN.pan.setValueAtTime(pan,when);const f=440*Math.pow(2,(clamp(ev.note,12,108)-69)/12);const gate=(p.gate||.6);const dur=stepDur*gate*2;const rel=Math.max(p.rel||.15,.02);const end=when+dur;this.osc1.type=p.wave1||'sawtooth';this.osc2.type=p.wave2||'sawtooth';this.osc1.frequency.cancelScheduledValues(when);this.osc2.frequency.cancelScheduledValues(when);const pv=clamp(p.penv||0,0,48);if(pv>0){const pd=Math.max(p.pdec||.08,.01);this.osc1.frequency.setValueAtTime(f*Math.pow(2,pv/12),when);this.osc1.frequency.exponentialRampToValueAtTime(f,when+pd);this.osc2.frequency.setValueAtTime(f*Math.pow(2,pv/12+(p.oct2||0)),when);this.osc2.frequency.exponentialRampToValueAtTime(f*Math.pow(2,p.oct2||0),when+pd)}else{this.osc1.frequency.setValueAtTime(f,when);this.osc2.frequency.setValueAtTime(f*Math.pow(2,p.oct2||0),when)}this.osc2.detune.setValueAtTime(p.detune||0,when);this.g1.gain.setValueAtTime(.6,when);this.g2.gain.setValueAtTime(.45,when);const sv=clamp(p.sub||0,0,1);if(sv>0){if(!this.subOsc){this.subOsc=this.ctx.createOscillator();this.subOsc.type='sine';this.subG=this.ctx.createGain();this.subG.gain.value=0;this.subOsc.connect(this.subG);this.subG.connect(this.filter);this.subOsc.start()}this.subOsc.frequency.setValueAtTime(f/2,when);this.subG.gain.setValueAtTime(.55*sv,when)}else if(this.subG)this.subG.gain.setValueAtTime(0,when);const cut=clamp(p.cutoff||1500,60,16000);const res=clamp(p.res||1,.2,24);this.filter.type=p.fType||'lowpass';this.filter.Q.setValueAtTime(res,when);this.filter.frequency.cancelScheduledValues(when);const fe=clamp(p.fenv!=null?p.fenv:3,0,16);const fd=p.fdec!=null?clamp(p.fdec,.01,2):Math.max((p.atk||.005)+(p.dec||.3)*.7,.01);this.filter.frequency.setValueAtTime(Math.min(cut*fe,16000),when);this.filter.frequency.exponentialRampToValueAtTime(cut,when+fd);if(p.lfoRate>0&&p.lfoDest==='cutoff'){this.lfo.frequency.setValueAtTime(p.lfoRate,when);this.lfoGain.gain.setValueAtTime((p.lfoDepth||0)*3000,when)}else this.lfoGain.gain.setValueAtTime(0,when);const vca=this.vca.gain;const vel=ev.vel;const atk=Math.max(p.atk||.005,.003);vca.cancelScheduledValues(when);vca.setValueAtTime(0,when);vca.linearRampToValueAtTime(vel*.5,when+atk);vca.setTargetAtTime(vel*.5*(p.sus!=null?p.sus:.6),when+atk,Math.max((p.dec||.3)/3,.01));vca.setTargetAtTime(.0001,end,Math.max(rel/3,.008));return p}
 panic(){try{this.vca.gain.cancelScheduledValues(0);this.vca.gain.setValueAtTime(0,this.ctx.currentTime)}catch(e){}if(this.subG){try{this.subG.gain.cancelScheduledValues(0);this.subG.gain.setValueAtTime(0,this.ctx.currentTime)}catch(e){}}}
 }
-/* ── DrumVoice v2 (v0.12.0 P1 — SOUND ENGINE v2) ──
-   Multi-layer synthesis behind the SAME pooled node architecture and the
-   SAME parameter surface (type/tune/decay/tone/punch keep their meaning —
-   the sound behind them is rebuilt):
-
-   KICK  — SUB (sine, exponential pitch env start→f0, punch maps the env
-           depth + click level), BODY (triangle at f0, tone maps body/sub
-           balance, saturated), CLICK (highpassed noise, 5 ms transient);
-           per-voice soft-clip WaveShaper (tanh curve precomputed ONCE per
-           engine, shared by all drum voices — allocation-free).
-   SNARE — TONE (triangle, ~0.4-semitone pitch drop, punch maps tone decay)
-           + NOISE (bandpass, tone maps the band) — dual-band structure.
-   CLAP  — 4 noise bursts (exponential ~11 ms spacing, per-burst spectral
-           decorrelation offsets on the bandpass — deterministic) + tail
-           burst with the long decay. (True L/R stereo decorrelation is a
-           WORKLET-path capability — main-thread voices are mono pre-pan;
-           documented in the limitations list.)
-   HATS  — metallic stack: SIX square oscillators at fixed inharmonic
-           ratios R=[2.0, 3.0, 4.16, 5.43, 6.79, 8.21] on a 40 Hz·tune base
-           (the classic 806-style cymbal recipe — non-integer ratios put
-           the partial lattice off integer multiples → metallic) →
-           bandpass 10 kHz → highpass (tone maps the corner, old law
-           7200·√tone) + a noise touch. Closed/open share the stack with
-           different envelopes; choke stays the existing pool discipline.
-           The stack is created LAZILY on a voice's first hat hit and kept
-           (first-hit lazy init is the documented hot-path exception).
-
-   Determinism: every layer is param automation over seeded buffers — same
-   params → identical PCM (asserted by G39). Duration formulas are
+/* ── DrumVoice (v0.30.0 FOUNDATION RESET — the legacy SYNTH fallback) ──
+   The pooled synth fallback for the six CORE drum types, used ONLY when
+   opts.rom=false (neutral A/B tests) or when a psy4 kit render fails
+   (counted in romFallbacks). The psy4 kit ROM is the sound of record —
+   this path exists so the engine never lies silent.
+   Same pooled node architecture and parameter surface as v2 (tune/decay/
+   tone/punch): KICK (sub+body+click, saturated), SNARE (tone+noise),
+   CLAP (multi-burst), HATS (six-square metallic stack, closed/open +
+   choke), SHAKER (dual-envelope micro-structure). Every junk family
+   (conga/bongo/cowbell/clave/rim/tom/zap/boom/glitch/darbuka/tambourine/
+   triangle/downlifter/crash/revcym/agogo/timbale) is DELETED — the kit
+   vocabulary is the psy4 kit's ten types, nothing else.
+   Determinism: param automation over seeded buffers; duration formulas
    UNCHANGED (drumDurEst) → pool discipline and busyUntil windows moved
-   zero. Old presets keep triggering sensibly: unknown/neutral params fall
-   back to the same defaults as v1. */
+   zero. */
 const HAT_RATIOS=[2.0,3.0,4.16,5.43,6.79,8.21];
 /* v0.14.0 drum v2 params — burst-position/dynamics tables for the clap
    `bursts` param (2..6). Precomputed at module level: the hit path stays
@@ -305,16 +278,15 @@ class DrumVoice{constructor(ctx,eng){this.ctx=ctx;this.eng=eng;this.bus=null;thi
 /* v2 layers: BODY osc (triangle — kick body / snare tone) + shared
    saturation shaper (kick only — routed out→outWS→bus; every other type
    routes out→bus directly, so non-kick voices are untouched) */
-this.osc2=ctx.createOscillator();this.osc2.type='triangle';this.osc2Gain=ctx.createGain();this.osc2Gain.gain.value=0;this.osc2.connect(this.osc2Gain);this.osc2Gain.connect(this.out);this.outWS=ctx.createWaveShaper();this.outWS.curve=eng._satC||(eng._satC=mkSatCurve());this.osc2.start();this.noise.start();this.osc.start();this.metal=null;this.fmod=null}
+this.osc2=ctx.createOscillator();this.osc2.type='triangle';this.osc2Gain=ctx.createGain();this.osc2Gain.gain.value=0;this.osc2.connect(this.osc2Gain);this.osc2Gain.connect(this.out);this.outWS=ctx.createWaveShaper();this.outWS.curve=eng._satC||(eng._satC=mkSatCurve());this.osc2.start();this.noise.start();this.osc.start();this.metal=null}
 ensureMetal(){if(this.metal)return;const c=this.ctx;const oscs=HAT_RATIOS.map(()=>{const o=c.createOscillator();o.type='square';o.frequency.value=80;o.start();return o});const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=10000;bp.Q.value=.9;const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=7200;const g=c.createGain();g.gain.value=0;oscs.forEach(o=>o.connect(bp));bp.connect(hp);hp.connect(g);g.connect(this.out);this.metal={oscs,bp,hp,g}}
-ensureFmod(){if(this.fmod)return;const c=this.ctx;const m=c.createOscillator();m.type='sine';m.frequency.value=4900;const mg=c.createGain();mg.gain.value=0;m.connect(mg);mg.connect(this.osc.frequency);m.start();this.fmod={m,mg}}
 connect(bus,useWS){const w=!!useWS;const viaDrive=w&&!!this.wsDrive;if(this.bus!==bus||this.wiredWS!==w||this.wiredDrive!==viaDrive){this.out.disconnect();this.outWS.disconnect();if(w){if(viaDrive){this.out.connect(this.wsDrive);this.wsDrive.connect(this.outWS)}else this.out.connect(this.outWS);this.outWS.connect(bus.input)}else{this.out.connect(bus.input)}this.bus=bus;this.wiredWS=w;this.wiredDrive=viaDrive}}
 hit(tr,when,vel,lock){const p=Object.assign({},tr.sound,lock||{});this.connect(this.eng.chains[tr.idx],(p.type||tr.type||'kick')==='kick');const tune=p.tune||1,decay=p.decay||1,tone=p.tone||1,punch=p.punch||0;const type=p.type||tr.type||'kick';const ng=this.noiseGain.gain,og=this.oscGain.gain,og2=this.osc2Gain.gain;
 /* v0.12.0 P1: zero EVERY layer at the hit anchor first — a voice reused
    across types never carries a previous layer's tail into the new hit
    (the pool steal semantics stay exactly the v1 ones: reuse happens at
    busyUntil, so this cut lands after the estimated duration). */
-ng.cancelScheduledValues(when);og.cancelScheduledValues(when);og2.cancelScheduledValues(when);ng.setValueAtTime(0,when);og.setValueAtTime(0,when);og2.setValueAtTime(0,when);/* v0.15.0: detune joins the zero-anchor — the cowbell's tone-mapped spread must never leak into a pooled reuse of the voice by another type (was always 0 before v0.15.0, so this is bit-neutral for every legacy path) */this.osc.detune.setValueAtTime(0,when);this.osc2.detune.setValueAtTime(0,when);if(this.metal){const mg=this.metal.g.gain;mg.cancelScheduledValues(when);mg.setValueAtTime(0,when)}if(this.fmod){const f=this.fmod.mg.gain;f.cancelScheduledValues(when);f.setValueAtTime(0,when)}
+ng.cancelScheduledValues(when);og.cancelScheduledValues(when);og2.cancelScheduledValues(when);ng.setValueAtTime(0,when);og.setValueAtTime(0,when);og2.setValueAtTime(0,when);/* v0.15.0: detune joins the zero-anchor — the cowbell's tone-mapped spread must never leak into a pooled reuse of the voice by another type (was always 0 before v0.15.0, so this is bit-neutral for every legacy path) */this.osc.detune.setValueAtTime(0,when);this.osc2.detune.setValueAtTime(0,when);if(this.metal){const mg=this.metal.g.gain;mg.cancelScheduledValues(when);mg.setValueAtTime(0,when)}
 if(type==='kick'){
 /* v0.14.0 drum v2: `dist` (0..1, default 0 = exact v0.13.1 path) — lazily
    builds a drive gain feeding the EXISTING kick saturation shaper
@@ -363,84 +335,10 @@ const open=type==='hatO';const dur=open?.26+.5*decay:.03+.05*decay;
 this.ensureMetal();const base=40*tune;const br=Math.min(Math.max(p.bright||1,.5),2);const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(10000*Math.sqrt(br),when);M.hp.frequency.setValueAtTime(7200*Math.sqrt(tone),when);const mg=M.g.gain;mg.setValueAtTime(vel*(open?.46:.42),when);mg.exponentialRampToValueAtTime(.0001,when+dur);
 /* noise touch keeps a little of the old breath */
 this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(8000,when);ng.setValueAtTime(vel*.14,when);ng.exponentialRampToValueAtTime(.0001,when+dur);
-}else if(type==='tom'){
-/* v0.15.0 P1 MEMBRANE v3: two-stage pitch path (strike bend 1.45×→1 in 28 ms,
-   THEN the existing downward glide — real toms carry both), overtone sine
-   1.6×f0 (the membrane's second mode, decay .35×dur), wider strike noise.
-   durEst UNCHANGED (.22+.35·decay — pool discipline). */
-const dur=.22+.35*decay;const tf=180*tune;this.osc.type='sine';this.osc.frequency.setValueAtTime(tf*1.45,when);this.osc.frequency.exponentialRampToValueAtTime(tf,when+.028);this.osc.frequency.exponentialRampToValueAtTime(tf*.55,when+dur*.7);og.setValueAtTime(vel*.85,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(tf*1.6,when);og2.setValueAtTime(vel*.24,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.35);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1300*tone,when);this.nFilter.Q.value=1;ng.setValueAtTime(vel*.26,when);ng.exponentialRampToValueAtTime(.0001,when+.01)}else if(type==='rim'){
-/* v0.12.0 P2: short FM metallic — lazy modulator pair feeds osc.frequency */
-this.ensureFmod();this.osc.type='sine';const rf=1750*tune;this.osc.frequency.setValueAtTime(rf,when);this.fmod.m.frequency.setValueAtTime(rf*2.76,when);const fmg=this.fmod.mg.gain;fmg.setValueAtTime(rf*1.4,when);fmg.exponentialRampToValueAtTime(1,when+.012);og.setValueAtTime(vel*.75,when);og.exponentialRampToValueAtTime(.0001,when+.045)}else if(type==='conga'){
-/* v0.15.0 P1 MEMBRANE v3 — the v0.12.0 model was a bare sine with a 1.08×
-   50 ms bend: it read as a beep, and it is the perc lane of EVERY composer
-   kit (the owner's #1 complaint). A conga head is a shell-reinforced
-   membrane: strike pitch-bend (1.25..1.7×→1 over 35 ms, punch maps the
-   depth), a shell partial at 2.6×f0 (fast .3×dur decay, tone maps the
-   level — this is what turns the beep into a drum), and a slap transient
-   (bandpass 2.1 kHz·tone, punch maps the level). durEst UNCHANGED. */
-const dur=.15+.25*decay;const cf=310*tune;const bd=1.25+.45*Math.min(punch,1);this.osc.type='sine';this.osc.frequency.setValueAtTime(cf*bd,when);this.osc.frequency.exponentialRampToValueAtTime(cf,when+.035);og.setValueAtTime(vel*.78,when);og.exponentialRampToValueAtTime(.0001,when+dur*.9);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(cf*2.6*bd,when);this.osc2.frequency.exponentialRampToValueAtTime(cf*2.6,when+.03);og2.setValueAtTime(vel*(.14+.2*Math.min(Math.max(tone,0),1.6)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.3);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(2100*tone,when);this.nFilter.Q.value=1.1;ng.setValueAtTime(vel*(.1+.3*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.007)}else if(type==='bongo'){
-/* v0.15.0 P1 MEMBRANE v3 (same rebuild as conga — the old bongo was the
-   same bare-sine beep at 440 Hz): deeper bend (bongos are slappier),
-   shell partial 2.7×f0, slap band 3.2 kHz·tone. durEst UNCHANGED. */
-const dur=.1+.15*decay;const cf=440*tune;const bd=1.35+.45*Math.min(punch,1);this.osc.type='sine';this.osc.frequency.setValueAtTime(cf*bd,when);this.osc.frequency.exponentialRampToValueAtTime(cf,when+.028);og.setValueAtTime(vel*.72,when);og.exponentialRampToValueAtTime(.0001,when+dur*.9);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(cf*2.7*bd,when);this.osc2.frequency.exponentialRampToValueAtTime(cf*2.7,when+.024);og2.setValueAtTime(vel*(.12+.2*Math.min(Math.max(tone,0),1.6)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.3);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(3200*tone,when);this.nFilter.Q.value=1.1;ng.setValueAtTime(vel*(.1+.34*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.005)}else if(type==='cowbell'){
-/* v0.15.0 P1: two-square metallic (560 + 845 Hz, the documented 1.509
-   pair) + a strike transient on the lower square (1.05×→1, 10 ms — the
-   "ding" attack) + tone maps a detune spread between the pair (the beat
-   that opens/closes the shimmer; tone 1 = 0 cents = the old pair). */
-const dur=.12+.08*decay;this.osc.type='square';this.osc.frequency.setValueAtTime(560*1.05*tune,when);this.osc.frequency.exponentialRampToValueAtTime(560*tune,when+.01);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='square';this.osc2.frequency.setValueAtTime(845*tune,when);this.osc2.detune.setValueAtTime((tone-1)*30,when);og2.setValueAtTime(vel*.5,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.8)}else if(type==='clave'){
-/* v0.15.0 P1: wood resonance (the two sine modes 1 : 1.5 stay) + a
-   broadband KNOCK transient at contact (bandpass 1.1 kHz·tone, punch
-   maps the level) — real claves carry a click under the ring. */
-this.osc.type='sine';this.osc.frequency.setValueAtTime(2500*tune,when);og.setValueAtTime(vel*.7,when);og.exponentialRampToValueAtTime(.0001,when+.012);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(3750*tune,when);og2.setValueAtTime(vel*.25,when);og2.exponentialRampToValueAtTime(.0001,when+.009);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1100*tone,when);this.nFilter.Q.value=1.2;ng.setValueAtTime(vel*(.1+.25*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.004)}else if(type==='zap'){
-/* fast downward sweep (laser): carrier glide + synced bandpass chirp */
-const dur=.2+.1*decay;this.osc.type='sine';this.osc.frequency.setValueAtTime(1600*tune,when);this.osc.frequency.exponentialRampToValueAtTime(Math.max(70*tune,40),when+.14);og.setValueAtTime(vel*.7,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(4000,when);this.nFilter.frequency.exponentialRampToValueAtTime(200,when+.12);this.nFilter.Q.value=3;ng.setValueAtTime(vel*.3,when);ng.exponentialRampToValueAtTime(.0001,when+.1)}else if(type==='boom'){
-/* sub drop with a clean reverb-ready tail */
-const dur=.9+.6*decay;this.osc.type='sine';this.osc.frequency.setValueAtTime(70*tune,when);this.osc.frequency.exponentialRampToValueAtTime(28,when+.5);og.setValueAtTime(vel*1.05,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.nFilter.type='lowpass';this.nFilter.frequency.setValueAtTime(400,when);ng.setValueAtTime(vel*.2,when);ng.exponentialRampToValueAtTime(.0001,when+.05)}else if(type==='glitch'){
-const dur=.08+.14*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(1500*tone+800,when);this.nFilter.Q.value=4;ng.setValueAtTime(vel*.7,when);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='shaker'){
+}else if(type==='shaker'){
 /* v0.12.0 P2: bandpass + dual-envelope micro-structure (fast attack,
    mid dip, secondary bump — the shaken-bead "shh-shh") */
-const dur=.04+.07*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(5500*tone,when);this.nFilter.Q.value=1.4;ng.setValueAtTime(0,when);ng.linearRampToValueAtTime(vel*.5,when+.002);ng.exponentialRampToValueAtTime(vel*.18,when+.011);ng.linearRampToValueAtTime(vel*.34,when+.015);ng.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='riser'){
-const dur=1.6;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(300,when);this.nFilter.frequency.exponentialRampToValueAtTime(6000,when+dur);ng.setValueAtTime(.0001,when);ng.exponentialRampToValueAtTime(vel*.6,when+dur);ng.exponentialRampToValueAtTime(.0001,when+dur+.05)}else if(type==='impact'){
-/* v0.12.0 P2: sub drop + triangle body octave for definition */
-const dur=1.1*decay+.3;this.osc.type='sine';this.osc.frequency.setValueAtTime(60*tune,when);this.osc.frequency.exponentialRampToValueAtTime(30,when+.5);og.setValueAtTime(vel*1.05,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(120*tune,when);this.osc2.frequency.exponentialRampToValueAtTime(55,when+.4);og2.setValueAtTime(vel*.3,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.5)}else if(type==='darbuka'){
-/* v0.14.0: goblet drum (doumbek family — the goa/psy lineage instrument).
-   DUM body: triangle sweep 1.5×f0 → f0 (~45 ms bend) = the low stroke;
-   TEK: sine ping 690→560 Hz + bandpass snap 4.2 kHz = the high stroke.
-   tone maps the snap band. Deterministic param automation, no allocation. */
-const dur=.14+.28*decay;const df=165*tune;this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(df*1.5,when);this.osc2.frequency.exponentialRampToValueAtTime(df,when+.045);og2.setValueAtTime(vel*.85,when);og2.exponentialRampToValueAtTime(.0001,when+dur);this.osc.type='sine';this.osc.frequency.setValueAtTime(690*tune,when);this.osc.frequency.exponentialRampToValueAtTime(560*tune,when+.02);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+.03);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(4200*tone,when);this.nFilter.Q.value=1.1;ng.setValueAtTime(vel*.32,when);ng.exponentialRampToValueAtTime(.0001,when+.014)}else if(type==='tambourine'){
-/* v0.14.0: jingle row — metal stack at 95 Hz base (ratios 2..8.21 →
-   190 Hz..780 Hz partials, the shell resonance band) + membrane thump;
-   tone leans jingle (bright) vs thump (dark). */
-const dur=.12+.24*decay;this.ensureMetal();const base=95*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(8200,when);M.hp.frequency.setValueAtTime(5600*Math.sqrt(tone),when);const mg=M.g.gain;mg.setValueAtTime(vel*.4,when);mg.exponentialRampToValueAtTime(.0001,when+dur);this.osc.type='sine';this.osc.frequency.setValueAtTime(195*tune,when);og.setValueAtTime(vel*(.45-.12*Math.min(tone,1)),when);og.exponentialRampToValueAtTime(.0001,when+dur*.6)}else if(type==='triangle'){
-/* v0.14.0: long inharmonic ring — metal stack at 205 Hz base through
-   BP 10.5k / HP 3.2k, TWO-stage decay (fast set-down then long ring;
-   decay maps the ring). 2-stage envelope = the struck-rod sustain shape. */
-const dur=.9+1.6*decay;this.ensureMetal();const base=205*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(10500,when);M.hp.frequency.setValueAtTime(3200,when);const mg=M.g.gain;mg.setValueAtTime(vel*.34,when);mg.exponentialRampToValueAtTime(vel*.16,when+dur*.25);mg.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='downlifter'){
-/* v0.14.0: the riser's mirror — closes sections instead of opening them
-   (declared in soundBank DrumType since v0.10, implemented here at last).
-   Highpassed noise descends 6.2k → 180 Hz while a sine drops 180 → 42 Hz;
-   decay maps the length (up to 2 s). */
-const dur=.9+1.1*decay;this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(6200,when);this.nFilter.frequency.exponentialRampToValueAtTime(180,when+dur);ng.setValueAtTime(vel*.55,when);ng.exponentialRampToValueAtTime(.0001,when+dur);this.osc.type='sine';this.osc.frequency.setValueAtTime(180*tune,when);this.osc.frequency.exponentialRampToValueAtTime(42,when+dur*.8);og.setValueAtTime(vel*.5,when);og.exponentialRampToValueAtTime(.0001,when+dur)}else if(type==='crash'){
-/* v0.15.0 P2: cymbal crash — the EXISTING 6-square inharmonic metal stack
-   (HAT_RATIOS, shared lazily — no new nodes) at a 52 Hz·tune base, through
-   the same BP/HP with crash corners; TWO-stage envelope (set-down to .6
-   level by 40% of the ring, then the long decay to dur — the shimmer a
-   one-point exp can't hold); a highpassed noise wash rides it (punch maps
-   wash level, tone maps the HP corner). decay maps the ring. */
-const dur=1.2+1.8*decay;this.ensureMetal();const base=52*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(8600,when);M.hp.frequency.setValueAtTime(4600*Math.sqrt(Math.min(Math.max(tone,0),2)),when);const mg=M.g.gain;mg.setValueAtTime(vel*.5,when);mg.exponentialRampToValueAtTime(vel*.3,when+dur*.4);mg.exponentialRampToValueAtTime(.0001,when+dur);this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(5200,when);ng.setValueAtTime(vel*(.28+.18*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(vel*.16,when+dur*.4);ng.exponentialRampToValueAtTime(.0001,when+dur*.9)}else if(type==='revcym'){
-/* v0.15.0 P2: reverse cymbal — the transition classic: metal stack +
-   noise swell EXPONENTIALLY (place the hit on the drop; the swell leads
-   INTO it) and a HARD cut at dur (setValueAtTime 0 — the vacuum the ear
-   wants). decay maps the swell length. */
-const dur=.8+.8*decay;this.ensureMetal();const base=46*tune;const M=this.metal;M.oscs.forEach((o,i)=>o.frequency.setValueAtTime(HAT_RATIOS[i]*base,when));M.bp.frequency.setValueAtTime(9000,when);M.hp.frequency.setValueAtTime(4200*Math.sqrt(Math.min(Math.max(tone,0),2)),when);const mg=M.g.gain;mg.setValueAtTime(.0001,when);mg.exponentialRampToValueAtTime(vel*.42,when+dur*.92);mg.setValueAtTime(0,when+dur);this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(3800,when);ng.setValueAtTime(.0001,when);ng.exponentialRampToValueAtTime(vel*.34,when+dur*.92);ng.setValueAtTime(0,when+dur)}else if(type==='agogo'){
-/* v0.15.0 P2: agogô bell — two inharmonic modes (1 : 1.506, the double
-   bell recipe) with a 6% strike bend; tone lifts the upper mode, punch
-   adds a 3.6 kHz click. Mid decay — the dry wooden-metal ring. */
-const dur=.12+.22*decay;const f0=1245*tune;this.osc.type='sine';this.osc.frequency.setValueAtTime(f0*1.06,when);this.osc.frequency.exponentialRampToValueAtTime(f0,when+.012);og.setValueAtTime(vel*.62,when);og.exponentialRampToValueAtTime(.0001,when+dur);this.osc2.type='sine';this.osc2.frequency.setValueAtTime(f0*1.506,when);og2.setValueAtTime(vel*(.3+.2*Math.min(Math.max(tone-1,0),1)),when);og2.exponentialRampToValueAtTime(.0001,when+dur*.6);this.nFilter.type='highpass';this.nFilter.frequency.setValueAtTime(3600,when);ng.setValueAtTime(vel*(.06+.2*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.004)}else if(type==='timbale'){
-/* v0.15.0 P2: timbale — the metal-shell drum: high pinged fundamental
-   (840 Hz·tune, strike bend 1.18×→1 in 22 ms), shell mode 1.68×
-   (triangle), and a rim-shot band 2.6 kHz·tone (punch maps the crack). */
-const dur=.1+.2*decay;const f0=840*tune;this.osc.type='sine';this.osc.frequency.setValueAtTime(f0*1.18,when);this.osc.frequency.exponentialRampToValueAtTime(f0,when+.022);og.setValueAtTime(vel*.62,when);og.exponentialRampToValueAtTime(.0001,when+dur*.9);this.osc2.type='triangle';this.osc2.frequency.setValueAtTime(f0*1.68,when);og2.setValueAtTime(vel*.3,when);og2.exponentialRampToValueAtTime(.0001,when+dur*.4);this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(2600*tone,when);this.nFilter.Q.value=1.4;ng.setValueAtTime(vel*(.14+.3*Math.min(punch,1)),when);ng.exponentialRampToValueAtTime(.0001,when+.008)}}
+const dur=.04+.07*decay;this.nFilter.type='bandpass';this.nFilter.frequency.setValueAtTime(5500*tone,when);this.nFilter.Q.value=1.4;ng.setValueAtTime(0,when);ng.linearRampToValueAtTime(vel*.5,when+.002);ng.exponentialRampToValueAtTime(vel*.18,when+.011);ng.linearRampToValueAtTime(vel*.34,when+.015);ng.exponentialRampToValueAtTime(.0001,when+dur)}}
 panic(){try{this.noiseGain.gain.cancelScheduledValues(0);this.noiseGain.gain.setValueAtTime(0,this.ctx.currentTime);this.oscGain.gain.cancelScheduledValues(0);this.oscGain.gain.setValueAtTime(0,this.ctx.currentTime);this.osc2Gain.gain.cancelScheduledValues(0);this.osc2Gain.gain.setValueAtTime(0,this.ctx.currentTime);if(this.metal)this.metal.g.gain.cancelScheduledValues(0),this.metal.g.gain.setValueAtTime(0,this.ctx.currentTime);if(this.fmod)this.fmod.mg.gain.cancelScheduledValues(0),this.fmod.mg.gain.setValueAtTime(0,this.ctx.currentTime)}catch(e){}}
 }
 

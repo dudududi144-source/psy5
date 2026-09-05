@@ -8,9 +8,10 @@
    composition path itself is fully deterministic on the field's value). */
 import { $, I, toast, loadProjectObj } from '../state.js';
 import { compose, COMPOSER_STYLES, FORM_IDS } from '../composer.js';
-import { styleKit, kitWarmTypes } from '../../foundation/dsp/kit-reason.mjs';
+import { styleKit, kitWarmTypes } from '../psy4kit.mjs';
 import { arrToggle } from '../arranger.js';
 import { applyComposerSampleHints } from './samples.js';
+import { readyAlbum } from '../library.js'; /* v0.29.0: the pre-boot compose path enriches the album too (parity with composeBoot) */
 
 function hasNotes(p) {
   if (!p) return false;
@@ -53,6 +54,7 @@ export function wireCompose() {
     fillFormSelects();
     const { styleId, minutes, seed, formId } = readForm($('compStyle'), $('compLen'), $('compSeed'), $('compForm'));
     const r = compose(styleId, minutes, seed, undefined, formId);
+    try { readyAlbum(r.project, styleId, seed, minutes) } catch (e) { /* album is enrichment — never blocks the boot */ }
     /* v0.24.0 KIT HOOK (power-screen path — same rule as the header modal) */
     if (I.p && I.p.kitPinned && kitWarmTypes(I.p.kit).length) { r.project.kit = I.p.kit; r.project.kitPinned = true }
     else { r.project.kit = styleKit(styleId); r.project.kitPinned = false }

@@ -6,7 +6,7 @@ import { SOUND_IDS, paramApply, ensureIns } from '../params.js';
 import { ensureVoice } from '../samplestore.js';
 import { freezeTrack } from '../bounce.js';
 import { importChannelsAsSample } from './samples.js';
-import { KIT_IDS, styleKit, kitMeta, kitWarmTypes } from '../../foundation/dsp/kit-reason.mjs';
+import { KIT_IDS, styleKit, kitMeta, kitWarmTypes } from '../psy4kit.mjs';
 
 /* v0.16.1 PERF — sig-gated preset list: the 345-row rebuild only happens when the filter/query/selection/assignment actually changed.
    v0.26.0 ROAST FIX #7 — the list is built through a DocumentFragment and clicks are DELEGATED to the container (456 individual onclick closures are gone); the search input is debounced 120 ms so typing no longer rebuilds the list per keystroke. */
@@ -33,7 +33,7 @@ if(t.kind!=='synth'){
    legacy-neutral). Assigning a preset still works exactly as before. */
 const t0=t.sound.type||t.type||'kick';
 const dd=document.createElement('div');dd.style.gridColumn='1/-1';
-const TYPES=['kick','snare','clap','hatC','hatO','tom','rim','conga','bongo','cowbell','clave','zap','boom','glitch','shaker','riser','impact','darbuka','tambourine','triangle','downlifter'];
+const TYPES=['kick','snare','clap','hatC','hatO','shaker','riser','impact','texture','downlifter'];
 dd.innerHTML='<label for="drTypeSel">TYPE</label><select id="drTypeSel" title="drum synthesis type — the engine voice model for this track">'+TYPES.map(x=>'<option'+(x===t0?' selected':'')+'>'+x+'</option>').join('')+'</select>';
 w.appendChild(dd);
 dd.querySelector('#drTypeSel').onchange=e=>{pushHist();t.sound.type=e.target.value;t.type=e.target.value;I.dirty=true;I.renderDirty=true;toast('TYPE → '+e.target.value)};
@@ -57,7 +57,7 @@ return}const fields=[['cutoff','Cutoff',60,14000],['res','Reso x100',1,220],['at
    hot path) and save the snapshot. syncKitSel mirrors state → select (no
    DOM write unless the value drifted) and is called from renderAll. */
 let _kitWarmStop=false;
-function warmKit(kit){if(!I.eng||!I.eng.romBuffer)return;const list=kitWarmTypes(kit);/* v0.29.0: warm the active kick preset's dims variant too (no first-hit render latency after a preset/kit change) */const kickP=()=>{const t=(I.p&&I.p.tracks||[]).find(x=>x&&x.kind==='drum'&&((x.sound&&x.sound.type)||x.type)==='kick');return (t&&t.sound)||null};let wi=0;const step=()=>{if(_kitWarmStop)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(!I.eng)return;if(wi<list.length){const ty=list[wi++];I.eng.romBuffer(ty,ty==='kick'?kickP():null);step()}}catch(e){}})};step()}
+function warmKit(kit){if(!I.eng||!I.eng.romBuffer)return;const list=kitWarmTypes(kit);/* v0.29.0: warm the active kick preset's dims variant too (no first-hit render latency after a preset/kit change) */const kickP=()=>{const t=(I.p&&I.p.tracks||[]).find(x=>x&&x.kind==='drum'&&((x.sound&&x.sound.type)||x.type)==='kick');return (t&&t.sound)||null};let wi=0;const step=()=>{if(_kitWarmStop)return;const dl=(window.requestIdleCallback||(cb=>setTimeout(cb,16)));dl(()=>{try{if(!I.eng)return;if(wi<list.length){const ty=list[wi++];I.eng.romBuffer(ty);step()}}catch(e){}})};step()}
 function syncKitSel(){const s=$('kitSel'),p=I.p;if(!s||!p)return;const v=(p.kitPinned&&kitMeta(p.kit))?p.kit:'auto';if(s.value!==v)s.value=v}
 function wireKitSel(){const row=$('libCat')&&$('libCat').parentElement;if(!row||$('kitSel'))return;const s=document.createElement('select');s.id='kitSel';s.setAttribute('aria-label','drum kit');s.title='the drum KIT — every kit is one instrument (all voices tuned to the kit root, leveled to the family loudness law). auto = follow the project style; an explicit kit is PINNED (persists through save/load and compose)';s.innerHTML='<option value="auto">KIT auto (follow style)</option>'+KIT_IDS.map(id=>{const m=kitMeta(id);return '<option value="'+id+'">'+(m?m.name:id)+'</option>'}).join('');row.appendChild(s);
 s.onchange=()=>{const p=I.p;if(!p)return;pushHist();_kitWarmStop=true;_kitWarmStop=false;if(s.value==='auto'){p.kitPinned=false;p.kit=styleKit(p.style)}else{p.kitPinned=true;p.kit=s.value}
