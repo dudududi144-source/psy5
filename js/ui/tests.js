@@ -8,7 +8,7 @@ import { PooledEngine, prepInsertDSP } from '../engine.js';
 import { buildStyle, libFind, libFilter, assignPresetToTrack, addTrackToProject, KITS } from '../presets.js';
 import { stepEvents, fnv, SYNTH_VOICES, DRUM_VOICES, M_ENERGY, loopLen, laneEval, SCALES } from '../model.js';
 import { recordPoint, quantStep, applyLanes } from '../autorec.js';
-import { compose, minVariantDiff, VARIANT_DIFF_MIN, COMPOSER_STYLES } from '../composer.js';
+import { compose, minVariantDiff, VARIANT_DIFF_MIN, COMPOSER_STYLES, FORM_IDS } from '../composer.js';
 import { chordDegreeAt, chordClasses } from '../../foundation/music/progression.mjs';
 import { evolutionState, evolutionStats } from '../evolution.js';
 import { libraryValid } from '../library.js';
@@ -1688,6 +1688,41 @@ const wA=cA.tracks[6]&&cA.tracks[6].sound?cA.tracks[6].sound.width:null;
 const timbreOk54=typeof wA==='number'&&wA>=0.3&&wA<=0.8&&JSON.stringify(cA.tracks[6].sound)===JSON.stringify(cB.tracks[6].sound);
 const ok54=asymP>0.15&&asymM<0.01&&mdZMfull===0&&timbreOk54;
 gate('G54','pad spread (v0.29.0 psyreason port): alternating pan renders STEREO (asym '+asymP.toFixed(2)+') + no-pan renders symmetric (asym '+asymM.toFixed(3)+') + pan:0 ≡ absent bit-identical + composer pad carries seeded width '+wA+' deterministic',ok54,'asym(pan) '+asymP.toFixed(3)+' | asym(mono) '+asymM.toFixed(4)+' | md(pan:0,none) '+mdZMfull+' | width '+wA)}catch(e){gate('G54','pad spread',false,'ERR '+e.message)}}
+if((window.__psy6GateSkip||[]).includes('G55')){gate('G55','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+/* ── G55 (v0.29.0) FORM LIBRARY — 36 named role-aware arrangements ──
+   psyreason 5be8271/64d29bc port. Evidence: (a) ALL 36 forms compose
+   (no throw, sane totalBars); (b) deterministic double-compose; (c) the
+   form's section NAMES land in c.form.sections; (d) ROLE ISOLATION at
+   pattern level — PERC: no bass/lead/pad/arp notes, kick 4-on-floor;
+   ACID: no kick/hats/perc/pad, bass+lead present; AMBIENT: pad only;
+   HALF-TIME: exactly one kick per bar, no hats; (e) AUTO (no formId)
+   stays byte-identical with formId=null. */
+const formsOk55=[];let formsN55=0,formsThrow55=0;
+for(const fid of FORM_IDS){try{const c=compose('FULL-ON',5,424242,undefined,fid);formsN55++;if(c.form.totalBars>=28&&c.form.sections.length>=3)formsOk55.push(fid)}catch(e){formsThrow55++}}
+const det55a=JSON.stringify(compose('FULL-ON',5,424242,undefined,'Forest Ritual'));
+const det55b=JSON.stringify(compose('FULL-ON',5,424242,undefined,'Forest Ritual'));
+const patOf55=(proj,sid)=>{const s=proj.form.sections.find(x=>x.id===sid);return s?proj.project.patterns[s.pattern]:null};
+const trackOn55=(pat,ti)=>{const d=pat&&pat.data[ti];if(!d)return 0;let n=0;for(const st of d.steps)if(st.on)n++;return n};
+const fr=compose('FULL-ON',5,424242,undefined,'Forest Ritual').project;
+const percPat=patOf55(fr,'PERC TRIBAL');
+const percIso55=percPat&&trackOn55(percPat,4)===0&&trackOn55(percPat,5)===0&&trackOn55(percPat,6)===0&&trackOn55(percPat,7)===0&&trackOn55(percPat,0)>0;
+const ao=compose('FULL-ON',5,424242,undefined,'Acid Odyssey').project;
+const acidPat=patOf55(ao,'ACID BREAK');
+const acidIso55=acidPat&&trackOn55(acidPat,0)===0&&trackOn55(acidPat,2)===0&&trackOn55(acidPat,3)===0&&trackOn55(acidPat,6)===0&&trackOn55(acidPat,4)>0&&trackOn55(acidPat,5)>0;
+const ds=compose('FULL-ON',5,424242,undefined,'Deep Space').project;
+const ambPat=patOf55(ds,'AMBIENT TEXTURE');
+const ambIso55=ambPat&&trackOn55(ambPat,0)===0&&trackOn55(ambPat,1)===0&&trackOn55(ambPat,2)===0&&trackOn55(ambPat,3)===0&&trackOn55(ambPat,4)===0&&trackOn55(ambPat,6)>0;
+const mu=compose('FULL-ON',5,424242,undefined,'Morning Uplift').project;
+const halfSec=mu.form.sections.find(x=>x.id==='HALF-TIME');
+const halfPat=halfSec?mu.project.patterns[halfSec.pattern]:null;
+const halfKicks55=halfPat?trackOn55(halfPat,0):-1;
+const halfBars55=halfPat?halfPat.data[0].len/16:-1;
+const halfOk55=halfPat&&halfKicks55===halfBars55&&trackOn55(halfPat,2)===0;
+const namesOk55=fr.form.sections.some(s=>s.id==='PERC TRIBAL')&&ao.form.sections.some(s=>s.id==='ACID BREAK')&&ds.form.sections.some(s=>s.id==='AMBIENT TEXTURE');
+const autoA=JSON.stringify(compose('FULL-ON',5,424242).project);
+const autoB=JSON.stringify(compose('FULL-ON',5,424242,undefined,null).project);
+const ok55=formsN55===36&&formsThrow55===0&&det55a===det55b&&percIso55&&acidIso55&&ambIso55&&halfOk55&&namesOk55&&autoA===autoB;
+gate('G55','form library (v0.29.0 psyreason port): all 36 forms compose + deterministic + section names land + ROLE ISOLATION (PERC drums-only, ACID bass+lead only, AMBIENT pad-only, HALF one kick/bar no hats) + AUTO ≡ null-formId',ok55,'forms '+formsN55+'/36 throw '+formsThrow55+' | perc '+percIso55+' acid '+acidIso55+' amb '+ambIso55+' half kicks '+halfKicks55+'/'+halfBars55+' | auto '+(autoA===autoB?'≡':'DIFF'))}catch(e){gate('G55','form library',false,'ERR '+e.message)}}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

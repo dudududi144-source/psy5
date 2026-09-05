@@ -177,6 +177,91 @@ const EXTENDED_CHAIN = [
 ];
 const SECTION_BY_ID = new Map(SECTION_CHAIN.map(s => [s.id, s]));
 
+/* ── v0.29.0 FORM LIBRARY (psyreason re-review #2 port: 5be8271/64d29bc
+   role-aware forms + dc4f68c-era structure vocabulary) ────────────────────
+   36 NAMED arrangements. psyreason's FORM presets carry a role per section
+   (intro/build/drop/break/perc/acid/ambient/half/climax/dropin/outro);
+   psy5 maps every role onto its canonical BEHAVIOR machinery:
+     intro/teaser → INTRO · build → BUILD · drop → DROP · drop2/re-entry →
+     DROP2 · climax → DROP2 (peak energy arc) · break → BREAK ·
+     perc → PERC (NEW: drums+percussion only) · acid → ACID (NEW: rolling
+     bass + lead, no drums) · ambient → AMBIENT (NEW: pad bed only) ·
+     half → HALF (NEW: half-time kick/snare + bass + pad) · outro → OUTRO.
+   compose(styleId, minutes, seed, label, formId) — formId ∈ FORM_IDS (or
+   null/undefined = the legacy weighted chains, byte-identical). The form's
+   relative bars scale to the target length via allocateBars (multiples of
+   4, remainder to the longest). Deterministic: same (style, seed, form) =
+   identical song, forever. */
+const ROLE_ENERGY = {
+  intro: [0.25, 0.40], build: [0.50, 0.85], drop: [0.90, 0.95], drop2: [0.95, 1.00],
+  break: [0.35, 0.50], perc: [0.55, 0.65], acid: [0.50, 0.65], ambient: [0.15, 0.30],
+  half: [0.45, 0.55], climax: [0.98, 1.00], outro: [0.40, 0.15],
+};
+const ROLE_BEH = {
+  intro: 'INTRO', intro_drum: 'INTRO', build: 'BUILD', drop: 'DROP', drop2: 'DROP2',
+  break: 'BREAK', perc: 'PERC', acid: 'ACID', ambient: 'AMBIENT', half: 'HALF',
+  climax: 'DROP2', outro: 'OUTRO',
+};
+const ROLE_COLOR = {
+  intro: 3, build: 4, drop: 0, drop2: 0, break: 5, perc: 1, acid: 2,
+  ambient: 6, half: 5, climax: 0, outro: 6,
+};
+const FS = (n, b, r) => ({ n, b, r });
+const FORM_DEFS = [
+  ['Classic Full-On', [FS('INTRO',16,'intro'),FS('TEASER',16,'intro'),FS('BUILD',4,'build'),FS('DROP',24,'drop'),FS('BREAK',16,'break'),FS('BUILD 2',4,'build'),FS('DROP 2',24,'drop2'),FS('CLIMAX',8,'climax'),FS('OUTRO',8,'outro')]],
+  ['Peak Time Club', [FS('DROP',32,'drop'),FS('PERC TRIBAL',8,'perc'),FS('DROP 2',32,'drop2'),FS('CLIMAX',8,'climax'),FS('DJ OUTRO',8,'outro')]],
+  ['Progressive Journey', [FS('AMBIENT TEXTURE',8,'ambient'),FS('INTRO',16,'intro'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('ACID BREAK',16,'acid'),FS('BUILD 2',8,'build'),FS('CLIMAX',32,'climax'),FS('OUTRO',16,'outro')]],
+  ['Morning Uplift', [FS('AMBIENT TEXTURE',8,'ambient'),FS('TEASER',16,'intro'),FS('BUILD',4,'build'),FS('DROP',24,'drop'),FS('HALF-TIME',8,'half'),FS('BUILD 2',4,'build'),FS('CLIMAX',32,'climax'),FS('OUTRO',8,'outro')]],
+  ['Dark Hypnotic', [FS('INTRO',16,'intro'),FS('DROP',48,'drop'),FS('PERC TRIBAL',8,'perc'),FS('ACID BREAK',8,'acid'),FS('DROP 2',48,'drop2'),FS('OUTRO',8,'outro')]],
+  ['Radio Edit', [FS('TEASER',12,'intro'),FS('BUILD',4,'build'),FS('DROP',16,'drop'),FS('BREAK',8,'break'),FS('DROP 2',16,'drop2'),FS('OUTRO',4,'outro')]],
+  ['Afterhours Deep', [FS('AMBIENT TEXTURE',16,'ambient'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('HALF-TIME',8,'half'),FS('ACID BREAK',8,'acid'),FS('CLIMAX',32,'climax'),FS('OUTRO',16,'outro')]],
+  ['Double Drop', [FS('INTRO',16,'intro'),FS('BUILD',4,'build'),FS('DROP',16,'drop'),FS('PERC TRIBAL',8,'perc'),FS('DROP 2',16,'drop2'),FS('BREAK',16,'break'),FS('CLIMAX',24,'climax'),FS('OUTRO',8,'outro')]],
+  ['Minimal Tool', [FS('INTRO',16,'intro'),FS('DROP',32,'drop'),FS('PERC TRIBAL',16,'perc'),FS('DROP 2',32,'drop2'),FS('DJ OUTRO',16,'outro')]],
+  ['Uplifting Anthem', [FS('AMBIENT TEXTURE',8,'ambient'),FS('TEASER',16,'intro'),FS('BUILD',8,'build'),FS('DROP',24,'drop'),FS('BREAK',24,'break'),FS('BUILD 2',8,'build'),FS('CLIMAX',32,'climax'),FS('OUTRO',8,'outro')]],
+  ['Forest Ritual', [FS('PERC TRIBAL',16,'perc'),FS('INTRO',16,'intro'),FS('BUILD',4,'build'),FS('DROP',32,'drop'),FS('ACID BREAK',16,'acid'),FS('CLIMAX',32,'climax'),FS('OUTRO',16,'outro')]],
+  ['Goa Ceremony', [FS('AMBIENT TEXTURE',16,'ambient'),FS('ACID BREAK',16,'acid'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('HALF-TIME',8,'half'),FS('BUILD 2',8,'build'),FS('CLIMAX',32,'climax'),FS('OUTRO',8,'outro')]],
+  ['Psycore Blast', [FS('INTRO',4,'intro'),FS('DROP',24,'drop'),FS('PERC TRIBAL',8,'perc'),FS('DROP 2',24,'drop2'),FS('ACID BREAK',8,'acid'),FS('CLIMAX',24,'climax'),FS('OUTRO',4,'outro')]],
+  ['Chill Descent', [FS('AMBIENT TEXTURE',16,'ambient'),FS('HALF-TIME',16,'half'),FS('BUILD',8,'build'),FS('DROP',24,'drop'),FS('BREAK',24,'break'),FS('OUTRO',16,'outro')]],
+  ['Sunrise Set', [FS('AMBIENT TEXTURE',16,'ambient'),FS('TEASER',16,'intro'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('BREAK',16,'break'),FS('BUILD 2',8,'build'),FS('CLIMAX',40,'climax'),FS('OUTRO',16,'outro')]],
+  ['Warehouse Loop', [FS('DROP',48,'drop'),FS('PERC TRIBAL',16,'perc'),FS('ACID BREAK',8,'acid'),FS('DROP 2',48,'drop2'),FS('DJ OUTRO',8,'outro')]],
+  ['Tribal Opening', [FS('PERC TRIBAL',16,'perc'),FS('ACID BREAK',16,'acid'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('HALF-TIME',8,'half'),FS('CLIMAX',32,'climax'),FS('OUTRO',8,'outro')]],
+  ['Acid Odyssey', [FS('ACID BREAK',16,'acid'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('PERC TRIBAL',8,'perc'),FS('ACID BREAK 2',16,'acid'),FS('CLIMAX',32,'climax'),FS('OUTRO',8,'outro')]],
+  ['Epic Climax', [FS('INTRO',16,'intro'),FS('BUILD',4,'build'),FS('DROP',24,'drop'),FS('BREAK',16,'break'),FS('BUILD 2',4,'build'),FS('DROP 2',24,'drop2'),FS('PERC TRIBAL',8,'perc'),FS('CLIMAX',24,'climax'),FS('OUTRO',8,'outro')]],
+  ['Deep Space', [FS('AMBIENT TEXTURE',24,'ambient'),FS('HALF-TIME',16,'half'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('AMBIENT TEXTURE 2',8,'ambient'),FS('CLIMAX',32,'climax'),FS('OUTRO',16,'outro')]],
+  ['Festival Closer', [FS('TEASER',16,'intro'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('PERC TRIBAL',8,'perc'),FS('BREAK',16,'break'),FS('BUILD 2',8,'build'),FS('CLIMAX',40,'climax'),FS('DJ OUTRO',16,'outro')]],
+  ['Tension & Release', [FS('INTRO',16,'intro'),FS('BUILD',4,'build'),FS('DROP',16,'drop'),FS('BREAK',8,'break'),FS('DROP 2',16,'drop2'),FS('BREAK 2',8,'break'),FS('CLIMAX',24,'climax'),FS('OUTRO',8,'outro')]],
+  ['Layered Re-Entry', [FS('AMBIENT TEXTURE',16,'ambient'),FS('BUILD',8,'build'),FS('RE-ENTRY',16,'drop'),FS('CLIMAX',16,'climax'),FS('OUTRO',8,'outro')]],
+  ['Acid Marathon', [FS('ACID BREAK',16,'acid'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('ACID BREAK 2',16,'acid'),FS('CLIMAX',32,'climax'),FS('OUTRO',8,'outro')]],
+  ['Sunrise Peak', [FS('AMBIENT TEXTURE',16,'ambient'),FS('TEASER',16,'intro'),FS('BUILD',8,'build'),FS('DROP',24,'drop'),FS('BREAK',16,'break'),FS('CLIMAX',48,'climax'),FS('OUTRO',16,'outro')]],
+  ['Anthem Re-Entry', [FS('TEASER',16,'intro'),FS('BUILD',8,'build'),FS('DROP',24,'drop'),FS('BREAK',16,'break'),FS('RE-ENTRY',16,'drop'),FS('CLIMAX',24,'climax'),FS('OUTRO',8,'outro')]],
+  ['Hypnotic Layers', [FS('INTRO',16,'intro'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('HALF-TIME',8,'half'),FS('RE-ENTRY',16,'drop'),FS('CLIMAX',24,'climax'),FS('OUTRO',8,'outro')]],
+  ['Peak Builder', [FS('INTRO',16,'intro'),FS('BUILD',4,'build'),FS('DROP',16,'drop'),FS('PERC TRIBAL',8,'perc'),FS('DROP 2',16,'drop2'),FS('BREAK',16,'break'),FS('RE-ENTRY',16,'drop'),FS('CLIMAX',24,'climax'),FS('DJ OUTRO',8,'outro')]],
+  ['Melodic Voyage', [FS('INTRO',16,'intro'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('AMBIENT TEXTURE',16,'ambient'),FS('ACID BREAK',8,'acid'),FS('BUILD 2',8,'build'),FS('RE-ENTRY',16,'drop'),FS('CLIMAX',32,'climax')]],
+  ['Deep Forest Ritual', [FS('PERC TRIBAL',16,'perc'),FS('INTRO',16,'intro'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('HALF-TIME',8,'half'),FS('PERC TRIBAL 2',8,'perc'),FS('CLIMAX',32,'climax')]],
+  ['Sunrise Anthem Extended', [FS('AMBIENT TEXTURE',16,'ambient'),FS('TEASER',16,'intro'),FS('BUILD',8,'build'),FS('DROP',24,'drop'),FS('BREAK',16,'break'),FS('BUILD 2',8,'build'),FS('CLIMAX',40,'climax')]],
+  ['Minimal Deep Tech', [FS('INTRO',16,'intro'),FS('DROP',32,'drop'),FS('PERC TRIBAL',16,'perc'),FS('DROP 2',32,'drop2')]],
+  ['Twilight Journey', [FS('AMBIENT TEXTURE',16,'ambient'),FS('INTRO',16,'intro'),FS('BUILD',8,'build'),FS('DROP',24,'drop'),FS('HALF-TIME',8,'half'),FS('ACID BREAK',8,'acid'),FS('DROP 2',32,'drop2')]],
+  ['Peak Festival', [FS('TEASER',8,'intro'),FS('BUILD',4,'build'),FS('DROP',24,'drop'),FS('PERC TRIBAL',8,'perc'),FS('DROP 2',24,'drop2'),FS('BREAK',8,'break'),FS('BUILD 2',4,'build'),FS('CLIMAX',32,'climax')]],
+  ['Ambient Descent', [FS('AMBIENT TEXTURE',24,'ambient'),FS('HALF-TIME',16,'half'),FS('BUILD',8,'build'),FS('DROP',24,'drop'),FS('AMBIENT TEXTURE 2',8,'ambient'),FS('CLIMAX',24,'climax')]],
+  ['Goa Sunrise Ceremony', [FS('AMBIENT TEXTURE',16,'ambient'),FS('ACID BREAK',16,'acid'),FS('BUILD',8,'build'),FS('DROP',32,'drop'),FS('PERC TRIBAL',8,'perc'),FS('RE-ENTRY',16,'drop'),FS('CLIMAX',32,'climax')]],
+];
+export const FORMS = Object.freeze(Object.fromEntries(FORM_DEFS.map(([name, secs]) => [name, secs])));
+export const FORM_IDS = Object.freeze(FORM_DEFS.map(([name]) => name));
+/* compileForm — a named form → SECTION_CHAIN-shaped sections (id/beh/energy/
+   color/w). Section ids are the form's display names (unique per form);
+   beh carries the canonical behavior fillSection/mixForSection key on.
+   Unknown formId → null (compose falls back to the weighted chains). */
+function compileForm(name) {
+  const secs = FORMS[name];
+  if (!secs) return null;
+  const sum = secs.reduce((a, s) => a + s.b, 0);
+  return secs.map((s) => ({
+    id: s.n, beh: ROLE_BEH[s.r] || 'DROP',
+    w: s.b / sum, energy: ROLE_ENERGY[s.r] || [0.5, 0.6],
+    color: ROLE_COLOR[s.r] != null ? ROLE_COLOR[s.r] : 0,
+  }));
+}
+
 const put = (pat, track, step, vel, note, micro) => {
   const d = pat.data[track]; const L = d.len;
   const st = d.steps[((step % L) + L) % L];
@@ -246,20 +331,28 @@ function fillSection(p, pat, section, bars, energy, ctx) {
   const sec = section.beh || section.id; /* v0.9.0 P4: canonical behavior (BREAK2→BREAK, DROP3→DROP, OUTRO2→OUTRO, BRIDGE→BREAK) */
   const degNote = (deg, oct) => root + 24 + degreeToSemitone(scaleIv, deg) + 12 * (oct || 0);
 
-  /* KICK — 4-on-floor when it kicks; silent in BREAK/RISER (breakdown feel) */
-  if (sec !== 'BREAK' && sec !== 'RISER') {
-    const full = energy >= 0.8 || sec === 'DROP' || sec === 'DROP2';
+  /* KICK — 4-on-floor when it kicks; silent in BREAK/RISER (breakdown feel);
+     v0.29.0 FORM behaviors: silent in ACID (bass+lead only) and AMBIENT
+     (pad bed only); HALF-TIME lands one deep kick per bar; PERC is FULL
+     4-on-floor (the tribal floor the form role demands). */
+  if (sec !== 'BREAK' && sec !== 'RISER' && sec !== 'ACID' && sec !== 'AMBIENT') {
+    const full = energy >= 0.8 || sec === 'DROP' || sec === 'DROP2' || sec === 'PERC';
     for (let b = 0; b < len / 16; b++) {
       const base = b * 16;
-      if (full) { put(pat, 0, base + 0, 0.95); put(pat, 0, base + 4, 0.95); put(pat, 0, base + 8, 0.95); put(pat, 0, base + 12, 0.95) }
+      if (sec === 'HALF') { put(pat, 0, base + 0, 0.92) }
+      else if (full) { put(pat, 0, base + 0, 0.95); put(pat, 0, base + 4, 0.95); put(pat, 0, base + 8, 0.95); put(pat, 0, base + 12, 0.95) }
       else { put(pat, 0, base + 0, 0.85); put(pat, 0, base + 8, 0.8) }
       if (full && energy > 0.92 && rng() < 0.3) put(pat, 0, base + 14, 0.55);
     }
   }
   /* BASS — psy rolling on drops (odd 16ths, psy-push micro baked in), 8ths mid,
      sustained when calm. FOREST recipe: rolling 16th grammar with octave
-     wander on the drops (the forest rolling-bass variant). */
-  if (sec === 'DROP' || sec === 'DROP2' || energy >= 0.8) {
+     wander on the drops (the forest rolling-bass variant).
+     v0.29.0 FORM behaviors: PERC/AMBIENT have NO bass; ACID rides the
+     rolling 16th grammar (the 303 floor the role demands). */
+  if (sec === 'PERC' || sec === 'AMBIENT') {
+    /* pattern-level silence — the strongest gate the mix snapshot can't lie about */
+  } else if (sec === 'DROP' || sec === 'DROP2' || sec === 'ACID' || energy >= 0.8) {
     if (rc.bassGrammar === 'forest') {
       for (let s = 0; s < len; s++) {
         if (rng() < 0.14) continue; /* breaths keep it rolling, not static */
@@ -283,23 +376,30 @@ function fillSection(p, pat, section, bars, energy, ctx) {
      ROOT — the evolution roll-op contract in evolution.test.ts depends on
      it). The octave pops above carry the phrase-ending gesture instead.
      Drops keep their octave pops instead. */
-  /* HATS — offbeat core, 16th ghosts as energy rises (density per recipe) */
-  if (energy >= 0.35) {
+  /* HATS — offbeat core, 16th ghosts as energy rises (density per recipe).
+     v0.29.0: ACID (pure bass+lead) and HALF-TIME (sparse half-feel) stay clean. */
+  if (energy >= 0.35 && sec !== 'ACID' && sec !== 'HALF') {
     for (let b = 0; b < len / 16; b++) for (const o of [2, 6, 10, 14]) put(pat, 2, b * 16 + o, 0.45 + energy * 0.2)
     if (energy >= 0.75) for (let s = 0; s < len; s++) if (s % 2 === 0 && rng() < 0.3 * (rc.hatGhostMul || 1)) put(pat, 2, s, 0.25 + rng() * 0.15)
   }
   /* PERC — seeded sparse density scaled by energy (recipe multiplier +
-     optional odd-16th glitch layer) */
-  for (let s = 0; s < len; s += 2) if (rng() < (0.06 + energy * 0.12) * (rc.percMul || 1)) put(pat, 3, s, 0.3 + rng() * 0.4)
-  if (rc.percOdd) { for (let s = 1; s < len; s += 2) if (rng() < (0.03 + energy * 0.07) * (rc.percMul || 1)) put(pat, 3, s, 0.22 + rng() * 0.3) }
-  /* SNARE — backbeat on full sections, half-time on BREAK */
+     optional odd-16th glitch layer). v0.29.0: PERC TRIBAL form sections
+     run the BUSY layer (the role's whole point); AMBIENT/ACID stay clean. */
+  if (sec !== 'AMBIENT' && sec !== 'ACID') {
+    const percBoost = sec === 'PERC' ? 2.2 : 1;
+    for (let s = 0; s < len; s += 2) if (rng() < (0.06 + energy * 0.12) * (rc.percMul || 1) * percBoost) put(pat, 3, s, 0.3 + rng() * 0.4)
+    if (rc.percOdd || sec === 'PERC') { for (let s = 1; s < len; s += 2) if (rng() < (0.03 + energy * 0.07) * (rc.percMul || 1) * percBoost) put(pat, 3, s, 0.22 + rng() * 0.3) }
+  }
+  /* SNARE — backbeat on full sections, half-time on BREAK, ONE landing hit
+     per bar on the HALF-TIME form behavior (the genre's slow snare). */
   if (sec === 'BREAK') { for (let b = 0; b < len / 16; b++) { put(pat, 1, b * 16 + 4, 0.6); put(pat, 1, b * 16 + 12, 0.65) } }
+  else if (sec === 'HALF') { for (let b = 0; b < len / 16; b++) put(pat, 1, b * 16 + 8, 0.62) }
   else if (energy >= 0.8) { for (let b = 0; b < len / 16; b++) { put(pat, 1, b * 16 + 4, 0.55); put(pat, 1, b * 16 + 12, 0.6) } }
   /* LEAD — the motif, varied per section; INTRO stays headless. v0.9.0:
      every motif degree is SNAPPED into the active bar's chord (nearest
      chord-tone class, deterministic tie-break) — the melody keeps its
      contour but never leaves the harmony. */
-  if (sec !== 'INTRO' && (energy >= 0.55 || sec === 'BREAK')) {
+  if (sec !== 'INTRO' && sec !== 'PERC' && sec !== 'AMBIENT' && sec !== 'HALF' && (energy >= 0.55 || sec === 'BREAK')) {
     const evs = motif.events; let cursor = 0;
     const barsN = len / 16;
     for (let b = 0; b < barsN; b++) {
@@ -320,7 +420,7 @@ function fillSection(p, pat, section, bars, energy, ctx) {
      preset release crossfades it into the next chord. Combined with the
      bar-spanning gate (compose() pad gate bump) this kills the per-bar
      "pulsing organ" stutter: one breathing bed instead of re-plucks. */
-  if (energy < 0.6 || sec === 'BREAK') {
+  if ((energy < 0.6 || sec === 'BREAK') && sec !== 'ACID' && sec !== 'PERC') {
     let prevCd = null;
     for (let b = 0; b < len / 16; b++) {
       const cd = chordDegreeAt(prog, b);
@@ -554,14 +654,26 @@ function mixForSection(sec, k) {
     set(5, .8, .35, .4, 0, pan); set(6, .9, .4, .5, 0); set(7, .7, .3, .35, 0);
   } else if (id === 'RISER') {
     set(2, .7, .1, .12, null, pan); set(4, .8, 0, 0, 0); set(5, .9, .2, .22, 0, pan); set(6, 1, .3, .35, 0); set(7, .8, .18, .2, 0); set(8, 1, 0, 0, 0);
+  } else if (id === 'PERC') {
+    /* v0.29.0 FORM behaviors — the pattern already silences what a role
+       excludes; the mix lifts what it features. PERC: the drum floor. */
+    set(2, .85, .1, .08, null, pan); set(3, .95, .2, .15, null, pan);
+  } else if (id === 'ACID') {
+    set(4, .95, .05, .05, 45); set(5, .9, .3, .35, 0, pan);
+  } else if (id === 'AMBIENT') {
+    set(6, .85, .35, .45, 0); set(7, .3, .25, .3, 0);
+  } else if (id === 'HALF') {
+    set(4, .8, .05, .08, 0); set(6, .9, .25, .35, 0);
   } else { /* OUTRO */
     set(2, .6, 0, .1, null, pan); set(3, .5, .08, .1); set(4, .75, .05, .05, 25); set(5, .55, .15, .2, 0, pan); set(6, .6, .2, .3, 0); set(7, .4, .12, .18, 0);
   }
   return { tracks: T };
 }
 
-/* compose — the pure entry point. targetMinutes ∈ {3,5,8} (any >0 works). */
-export function compose(styleId, targetMinutes, seed, seedLabel) {
+/* compose — the pure entry point. targetMinutes ∈ {3,5,8} (any >0 works).
+   v0.29.0: formId ∈ FORM_IDS (36 named arrangements) — null/undefined keeps
+   the legacy weighted chains (byte-identical). */
+export function compose(styleId, targetMinutes, seed, seedLabel, formId) {
   const style = COMPOSER_STYLES[styleId] || COMPOSER_STYLES['FULL-ON'];
   const bpm = style.bpm;
   const seedInt = (typeof seed === 'number' ? seed : parseInt(fnvish(String(seed)), 16) >>> 0) | 0;
@@ -569,9 +681,12 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
 
   /* 1. form: bars + energies — v0.9.0 P4: lengths >8 min use the 11-section
      EXTENDED_CHAIN (DROP3 + double-BREAK + BRIDGE + OUTRO2); 3/5/8-min keep
-     the exact per-style 7-section chains (byte-identical outputs, pinned). */
+     the exact per-style 7-section chains (byte-identical outputs, pinned).
+     v0.29.0: a NAMED FORM (formId ∈ FORM_IDS) replaces the weighted chain —
+     the form's relative bars scale to the target via allocateBars. */
   const rc = style.recipe || {};
-  const chain = targetMinutes > 8 ? EXTENDED_CHAIN : (style.chain || SECTION_CHAIN);
+  const form = formId ? compileForm(formId) : null;
+  const chain = form || (targetMinutes > 8 ? EXTENDED_CHAIN : (style.chain || SECTION_CHAIN));
   const rawTotal = (targetMinutes * bpm) / 4;           /* 1 bar = 4 beats */
   const totalBars = Math.max(28, Math.round(rawTotal / 4) * 4); /* multiple of 4 */
   const bars = allocateBars(totalBars, chain.map(s => s.w));

@@ -38,6 +38,7 @@
       <div class="powInline">
         <select id="compStyle" title="composer style" aria-label="composer style"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option><option>PSYTRANCE</option><option>GOA</option><option>TECHNO</option><option>TRANCE</option></select>
         <select id="compLen" title="target length" aria-label="target length"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option><option value="12">12 min</option><option value="20">20 min</option></select>
+        <select id="compForm" title="FORM — 36 named arrangements (perc tribal / acid break / ambient / half-time roles); auto = weighted chain" aria-label="arrangement form"></select>
         <input id="compSeed" placeholder="seed" style="width:110px" title="seed — same seed = identical song" aria-label="seed">
         <button id="bCompose" class="cta" title="generate a complete unique arrangement (intro→build→drop→break→riser→drop2→outro)">✦ COMPOSE</button>
       </div>
@@ -327,6 +328,7 @@
     <div class="hBtns" style="flex-wrap:wrap">
       <label for="cmpStyle" style="font-size:10px;color:var(--dim)">STYLE <select id="cmpStyle"><option>FULL-ON</option><option>DARK-PSY</option><option>PROGRESSIVE</option><option>FOREST</option><option>HI-TECH</option><option>PSYTRANCE</option><option>GOA</option><option>TECHNO</option><option>TRANCE</option></select></label>
       <label style="font-size:10px;color:var(--dim)">LENGTH <select id="cmpLen"><option value="3">3 min</option><option value="5">5 min</option><option value="8">8 min</option><option value="12">12 min</option><option value="20">20 min</option></select></label>
+      <label for="cmpForm" style="font-size:10px;color:var(--dim)" title="36 named arrangements — PERC TRIBAL / ACID BREAK / AMBIENT / HALF-TIME roles included; auto = the weighted chain">FORM <select id="cmpForm"></select></label>
       <label style="font-size:10px;color:var(--dim)">SEED <input id="cmpSeed" placeholder="seed" style="width:100px"></label>
     </div>
     <div class="note" id="cmpInfo" style="margin:8px 0"></div>

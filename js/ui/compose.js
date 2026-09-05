@@ -7,7 +7,7 @@
    The seed field's INITIAL value uses Date.now (UI convenience only — the
    composition path itself is fully deterministic on the field's value). */
 import { $, I, toast, loadProjectObj } from '../state.js';
-import { compose, COMPOSER_STYLES } from '../composer.js';
+import { compose, COMPOSER_STYLES, FORM_IDS } from '../composer.js';
 import { styleKit, kitWarmTypes } from '../../foundation/dsp/kit-reason.mjs';
 import { arrToggle } from '../arranger.js';
 import { applyComposerSampleHints } from './samples.js';
@@ -16,12 +16,13 @@ function hasNotes(p) {
   if (!p) return false;
   return Object.values(p.patterns || {}).some(pat => Object.values(pat.data || {}).some(d => (d.steps || []).some(s => s.on)));
 }
-function readForm(styleSel, lenSel, seedInp) {
+function readForm(styleSel, lenSel, seedInp, formSel) {
   const styleId = styleSel.value;
   const minutes = +lenSel.value;
   const seedRaw = (seedInp.value || '').trim();
   const seed = seedRaw === '' ? (Date.now() % 1000000) : (isNaN(+seedRaw) ? seedRaw : +seedRaw);
-  return { styleId, minutes, seed };
+  const formId = (formSel && formSel.value) || undefined; /* '' = AUTO weighted chains */
+  return { styleId, minutes, seed, formId };
 }
 function landOnPerform(form) {
   const btn = Array.from(document.querySelectorAll('nav button')).find(x => x.dataset.t === 'perform');
@@ -34,15 +35,24 @@ function updateInfo() {
   const el = $('cmpInfo'); if (!el) return;
   const styleId = $('cmpStyle').value;
   const minutes = +$('cmpLen').value;
+  const formSel = $('cmpForm');
   const bpm = (COMPOSER_STYLES[styleId] || {}).bpm || '?';
-  el.textContent = styleId + ' · ' + bpm + ' BPM · ~' + minutes + ' min · seed editable — same seed = identical song';
+  el.textContent = styleId + ' · ' + bpm + ' BPM · ~' + minutes + ' min' + (formSel && formSel.value ? ' · FORM: ' + formSel.value : ' · form: auto (weighted)') + ' · seed editable — same seed = identical song';
+}
+/* v0.29.0 FORM LIBRARY — populate both FORM selects (landing row + modal)
+   from the composer's 36 named arrangements. AUTO ('') = the legacy
+   weighted chains. */
+function fillFormSelects() {
+  const opts = '<option value="">FORM auto (weighted)</option>' + FORM_IDS.map((f) => '<option>' + f + '</option>').join('');
+  for (const id of ['cmpForm', 'compForm']) { const s = $(id); if (s && !s.children.length) s.innerHTML = opts }
 }
 export function wireCompose() {
   /* ── power-screen row: compose BEFORE boot (goes through powerOn) ── */
   const pb = $('bCompose');
   if (pb) pb.onclick = () => {
-    const { styleId, minutes, seed } = readForm($('compStyle'), $('compLen'), $('compSeed'));
-    const r = compose(styleId, minutes, seed);
+    fillFormSelects();
+    const { styleId, minutes, seed, formId } = readForm($('compStyle'), $('compLen'), $('compSeed'), $('compForm'));
+    const r = compose(styleId, minutes, seed, undefined, formId);
     /* v0.24.0 KIT HOOK (power-screen path — same rule as the header modal) */
     if (I.p && I.p.kitPinned && kitWarmTypes(I.p.kit).length) { r.project.kit = I.p.kit; r.project.kitPinned = true }
     else { r.project.kit = styleKit(styleId); r.project.kitPinned = false }
@@ -55,14 +65,14 @@ export function wireCompose() {
   };
   /* ── header modal: compose while running ── */
   const hb = $('bComposeHdr');
-  if (hb) hb.onclick = () => { const m = $('composeModal'); if (m) { m.style.display = 'flex'; updateInfo() } };
+  if (hb) hb.onclick = () => { const m = $('composeModal'); if (m) { fillFormSelects(); m.style.display = 'flex'; updateInfo() } };
   const cancel = $('cmpCancel');
   if (cancel) cancel.onclick = () => { const m = $('composeModal'); if (m) m.style.display = 'none' };
   const go = $('cmpGo');
   if (go) go.onclick = () => {
-    const { styleId, minutes, seed } = readForm($('cmpStyle'), $('cmpLen'), $('cmpSeed'));
+    const { styleId, minutes, seed, formId } = readForm($('cmpStyle'), $('cmpLen'), $('cmpSeed'), $('cmpForm'));
     if (hasNotes(I.p) && !confirm('COMPOSE replaces the current in-memory project:\n• all scenes, patterns and lanes\n• the arranger chain\n• project bpm/scale/root\nYour current project is NOT saved. Continue?')) return;
-    const r = compose(styleId, minutes, seed);
+    const r = compose(styleId, minutes, seed, undefined, formId);
     /* v0.24.0 KIT HOOK — the composed set follows its style's kit unless the
        user PINNED one in the Sound tab (the pin rides the live project and
        carries across a compose; loadProjectObj applies the kit to the engine). */
@@ -82,5 +92,6 @@ export function wireCompose() {
     applyComposerSampleHints(r); /* v0.10.0: resolve the composer's sample slots (async, honest toasts) */
     landOnPerform(r.form);
   };
-  for (const id of ['cmpStyle', 'cmpLen', 'cmpSeed']) { const el = $(id); if (el) el.onchange = updateInfo }
+  for (const id of ['cmpStyle', 'cmpLen', 'cmpSeed', 'cmpForm']) { const el = $(id); if (el) el.onchange = updateInfo }
+  fillFormSelects();
 }
