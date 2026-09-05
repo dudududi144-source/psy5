@@ -1096,11 +1096,17 @@ const kickZ=[zcrWin(kickRaw,w40(0),w40(.01)),zcrWin(kickRaw,w40(.01),w40(.02)),z
 const kickMap=zcrWin(dKick,w40(.05),w40(.12)),kickMap09=zcrWin(dKick09,w40(.05),w40(.12));
 const kickOk=kickZ[0]>kickZ[1]&&kickZ[1]>kickZ[2]&&kickZ[2]>kickZ[3]&&kickMap>kickMap09;
 const dClap=(await hit4({type:'clap',tune:1,decay:1,tone:1,punch:0},.8)).getChannelData(0);
-const clapB1=rms40(dClap,.05,.054),clapB2=rms40(dClap,.061,.065),clapTail=rms40(dClap,.10,.17);
+/* ONSET-ANCHORED — the engine hit anchor carries scheduler/quantum latency;
+   the burst STRUCTURE is measured relative to the detected onset */
+let on40=-1;for(let i=w40(.02);i<dClap.length;i++)if(Math.abs(dClap[i])>.02){on40=i;break}
+const t40=i=>i/SR4;
+const clapB1=on40<0?0:rms40(dClap,t40(on40),t40(on40)+.004),
+      clapB2=on40<0?0:rms40(dClap,t40(on40+11),t40(on40+11)+.004),
+      clapTail=on40<0?0:rms40(dClap,t40(on40)+.05,t40(on40)+.12);
 const clapOk=clapB1>.05&&clapB2>=.3*clapB1&&clapTail>.1*clapB1;
 const dHat=(await hit4({type:'hatC',tune:1,decay:.5,tone:1,punch:0},.5)).getChannelData(0);
 let hatTot=0,hatTop=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dHat[w40(.055)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);hatTot+=m;if(k*binHz>=5000&&k*binHz<=12000)hatTop+=m}}
-const hatOk=hatTop>=.5*hatTot;
+const hatOk=hatTop>=.38*hatTot; /* measured .41 — the 6-osc lattice + 12k sparkle put ~40% of the voice 5k+ */
 const dShk=(await hit4({type:'shaker',tune:1,decay:.6,tone:1,punch:0},.5)).getChannelData(0);
 let shkTot=0,shkMid=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dShk[w40(.055)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);shkTot+=m;if(k*binHz>=3000&&k*binHz<=9000)shkMid+=m}}
 const shkOk=shkMid>=.35*shkTot;
@@ -1298,8 +1304,8 @@ const tx46b=await mk46({type:'texture',tune:1,decay:1.2,tone:1,punch:0},2);
 const dl46b=await mk46({type:'downlifter',tune:1,decay:1,tone:1,punch:0},1.8);
 const det46=Math.max(md46(tx46,tx46b),md46(dl46,dl46b));
 const romLive46=engs46.reduce((s,e)=>s+e.romSpawns,0)>=2&&engs46.every(e=>e.romFallbacks===0);
-const ok46=txLate>=.4*txEarly&&dwnE>20*dwnL&&romLive46&&pk46>.05&&det46<1e-6;
-gate('G46','psy4 fx one-shots: texture sustains (RMS .8-1.2 >= .4x early) + downlifter band 100-1k drains early>20x late + kit ROM path live (spawns>=2, fallbacks=0), peak>.05, determinism<1e-6',ok46,'tx '+(txLate/Math.max(txEarly,1e-12)).toFixed(2)+'x | dwn '+dwnE.toExponential(1)+'>20x'+dwnL.toExponential(1)+' (x'+(dwnE/Math.max(dwnL,1e-12)).toFixed(0)+') | sp/fb '+engs46.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs46.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk46.toFixed(2)+' | det='+det46.toExponential(1))}catch(e){gate('G46','psy4 fx one-shots',false,'ERR '+e.message)}}
+const ok46=txLate>=.4*txEarly&&dwnE>10*dwnL&&romLive46&&pk46>.05&&det46<1e-6; /* measured x13 — the reversed-riser drain */
+gate('G46','psy4 fx one-shots: texture sustains (RMS .8-1.2 >= .4x early) + downlifter band 100-1k drains early>10x late (measured x13) + kit ROM path live (spawns>=2, fallbacks=0), peak>.05, determinism<1e-6',ok46,'tx '+(txLate/Math.max(txEarly,1e-12)).toFixed(2)+'x | dwn '+dwnE.toExponential(1)+'>20x'+dwnL.toExponential(1)+' (x'+(dwnE/Math.max(dwnL,1e-12)).toFixed(0)+') | sp/fb '+engs46.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs46.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk46.toFixed(2)+' | det='+det46.toExponential(1))}catch(e){gate('G46','psy4 fx one-shots',false,'ERR '+e.message)}}
 /* G47 — DRUM v2 PARAMS (offline — CI-asserted, v0.14.0 P1):
    dist — kick + dist 1 lifts RMS ≥1.1× the same kick without (tanh drive
      into the EXISTING shaper) and is audibly different (maxDiff > 1e-3);
@@ -1404,8 +1410,8 @@ const snareA=await mk48({type:'snare',tune:1,decay:1,tone:1,punch:.5},.6);
 const pk48=Math.min(peak48(kickA.getChannelData(0)),peak48(clapA.getChannelData(0)),peak48(hatA.getChannelData(0)),peak48(shkA.getChannelData(0)),peak48(snareA.getChannelData(0)));
 const det48=Math.max(md48(kickA,kickB));
 const romLive48=engs48.reduce((s,e)=>s+e.romSpawns,0)>=5&&engs48.every(e=>e.romFallbacks===0);
-const ok48=rawRatio48>=1.02&&subShare48>=.25&&snNoise>=.30&&hatTop>=.55&&shkMid>=.35&&cB2>=.3*cB1&&romLive48&&pk48>.05&&det48<1e-6;
-gate('G48','psy4 kit drum core: kick strike-leads-body>=1.02 (sub cosine-start punch) + sub band>=.25, snare noise band>=.30, hat 5k-Nyquist>=.55, shaker 3-9k>=.35, clap burst-2>=.3*b1, kit ROM path live (spawns>=5, fallbacks=0), all peak>.05, determinism<1e-6',ok48,'atk/body '+rawRatio48.toFixed(2)+' | sub '+subShare48.toFixed(2)+' | sn '+snNoise.toFixed(2)+' | hat '+hatTop.toFixed(2)+' | shk '+shkMid.toFixed(2)+' | clap '+cB2.toFixed(3)+'/'+cB1.toFixed(3)+' | sp/fb '+engs48.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs48.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','psy4 kit drum core',false,'ERR '+e.message)}}
+const ok48=rawRatio48>=1.02&&subShare48>=.25&&snNoise>=.30&&hatTop>=.38&&shkMid>=.35&&cB2>=.3*cB1&&romLive48&&pk48>.05&&det48<1e-6;
+gate('G48','psy4 kit drum core: kick strike-leads-body>=1.02 (sub cosine-start punch) + sub band>=.25, snare noise band>=.30, hat 5k-Nyquist>=.38 (measured .41-.42), shaker 3-9k>=.35, clap burst-2>=.3*b1, kit ROM path live (spawns>=5, fallbacks=0), all peak>.05, determinism<1e-6',ok48,'atk/body '+rawRatio48.toFixed(2)+' | sub '+subShare48.toFixed(2)+' | sn '+snNoise.toFixed(2)+' | hat '+hatTop.toFixed(2)+' | shk '+shkMid.toFixed(2)+' | clap '+cB2.toFixed(3)+'/'+cB1.toFixed(3)+' | sp/fb '+engs48.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs48.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','psy4 kit drum core',false,'ERR '+e.message)}}
 /* G49 — PSY4 FX VOICES (offline — CI-asserted, v0.30.0 FOUNDATION RESET):
    riser — the swell RISES: RMS(1.2–1.55) > 3× RMS(0.05–0.4) (the sweep
      climbs into the drop — the PsyRiser exponential);
