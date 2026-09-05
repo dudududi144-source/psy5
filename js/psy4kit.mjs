@@ -172,7 +172,7 @@ export function renderPsy4Pcm(type, sampleRate, opts) {
                    fabricated decay knob. The trigger decay is passed anyway as the
                    documented kit anchor. */
                 const v = new PsyKick(rng);
-                const fund = Math.min(56, Math.max(40, kit.kickFund * rootMul * draw(0.97, 1.03)));
+                const fund = Math.min(90, Math.max(30, kit.kickFund * rootMul * draw(0.97, 1.03))); /* ±2 oct guard — the root law (project key transposition) must survive the render */
                 const dec = kit.kickDecay * draw(0.94, 1.06);
                 v.trigger(1.0, fund, dec);
                 pcm = render(v, null, 0.85); /* spec envelope ends ≈ subDecay+0.05 s */

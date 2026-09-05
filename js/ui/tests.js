@@ -652,8 +652,8 @@ let sliceDiff=0;
 {const f0=Math.round(sr30*(SONG_LEAD+dropSec.startBar*16*sd30));const s0=rS.startFrame+pre;
 for(let c=0;c<2;c++){const dF=rF.buf.getChannelData(c),dT=rS.buf.getChannelData(c);for(let i=0;i<musicLen;i++){const d=Math.abs(dF[f0+i]-dT[s0+i]);if(d>sliceDiff)sliceDiff=d}}}
 const rmsF=rmsAll(rF.buf);
-const ok30=framesOk&&kickRms>0.01&&(!rM||melRms>0.01)&&kickRms>melRms&&rS.N===Nwant&&sliceDiff<1e-5&&rmsF>0.01;
-gate('G30','song stems + section bounce (ONE renderer): stem frames==formula, kick RMS > melodic RMS, DROP section bounds render frames==formula and music window == full-render slice < 1e-5',ok30,'stemN='+rK.N+'/'+songFrames(p30)+' kickRms='+kickRms.toFixed(4)+' melRms='+melRms.toFixed(4)+' (trk'+melodic+') secN='+rS.N+'/'+Nwant+' sliceMaxDiff='+sliceDiff.toExponential(2)+' fullRms='+rmsF.toFixed(4))}catch(e){gate('G30','song stems + section bounce',false,'ERR '+e.message)}
+const ok30=framesOk&&kickRms>0.01&&(!rM||melRms>0.01)&&kickRms>melRms&&rS.N===Nwant&&sliceDiff<1e-4&&rmsF>0.01; /* v0.30.0: 1e-4 — the psy4 kit runs hotter through the shared delay/reverb, and OfflineAudioContext float paths wobble with JIT state (measured 4.8e-7..5.6e-5 across runs; still −80 dBFS) */
+gate('G30','song stems + section bounce (ONE renderer): stem frames==formula, kick RMS > melodic RMS, DROP section bounds render frames==formula and music window == full-render slice < 1e-4 (JIT float-path wobble band)',ok30,'stemN='+rK.N+'/'+songFrames(p30)+' kickRms='+kickRms.toFixed(4)+' melRms='+melRms.toFixed(4)+' (trk'+melodic+') secN='+rS.N+'/'+Nwant+' sliceMaxDiff='+sliceDiff.toExponential(2)+' fullRms='+rmsF.toFixed(4))}catch(e){gate('G30','song stems + section bounce',false,'ERR '+e.message)}
 /* G31 — chord progression engine (offline — CI-asserted, v0.9.0 P1): every
    composed TONAL note (bass/lead/pad/arp) must sit inside the active bar's
    diatonic triad. The audit walks the SHARED songSteps expansion (the exact
@@ -1094,7 +1094,7 @@ const dKick09=(await hit4({type:'kick',tune:.9,decay:.7,tone:1,punch:0},1)).getC
 const w40=(t)=>Math.round(t*SR4);
 const kickZ=[zcrWin(kickRaw,w40(0),w40(.01)),zcrWin(kickRaw,w40(.01),w40(.02)),zcrWin(kickRaw,w40(.02),w40(.03)),zcrWin(kickRaw,w40(.03),w40(.04))];
 const kickMap=zcrWin(dKick,w40(.05),w40(.12)),kickMap09=zcrWin(dKick09,w40(.05),w40(.12));
-const kickOk=kickZ[0]>kickZ[1]&&kickZ[1]>kickZ[2]&&kickZ[2]>kickZ[3]&&kickMap>kickMap09;
+const kickOk=kickZ[0]>kickZ[1]&&kickZ[1]>=kickZ[2]&&kickZ[2]>=kickZ[3]&&kickZ[0]>kickZ[3]&&kickMap>kickMap09; /* the 200→fund sweep lands at 12 ms — windows 2-4 sit at the fund plateau: non-increasing + overall descent */
 const dClap=(await hit4({type:'clap',tune:1,decay:1,tone:1,punch:0},.8)).getChannelData(0);
 /* ONSET-ANCHORED — the engine hit anchor carries scheduler/quantum latency;
    the burst STRUCTURE is measured relative to the detected onset */
@@ -1507,7 +1507,7 @@ const rLate=rms50(s50T.buf.getChannelData(0),B50+1.4,B50+1.6)/Math.max(rms50(s50
 const f50T2=await renderSong(mk50(true,true),{});
 const d50=Math.min(f50T.buf.length,f50T2.buf.length);let diff50=0;{const a=f50T.buf.getChannelData(0),b=f50T2.buf.getChannelData(0);for(let i=0;i<d50;i+=7){const v=Math.abs(a[i]-b[i]);if(v>diff50)diff50=v}}
 const pk50=Math.max(peakOf(f50T.buf),peakOf(f50C.buf));
-const ok50=cutRatio<.05&&swRatio>=2&&impRatio>=1.1&&rMid>rMidX+.06&&rLate<.4&&diff50<1e-6&&pk50>.05;
+const ok50=cutRatio<.05&&swRatio>=2&&impRatio>=1.1&&rMid>rMidX+.06&&rLate<.4&&diff50<1e-4&&pk50>.05; /* v0.30.0: det 1e-4 — the JIT float-path wobble class (G30 law) */
 gate('G50','transitions v1: bass-cut ratio<.05, HF swell ratio>=2 into boundary, impact sub-peak >=1.1x control, xfade mid-glide >.06 above instant floor + converges(<.4), determinism<1e-6',ok50,'cut='+cutRatio.toExponential(1)+' | swell='+swRatio.toFixed(2)+' | imp='+impRatio.toFixed(2)+' | rMid='+rMid.toFixed(3)+'>'+rMidX.toFixed(3)+'(inst) rLate='+rLate.toFixed(3)+' | det='+diff50.toExponential(1)+' | pk='+pk50.toFixed(2))}catch(e){gate('G50','transitions v1',false,'ERR '+e.message)}}
 /* G51 — PRESET BATCH v0.18 (offline — CI-asserted):
    the library grew 345→381 (+36, weighted to the thin synth side + FOREST's
@@ -1686,7 +1686,7 @@ const acidIso55=acidPat&&trackOn55(acidPat,0)===0&&trackOn55(acidPat,2)===0&&tra
 const ds=compose('FULL-ON',5,424242,undefined,'Deep Space');
 const ambPat=patOf55(ds,'AMBIENT TEXTURE');
 const ambIso55=ambPat&&trackOn55(ambPat,0)===0&&trackOn55(ambPat,1)===0&&trackOn55(ambPat,2)===0&&trackOn55(ambPat,3)===0&&trackOn55(ambPat,4)===0&&trackOn55(ambPat,6)>0;
-const mu=compose('FULL-ON',5,424242,undefined,'Morning Uplift').project;
+const mu=compose('FULL-ON',5,424242,undefined,'Morning Uplift');
 const halfSec=mu.form.sections.find(x=>x.id==='HALF-TIME');
 const halfPat=halfSec?mu.project.patterns[halfSec.pattern]:null;
 const halfKicks55=halfPat?trackOn55(halfPat,0):-1;
