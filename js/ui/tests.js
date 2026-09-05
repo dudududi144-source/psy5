@@ -1584,6 +1584,49 @@ const forestOk=libFilter('drum','FOREST').length>=2;
 const ok51=pk51m>.05&&minMd>1e-3&&cSpread>=250&&det51<1e-6&&forestOk;
 gate('G51','preset batch v0.18 (library 345→381): 4 representative new voices non-silent (peak>.05), pairwise distinct (md>1e-3), centroid spread>=250Hz, deterministic<1e-6, FOREST presets exist',ok51,'cent '+cents.map(c=>Math.round(c)).join('/')+' spread='+Math.round(cSpread)+'Hz | minMd='+minMd.toExponential(1)+' | pk='+pk51m.toFixed(2)+' | det='+det51.toExponential(1))}catch(e){gate('G51','preset batch v0.18',false,'ERR '+e.message)}}
 
+if((window.__psy6GateSkip||[]).includes('G52')){gate('G52','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+const SR52=44100;
+const REASON_ROLES52=['kick','snare','clap','hatO','hatC','tom','crash','ride'];
+const rms52=(x,a,b)=>{const A=Math.round(a*SR52),B=Math.min(Math.round(b*SR52),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
+const mkTr52=(type,extra)=>({idx:0,kind:'drum',presetId:'g52',name:'g52',sound:Object.assign({type,tune:1,decay:1,tone:1,punch:.5},extra||{}),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
+const mkEng52=(tracks)=>{const oc=new OfflineAudioContext(1,Math.round(SR52*1),SR52);const eng=new PooledEngine(oc);eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks});return{oc,eng}};
+const trk52=()=>({idx:0,kind:'drum',presetId:'g52',name:'g52',sound:{type:'kick',tune:1,decay:1,tone:1,punch:.5},mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
+/* liveness: kick + hatO + hatC + conga through the DEFAULT kit engine */
+const live52=mkEng52([trk52()]);
+live52.eng.trigger(mkTr52('kick'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
+live52.eng.trigger(mkTr52('hatO'),.1,{track:0,off:0,vel:.8,note:60,lock:{}},60/145/4);
+live52.eng.trigger(mkTr52('hatC'),.22,{track:0,off:0,vel:.8,note:60,lock:{}},60/145/4);
+live52.eng.trigger(mkTr52('conga'),.3,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
+const liveBuf52=await live52.oc.startRendering();
+const livePk52=(()=>{const x=liveBuf52.getChannelData(0);let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m})();
+const liveOk52=live52.eng.reasonSpawns>=3&&live52.eng.reasonFallbacks===0&&live52.eng.romFallbacks===0&&live52.eng.romSpawns>=4&&livePk52>.05;
+/* choke A/B: hatO alone vs hatO→hatC (the tail dies) */
+const chA=mkEng52([trk52()]);chA.eng.trigger(mkTr52('hatO'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
+const chB=mkEng52([trk52()]);chB.eng.trigger(mkTr52('hatO'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);chB.eng.trigger(mkTr52('hatC'),.15,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
+const bufA=await chA.oc.startRendering(),bufB=await chB.oc.startRendering();
+const tailA=rms52(bufA.getChannelData(0),.3,.45),tailB=rms52(bufB.getChannelData(0),.3,.45);
+const chokeOk52=tailA>5e-4&&tailB<.4*tailA;
+/* kick sidechain on the ROM path: neighbour chain with duck amount gets scheduled */
+const scTrk=trk52();scTrk.idx=1;scTrk.scAmount=80;
+const duck52=mkEng52([trk52(),scTrk]);
+const t0Before=duck52.eng.duckState[1].t0;
+duck52.eng.trigger(mkTr52('kick'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
+const duckOk52=t0Before===-1&&duck52.eng.duckState[1].t0>=0;
+/* renderer-level laws: determinism, kit governance, 6 kits × 8 types loudness */
+const pkK=kitPatch('psy-classic','kick'),pkT=kitPatch('tribal-raw','kick');
+const dA=renderReasonPcm('kick',pkK,SR52,0,2),dB=renderReasonPcm('kick',pkK,SR52,0,2);
+let det52=0;for(let i=0;i<dA.length;i++){const d=Math.abs(dA[i]-dB[i]);if(d>det52)det52=d}
+const kA=renderReasonPcm('kick',pkK,SR52,0,2),kB=renderReasonPcm('kick',pkT,SR52,0,2);
+let gov52=0;for(let i=0;i<Math.min(kA.length,kB.length);i++){const d=Math.abs(kA[i]-kB[i]);if(d>gov52)gov52=d}
+let lawWorst52=0,lawPk52=0,lawN52=0;
+for(let ki=0;ki<KIT_IDS.length;ki++){for(let ri=0;ri<REASON_ROLES52.length;ri++){const ty=REASON_ROLES52[ri];const pat=kitPatch(KIT_IDS[ki],ty);const pcm=renderReasonPcm(ty,pat,SR52,0,2);let s=0,pk=0;for(let i=0;i<pcm.length;i++){s+=pcm[i]*pcm[i];const d=Math.abs(pcm[i]);if(d>pk)pk=d}const r=Math.sqrt(s/pcm.length);const err=Math.abs(r-pat.rms)/pat.rms;if(err>lawWorst52)lawWorst52=err;if(pk>lawPk52)lawPk52=pk;lawN52++}}
+/* v0.27.0: the ceiling compares against the FLOAT32 value of 0.97 — the
+   renderer's peak clamp scales into a Float32Array, and 0.97 is not exactly
+   representable in f32 (fround(0.97)=0.97000002861…); the raw `<=.97`
+   comparison failed by 2.9e-8 (1 ulp) on every clamp-affected render. */
+const lawOk52=lawN52===48&&lawWorst52<=.15&&lawPk52<=Math.fround(.97);
+const ok52=liveOk52&&chokeOk52&&duckOk52&&det52===0&&gov52>1e-3&&lawOk52;
+gate('G52','kit-governed reason system: reason path live (spawns>=3, fallbacks=0) + kit governance audible (psy-classic vs tribal-raw kick md>1e-3) + 48 kit×type renders RMS ±15% of patch.rms peak<=.97 + determinism md=0 + hatC→hatO choke tail<40% + kick sidechain fires on the ROM path',ok52,'sp/fb '+live52.eng.romSpawns+'/'+live52.eng.romFallbacks+' rs/rf '+live52.eng.reasonSpawns+'/'+live52.eng.reasonFallbacks+' | gov '+gov52.toExponential(1)+' | law worst '+lawWorst52.toFixed(3)+' pk '+lawPk52.toFixed(2)+' n='+lawN52+' | tailA '+tailA.toExponential(1)+' tailB '+tailB.toExponential(1)+' | duck '+(duckOk52?'fired':'MISSED')+' | det '+det52)}catch(e){gate('G52','kit-governed reason system',false,'ERR '+e.message)}}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.
@@ -1643,45 +1686,6 @@ gate('G15w','worklet: priority stealing under overload — all kicks voiced, tie
    kick sidechain on the ROM path — the kick now routes through the ROM
      early-return, so the duck MUST fire there (duckState t0 advances on a
      neighbour chain; the v0.24.0 BUG GUARD is behaviorally pinned). */
-if((window.__psy6GateSkip||[]).includes('G52')){gate('G52','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
-const SR52=44100;
-const REASON_ROLES52=['kick','snare','clap','hatO','hatC','tom','crash','ride'];
-const rms52=(x,a,b)=>{const A=Math.round(a*SR52),B=Math.min(Math.round(b*SR52),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
-const mkTr52=(type,extra)=>({idx:0,kind:'drum',presetId:'g52',name:'g52',sound:Object.assign({type,tune:1,decay:1,tone:1,punch:.5},extra||{}),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
-const mkEng52=(tracks)=>{const oc=new OfflineAudioContext(1,Math.round(SR52*1),SR52);const eng=new PooledEngine(oc);eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks});return{oc,eng}};
-const trk52=()=>({idx:0,kind:'drum',presetId:'g52',name:'g52',sound:{type:'kick',tune:1,decay:1,tone:1,punch:.5},mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140});
-/* liveness: kick + hatO + hatC + conga through the DEFAULT kit engine */
-const live52=mkEng52([trk52()]);
-live52.eng.trigger(mkTr52('kick'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
-live52.eng.trigger(mkTr52('hatO'),.1,{track:0,off:0,vel:.8,note:60,lock:{}},60/145/4);
-live52.eng.trigger(mkTr52('hatC'),.22,{track:0,off:0,vel:.8,note:60,lock:{}},60/145/4);
-live52.eng.trigger(mkTr52('conga'),.3,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
-const liveBuf52=await live52.oc.startRendering();
-const livePk52=(()=>{const x=liveBuf52.getChannelData(0);let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m})();
-const liveOk52=live52.eng.reasonSpawns>=3&&live52.eng.reasonFallbacks===0&&live52.eng.romFallbacks===0&&live52.eng.romSpawns>=4&&livePk52>.05;
-/* choke A/B: hatO alone vs hatO→hatC (the tail dies) */
-const chA=mkEng52([trk52()]);chA.eng.trigger(mkTr52('hatO'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
-const chB=mkEng52([trk52()]);chB.eng.trigger(mkTr52('hatO'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);chB.eng.trigger(mkTr52('hatC'),.15,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
-const bufA=await chA.oc.startRendering(),bufB=await chB.oc.startRendering();
-const tailA=rms52(bufA.getChannelData(0),.3,.45),tailB=rms52(bufB.getChannelData(0),.3,.45);
-const chokeOk52=tailA>5e-4&&tailB<.4*tailA;
-/* kick sidechain on the ROM path: neighbour chain with duck amount gets scheduled */
-const scTrk=trk52();scTrk.idx=1;scTrk.scAmount=80;
-const duck52=mkEng52([trk52(),scTrk]);
-const t0Before=duck52.eng.duckState[1].t0;
-duck52.eng.trigger(mkTr52('kick'),.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);
-const duckOk52=t0Before===-1&&duck52.eng.duckState[1].t0>=0;
-/* renderer-level laws: determinism, kit governance, 6 kits × 8 types loudness */
-const pkK=kitPatch('psy-classic','kick'),pkT=kitPatch('tribal-raw','kick');
-const dA=renderReasonPcm('kick',pkK,SR52,0,2),dB=renderReasonPcm('kick',pkK,SR52,0,2);
-let det52=0;for(let i=0;i<dA.length;i++){const d=Math.abs(dA[i]-dB[i]);if(d>det52)det52=d}
-const kA=renderReasonPcm('kick',pkK,SR52,0,2),kB=renderReasonPcm('kick',pkT,SR52,0,2);
-let gov52=0;for(let i=0;i<Math.min(kA.length,kB.length);i++){const d=Math.abs(kA[i]-kB[i]);if(d>gov52)gov52=d}
-let lawWorst52=0,lawPk52=0,lawN52=0;
-for(let ki=0;ki<KIT_IDS.length;ki++){for(let ri=0;ri<REASON_ROLES52.length;ri++){const ty=REASON_ROLES52[ri];const pat=kitPatch(KIT_IDS[ki],ty);const pcm=renderReasonPcm(ty,pat,SR52,0,2);let s=0,pk=0;for(let i=0;i<pcm.length;i++){s+=pcm[i]*pcm[i];const d=Math.abs(pcm[i]);if(d>pk)pk=d}const r=Math.sqrt(s/pcm.length);const err=Math.abs(r-pat.rms)/pat.rms;if(err>lawWorst52)lawWorst52=err;if(pk>lawPk52)lawPk52=pk;lawN52++}}
-const lawOk52=lawN52===48&&lawWorst52<=.15&&lawPk52<=.97;
-const ok52=liveOk52&&chokeOk52&&duckOk52&&det52===0&&gov52>1e-3&&lawOk52;
-gate('G52','kit-governed reason system: reason path live (spawns>=3, fallbacks=0) + kit governance audible (psy-classic vs tribal-raw kick md>1e-3) + 48 kit×type renders RMS ±15% of patch.rms peak<=.97 + determinism md=0 + hatC→hatO choke tail<40% + kick sidechain fires on the ROM path',ok52,'sp/fb '+live52.eng.romSpawns+'/'+live52.eng.romFallbacks+' rs/rf '+live52.eng.reasonSpawns+'/'+live52.eng.reasonFallbacks+' | gov '+gov52.toExponential(1)+' | law worst '+lawWorst52.toFixed(3)+' pk '+lawPk52.toFixed(2)+' n='+lawN52+' | tailA '+tailA.toExponential(1)+' tailB '+tailB.toExponential(1)+' | duck '+(duckOk52?'fired':'MISSED')+' | det '+det52)}catch(e){gate('G52','kit-governed reason system',false,'ERR '+e.message)}}
 
 function wireTests(){$('bGate').onclick=runSelfGate;}
 
