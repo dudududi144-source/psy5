@@ -25,6 +25,9 @@ LOCAL · DETERMINISTIC · NO SERVER · NO TELEMETRY · NO BUILD STEP
 | `data/` | scales / motifs / rhythms / presets / styles JSON. |
 | `samples/` | Drum one-shot sample manifest + WAVs. |
 | `tools/verify.mjs` | Repository verification gates (syntax + document structure) — run by CI before deploy. |
+| `tools/e2e-pipeline.mjs` | The family pipeline proof (Task 19): factory project → PSYBUS v2 wire → foundation `/api/render-notes` → mastered WAV → acceptance gate. 8/8 claims. |
+| `tools/acceptance-check.mjs` | Standalone WAV acceptance gate — verbatim copy of psy-foundation `scripts/acceptance-check.mjs` (md5-verified). Needs only node + ffmpeg. |
+| `js/family-wire.js` | The WHAT→HOW bridge: a PSY6 project (the device's own `stepEvents` walker) → validated PSYBUS v2 envelopes. Codec = verbatim vendored foundation protocol v2. |
 
 ## Run it
 
@@ -41,8 +44,9 @@ No bundler, no install, no account. Everything runs locally in your browser.
 ## Tests
 
 ```bash
-bun test             # 666 tests across 52 files — 666 pass / 0 fail
+bun test             # 629 tests across 51 files — 629 pass / 0 fail
 node tools/verify.mjs  # syntax + structure gates (CI runs this before deploy) — GREEN
+bun tools/e2e-pipeline.mjs  # family wire e2e over live HTTP (needs foundation's dev server) — 8/8 claims
 bun tools/e2e.mjs    # headless-Chrome Self-Gate evidence (CI job `gates`) — JSON out
 bun tools/rom-audit.mjs  # PERCUSSION ROM + REASON kit audit (v0.24.0) — 13/13 + 48/48 kit×type PASS
 ```
