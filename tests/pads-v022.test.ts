@@ -11,8 +11,9 @@
  *      parameter locks riding the per-hit lock mechanism). ZERO dead pads,
  *      ZERO duplicate identities, labels NEVER a lone genre word.
  *   2. SCALE: real note names matching the scale math (root+24 layout).
- *   3. CHORD: diatonic triads with correct quality symbols — natural minor
- *      degrees give i ii° III iv v VI VII.
+ *   3. CHORD: diatonic 7th chords (v0.28.0, root+3+5+7 — psyreason 47ec8a0)
+ *      with correct quality symbols — natural minor degrees give
+ *      i ii° III iv v VI VII triads plus the diatonic seventh.
  *   4. GLYPHS: every engine drum type (drumDurEst switch) has a silhouette.
  *   5. HONESTY: a set with no drum voices yields 16 'empty' markers (the UI
  *      toasts the Sound-tab fix — never a silent pad).

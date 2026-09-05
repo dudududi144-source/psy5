@@ -53,8 +53,10 @@ reproducible with the command shown next to it.
   law (7th diatonic per degree + label suffixes), reason-wiring release
   pin bumped. Evolution OFF_PIN untouched (4325 events — padKit is a
   UI surface, not pattern events).
-- **Verification** — `bun test` 669/669 · `tools/verify.mjs` GREEN ·
-  live Pages URL serving the new skin (curl + in-browser walk).
+- **Verification** — `bun test` 666/666 · `tools/verify.mjs` GREEN ·
+  live Pages URL serving the new skin (curl + in-browser walk:
+  landing → READY SET boot → PLAYING → CHORD pads read Am7/A#maj7/C7…,
+  pad press clean, footer v0.28.0 + new landing status footer).
 
 ## [0.27.0] — Run 26: PRODUCTION SKIN + SOUND ENGINE v3 — the roast, executed
 

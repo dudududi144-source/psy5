@@ -103,6 +103,16 @@ th{background:var(--p1);color:var(--dim);text-transform:uppercase;font-size:8px;
 .powSec:hover{opacity:1}
 .powEngine{opacity:.62}
 .powEngine:hover{opacity:1}
+/* v0.28.0 landing status footer — IN FLOW with margin-top:auto: pinned to
+   the bottom on short viewports (the auto margin eats the free space even
+   under justify-content:center) and scrolls naturally after the content on
+   tall/overflowing viewports — the same flex-push contract as #statusBar,
+   so it can never overlay the engine picker */
+.powFoot{margin-top:auto;display:flex;align-items:center;gap:var(--s3);padding:var(--s5) var(--s4) calc(10px + env(safe-area-inset-bottom));font-size:9px;letter-spacing:.12em;color:var(--faint);flex-shrink:0;width:100%;box-sizing:border-box}
+.powFoot .pfBrand{color:var(--dim);letter-spacing:.16em}
+.powFoot .pfBrand b{color:var(--acc);font-weight:600}
+.powFoot .pfSep{flex:1}
+.powFoot .pfNote{text-align:right}
 #power .styles{display:flex;gap:var(--s3);flex-wrap:wrap;justify-content:center}
 #power .styles button{padding:10px 16px;font-size:11px;letter-spacing:.04em}
 #power .note{font-size:10px;max-width:540px}
