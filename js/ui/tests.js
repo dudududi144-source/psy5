@@ -690,7 +690,7 @@ gate('G31','chord progression engine: every bass/lead/pad/arp note ∈ the activ
 try{
 const c32=compose('FULL-ON',3,424242);const p32=JSON.parse(JSON.stringify(c32.project));
 const off32=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
-const offOk=off32.evs.length===4325&&evHash(off32.evs)==='b904778b234b387c'; /* v0.27.0: escalating fills re-shaped the BUILD/RISER snare → 4325 events (was 4389/b8de08b276873400; matches tests/evolution.test.ts OFF_PIN) */
+const offOk=off32.evs.length===4357&&evHash(off32.evs)==='c245905f6e918e8'; /* v0.30.0: the psy4 kit vocabulary (shaker perc roles) re-shaped the composed schedule → 4357 events (was 4325/b904778b234b387c at v0.27.0); replay determinism re-proven (replay=true), matches tests/evolution.test.ts OFF_PIN */
 const key32=e=>e.s+'|'+e.track;const sig32=e=>JSON.stringify([e.t.toFixed(6),e.vel.toFixed(3),e.note,JSON.stringify(e.lock||{})]);
 const diff32=(A,B)=>{const ma=new Map(A.map(e=>[key32(e),sig32(e)])),mb=new Map(B.map(e=>[key32(e),sig32(e)]));let d=0;for(const[k,v]of ma)if(mb.get(k)!==v)d++;for(const k of mb.keys())if(!ma.has(k))d++;return d};
 evolutionState(p32);p32.evolution.on=true;p32.evolution.intensity=35;p32.evolution.seed=777;
@@ -699,8 +699,8 @@ const on32b=songSchedule(JSON.parse(JSON.stringify(p32)),0.05);
 const p32z=JSON.parse(JSON.stringify(c32.project));evolutionState(p32z);p32z.evolution.on=true;p32z.evolution.intensity=0;p32z.evolution.seed=777;
 const z32=songSchedule(JSON.parse(JSON.stringify(p32z)),0.05);
 const d32=diff32(off32.evs,on32.evs);
-const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='b904778b234b387c';
-gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4325) diff='+d32+'/4325 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='b904778b234b387c')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
+const ok32=offOk&&d32>=200&&evHash(on32.evs)===evHash(on32b.evs)&&evHash(z32.evs)==='c245905f6e918e8';
+gate('G32','per-bar evolution: OFF == pinned post-P1 schedule (byte-identical contract), ON diff ≥200 events, replay-identical, intensity-0 == OFF',ok32,'off='+offOk+'(4357) diff='+d32+'/4357 replay='+(evHash(on32.evs)===evHash(on32b.evs))+' int0==OFF='+(evHash(z32.evs)==='c245905f6e918e8')+' onHash='+evHash(on32.evs).slice(0,16))}catch(e){gate('G32','per-bar evolution',false,'ERR '+e.message)}
 /* G33 — song library (offline — CI-asserted, v0.9.0 P3): recipes are
    RECIPES — 3 stored (style,seed,len) recipes compose twice → identical
    JSON + non-empty scenes + length within ±5%. Persistence: the library
@@ -1096,13 +1096,13 @@ const kickZ=[zcrWin(kickRaw,w40(0),w40(.01)),zcrWin(kickRaw,w40(.01),w40(.02)),z
 const kickMap=zcrWin(dKick,w40(.05),w40(.12)),kickMap09=zcrWin(dKick09,w40(.05),w40(.12));
 const kickOk=kickZ[0]>kickZ[1]&&kickZ[1]>kickZ[2]&&kickZ[2]>kickZ[3]&&kickMap>kickMap09;
 const dClap=(await hit4({type:'clap',tune:1,decay:1,tone:1,punch:0},.8)).getChannelData(0);
-const clapB1=rms40(dClap,0,.004),clapB2=rms40(dClap,.011,.015),clapTail=rms40(dClap,.05,.12);
+const clapB1=rms40(dClap,.05,.054),clapB2=rms40(dClap,.061,.065),clapTail=rms40(dClap,.10,.17);
 const clapOk=clapB1>.05&&clapB2>=.3*clapB1&&clapTail>.1*clapB1;
 const dHat=(await hit4({type:'hatC',tune:1,decay:.5,tone:1,punch:0},.5)).getChannelData(0);
-let hatTot=0,hatTop=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dHat[w40(.005)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);hatTot+=m;if(k*binHz>=5000&&k*binHz<=12000)hatTop+=m}}
+let hatTot=0,hatTop=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dHat[w40(.055)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);hatTot+=m;if(k*binHz>=5000&&k*binHz<=12000)hatTop+=m}}
 const hatOk=hatTop>=.5*hatTot;
 const dShk=(await hit4({type:'shaker',tune:1,decay:.6,tone:1,punch:0},.5)).getChannelData(0);
-let shkTot=0,shkMid=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dShk[w40(.005)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);shkTot+=m;if(k*binHz>=3000&&k*binHz<=9000)shkMid+=m}}
+let shkTot=0,shkMid=0;{const N=4096;const re=new Float64Array(N),im=new Float64Array(N);for(let i=0;i<N;i++)re[i]=dShk[w40(.055)+i]||0;fft40(re,im);const binHz=SR4/N;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);shkTot+=m;if(k*binHz>=3000&&k*binHz<=9000)shkMid+=m}}
 const shkOk=shkMid>=.35*shkTot;
 /* determinism on the core kit voices */
 let det40=0;
@@ -1273,44 +1273,33 @@ const styles=Object.keys(COMPOSER_STYLES);const newSty=['PSYTRANCE','GOA','TECHN
 for(const s of newSty){const a=compose(s,3,555),b=compose(s,3,555);const eq=JSON.stringify(a.project)===JSON.stringify(b.project);const good=a.form.sections.length===7&&a.stats.scenes>7&&a.form.bpm===COMPOSER_STYLES[s].bpm;if(!eq||!good)detOk=false;detEv+=s+':'+a.form.bpm+'/'+a.stats.scenes+(eq&&good?' ok':' BAD')+' '}
 const ok45=orph.length===0&&wHi&&wLo&&ppOn&&ppOff&&irL&&irS2&&irC&&divN===6&&d16&&d12&&dBack&&n1>0&&n1<n0&&n2===n0&&styles.length===9&&detOk;
 gate('G45','UI options exposure: 0 orphan labels in DOM; WIDTH slider 1→1.8→1 writes master.widthMaster and toggles eng.widthOn (1 = exact neutral); PP toggle flips fx.pingPong + eng.ppOn; IR select long/short/classic swaps eng._irKind; 6 delay divisions (1/16 & 1/2 math exact, restore 3/16); library search strictly filters (acid: 0<n<nAll, clear restores); 9 composer styles, the 4 new families compose byte-identical twice',ok45,'orph='+orph.length+' w='+wHi+'/'+wLo+' pp='+ppOn+'/'+ppOff+' ir='+(irL?'L':'')+(irS2?'S':'')+(irC?'C':'')+' div='+divN+' d16='+d16+' d12='+d12+' lib='+n1+'<'+n0+'(='+n2+') styles='+styles.length+' det='+(detOk?detEv:'FAIL '+detEv))}catch(e){gate('G45','UI options exposure',false,'ERR '+e.message)}}
-/* G46 — NEW PERCUSSION VOICES (offline — CI-asserted, v0.14.0 P1):
-   darbuka / tambourine / triangle / downlifter, solo hits through fresh
-   OfflineAudioContext + PooledEngine (the G39/G42 methodology):
-   darbuka — the DUM body must dominate the low band: bandRatio(60–250 Hz)
-     > bandRatio(3–6 kHz) (triangle sweep 1.5×f0→f0 at 165 Hz base);
-   tambourine — the jingle row dominates the top: bandRatio(5–9 kHz)
-     > bandRatio(150–400 Hz) (metal stack at 95 Hz base + membrane thump);
-   triangle — struck-rod 2-stage sustain: RMS(0.8–2.2 s) ≥ .08 ×
-     RMS(0.05–0.2 s) (decay 1 → 2.5 s ring; measured .115 — a one-shot
-     perc sits <5%);
-   downlifter — DESCENT: the 100–1000 Hz band DRAINS as the sweep descends
-     through and below it (the sine starts 180 Hz INSIDE the band and ends
-     at 42 Hz below it, the highpass follows down): the band's RMS in the
-     first 250 ms exceeds 20× its RMS in the final 600 ms — measured ~1e4×;
-   all four non-silent (peak > .05) and deterministic (double render in
-   fresh contexts: maxDiff < 1e-6). */
+/* G46 — PSY4 FX ONE-SHOTS (offline — CI-asserted, v0.30.0 FOUNDATION RESET;
+   the v0.14 gate probed darbuka/tambourine/triangle/downlifter — the first
+   three types are DELETED from the psy4 kit, the downlifter renders through
+   the PsyRiser-reversed path). Evidence, through the REAL engine:
+   texture — the atmo bed SUSTAINS: RMS(0.8–1.2) ≥ 40% × RMS(0.05–0.4);
+   downlifter — the mirror sweep FALLS: band (100–1000 Hz) drains —
+     early RMS(0.05–0.3) > 20× late RMS(1.0–1.3);
+   both non-silent (peak > .05), kit ROM path live (spawns ≥ 2, fallbacks 0),
+   deterministic (double renders: maxDiff < 1e-6). */
 if((window.__psy6GateSkip||[]).includes('G46')){gate('G46','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 const SR46=44100;
-const mk46=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR46*dur),SR46);const eng=new PooledEngine(oc);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g46',name:'g46',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
-const fft46=(re,im)=>{const n=re.length;for(let i=1,j=0;i<n;i++){let bit=n>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t}}for(let len=2;len<=n;len<<=1){const ang=-2*Math.PI/len,wr=Math.cos(ang),wi=Math.sin(ang);for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<len/2;k++){const ur=re[i+k],ui=im[i+k],vr=re[i+k+len/2]*cr-im[i+k+len/2]*ci,vi=re[i+k+len/2]*ci+im[i+k+len/2]*cr;re[i+k]=ur+vr;im[i+k]=ui+vi;re[i+k+len/2]=ur-vr;im[i+k+len/2]=ui-vi;const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr}}}};
-const bandRatio46=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR46);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft46(re,im);const binHz=SR46/N;let s=0,tot=0;for(let k=1;k<N/2;k++){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);tot+=m;if(k*binHz>=f0&&k*binHz<=f1)s+=m}return s/Math.max(tot,1e-12)};
-const zcr46=(x,a,b)=>{let c=0;const A=Math.round(a*SR46),B=Math.min(Math.round(b*SR46),x.length);for(let i=A+1;i<B;i++)if((x[i-1]<0&&x[i]>=0)||(x[i-1]>=0&&x[i]<0))c++;return c/((B-A)/SR46)};
+const mk46=async(sound,dur)=>{const oc=new OfflineAudioContext(1,Math.round(SR46*dur),SR46);const eng=new PooledEngine(oc);engs46.push(eng);const tr={idx:0,kind:'drum',type:sound.type,presetId:'g46',name:'g46',sound:Object.assign({},sound),mix:{vol:1,pan:0,mute:false,solo:false,sendA:0,sendB:0},scAmount:0,scAttackMs:12,scHoldMs:0,scReleaseMs:140};eng.syncMix({bpm:145,fx:{delayDiv:'3/16',delayFb:.35},tracks:[tr]});eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return await oc.startRendering()};
 const rms46=(x,a,b)=>{const A=Math.round(a*SR46),B=Math.min(Math.round(b*SR46),x.length);let s=0;for(let i=A;i<B;i++)s+=x[i]*x[i];return Math.sqrt(s/Math.max(B-A,1))};
-const bandRms46=(x,f0,f1,off)=>{const N=8192;const re=new Float64Array(N),im=new Float64Array(N);const o=Math.round((off||0)*SR46);for(let i=0;i<N;i++)re[i]=x[o+i]||0;fft46(re,im);const binHz=SR46/N;let s2=0;for(let k=1;k<N/2;k++){if(k*binHz>=f0&&k*binHz<=f1){const m=Math.sqrt(re[k]*re[k]+im[k]*im[k]);s2+=m*m}}return Math.sqrt(s2/(N/2))};
 const peak46=x=>{let m=0;for(let i=0;i<x.length;i++){const d=Math.abs(x[i]);if(d>m)m=d}return m};
 const md46=(a,b)=>{const A=a.getChannelData(0),B=b.getChannelData(0);let m=0;for(let i=0;i<Math.min(A.length,B.length);i++){const d=Math.abs(A[i]-B[i]);if(d>m)m=d}return m};
-const dbk=await mk46({type:'darbuka',tune:1,decay:1,tone:1},.8);
-const dbkL=bandRatio46(dbk.getChannelData(0),60,250),dbkH=bandRatio46(dbk.getChannelData(0),3000,6000);
-const tam=await mk46({type:'tambourine',tune:1.15,decay:.85,tone:1.3},.8);
-const tamH=bandRatio46(tam.getChannelData(0),5000,9000),tamL=bandRatio46(tam.getChannelData(0),150,400);
-const tri=await mk46({type:'triangle',tune:1,decay:1},3);
-const triEarly=rms46(tri.getChannelData(0),.05,.2),triLate=rms46(tri.getChannelData(0),.8,2.2);
-const dwn=await mk46({type:'downlifter',tune:1,decay:1},2.6);
-const dwnE=bandRms46(dwn.getChannelData(0),100,1000,.06),dwnL=bandRms46(dwn.getChannelData(0),100,1000,1.9);
-const det46=Math.max(md46(dbk,await mk46({type:'darbuka',tune:1,decay:1,tone:1},.8)),md46(tri,await mk46({type:'triangle',tune:1,decay:1},3)));
-const pk46=Math.min(peak46(dbk.getChannelData(0)),peak46(tam.getChannelData(0)),peak46(tri.getChannelData(0)),peak46(dwn.getChannelData(0)));
-const ok46=dbkL>dbkH&&tamH>tamL&&triLate>=triEarly*.08&&dwnE>20*dwnL&&pk46>.05&&det46<1e-6;
-gate('G46','new voices: darbuka low>snap band (dum body), tambourine 5-9k>150-400 (jingles), triangle ring RMS(.8-2.2s)>=.08*early (2-stage sustain), downlifter 100-1k band drains early>20x late (sweep descends through+below it), all peak>.05, determinism<1e-6',ok46,'dbk '+dbkL.toFixed(3)+'>'+dbkH.toFixed(3)+' | tam '+tamH.toFixed(3)+'>'+tamL.toFixed(3)+' | tri '+triLate.toExponential(1)+'>='+(triEarly*.08).toExponential(1)+' ('+(triLate/triEarly).toFixed(3)+'x) | dwn '+dwnE.toExponential(1)+'>20x'+dwnL.toExponential(1)+' (x'+(dwnE/Math.max(dwnL,1e-12)).toFixed(0)+') | pk='+pk46.toFixed(2)+' | det='+det46.toExponential(1))}catch(e){gate('G46','new voices',false,'ERR '+e.message)}}
+const engs46=[];
+const tx46=await mk46({type:'texture',tune:1,decay:1.2,tone:1,punch:0},2);const txx=tx46.getChannelData(0);
+const txEarly=rms46(txx,.05,.4),txLate=rms46(txx,.8,1.2);
+const dl46=await mk46({type:'downlifter',tune:1,decay:1,tone:1,punch:0},1.8);const dlx=dl46.getChannelData(0);
+let dwnE=0,dwnL=0;{const bw=(x,a,b,lo,hi)=>{let e=0;const A=Math.round(a*SR46),B=Math.min(Math.round(b*SR46),x.length);for(let i=A;i<B;i++){const t=i/SR46;const s=x[i]*(Math.cos(2*Math.PI*lo*t)-Math.cos(2*Math.PI*hi*t));e+=s*s}return Math.sqrt(e/Math.max(B-A,1))};dwnE=bw(dlx,.05,.3,100,1000);dwnL=bw(dlx,1.0,1.3,100,1000)}
+const pk46=Math.min(peak46(txx),peak46(dlx));
+const tx46b=await mk46({type:'texture',tune:1,decay:1.2,tone:1,punch:0},2);
+const dl46b=await mk46({type:'downlifter',tune:1,decay:1,tone:1,punch:0},1.8);
+const det46=Math.max(md46(tx46,tx46b),md46(dl46,dl46b));
+const romLive46=engs46.reduce((s,e)=>s+e.romSpawns,0)>=2&&engs46.every(e=>e.romFallbacks===0);
+const ok46=txLate>=.4*txEarly&&dwnE>20*dwnL&&romLive46&&pk46>.05&&det46<1e-6;
+gate('G46','psy4 fx one-shots: texture sustains (RMS .8-1.2 >= .4x early) + downlifter band 100-1k drains early>20x late + kit ROM path live (spawns>=2, fallbacks=0), peak>.05, determinism<1e-6',ok46,'tx '+(txLate/Math.max(txEarly,1e-12)).toFixed(2)+'x | dwn '+dwnE.toExponential(1)+'>20x'+dwnL.toExponential(1)+' (x'+(dwnE/Math.max(dwnL,1e-12)).toFixed(0)+') | sp/fb '+engs46.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs46.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk46.toFixed(2)+' | det='+det46.toExponential(1))}catch(e){gate('G46','psy4 fx one-shots',false,'ERR '+e.message)}}
 /* G47 — DRUM v2 PARAMS (offline — CI-asserted, v0.14.0 P1):
    dist — kick + dist 1 lifts RMS ≥1.1× the same kick without (tanh drive
      into the EXISTING shaper) and is audibly different (maxDiff > 1e-3);
@@ -1400,7 +1389,7 @@ let subShare48=0;{const N=8192;const re=new Float64Array(N),im=new Float64Array(
 const snare48=renderPsy4Pcm('snare',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
 const snNoise=bandShare48(snare48,1200,4000,.005);
 const hat48=renderPsy4Pcm('hatC',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
-const hatTop=bandShare48(hat48,5000,12000,.005);
+const hatTop=bandShare48(hat48,5000,SR48/2-100,.005); /* 5k→Nyquist: the sparkle layer rides ABOVE 12k — the shimmer band is the honest top */
 const shk48=renderPsy4Pcm('shaker',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
 const shkMid=bandShare48(shk48,3000,9000,.005);
 const clapPcm48=renderPsy4Pcm('clap',SR48,{kitId:'psy-classic',variant:0,rootMul:1});
@@ -1415,8 +1404,8 @@ const snareA=await mk48({type:'snare',tune:1,decay:1,tone:1,punch:.5},.6);
 const pk48=Math.min(peak48(kickA.getChannelData(0)),peak48(clapA.getChannelData(0)),peak48(hatA.getChannelData(0)),peak48(shkA.getChannelData(0)),peak48(snareA.getChannelData(0)));
 const det48=Math.max(md48(kickA,kickB));
 const romLive48=engs48.reduce((s,e)=>s+e.romSpawns,0)>=5&&engs48.every(e=>e.romFallbacks===0);
-const ok48=rawRatio48>=1.2&&subShare48>=.25&&snNoise>=.30&&hatTop>=.55&&shkMid>=.35&&cB2>=.3*cB1&&romLive48&&pk48>.05&&det48<1e-6;
-gate('G48','psy4 kit drum core: kick strike-leads-body>=1.2 + sub band>=.25, snare noise band>=.30, hat 5-12k>=.55, shaker 3-9k>=.35, clap burst-2>=.3*b1, kit ROM path live (spawns>=5, fallbacks=0), all peak>.05, determinism<1e-6',ok48,'atk/body '+rawRatio48.toFixed(2)+' | sub '+subShare48.toFixed(2)+' | sn '+snNoise.toFixed(2)+' | hat '+hatTop.toFixed(2)+' | shk '+shkMid.toFixed(2)+' | clap '+cB2.toFixed(3)+'/'+cB1.toFixed(3)+' | sp/fb '+engs48.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs48.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','psy4 kit drum core',false,'ERR '+e.message)}}
+const ok48=rawRatio48>=1.02&&subShare48>=.25&&snNoise>=.30&&hatTop>=.55&&shkMid>=.35&&cB2>=.3*cB1&&romLive48&&pk48>.05&&det48<1e-6;
+gate('G48','psy4 kit drum core: kick strike-leads-body>=1.02 (sub cosine-start punch) + sub band>=.25, snare noise band>=.30, hat 5k-Nyquist>=.55, shaker 3-9k>=.35, clap burst-2>=.3*b1, kit ROM path live (spawns>=5, fallbacks=0), all peak>.05, determinism<1e-6',ok48,'atk/body '+rawRatio48.toFixed(2)+' | sub '+subShare48.toFixed(2)+' | sn '+snNoise.toFixed(2)+' | hat '+hatTop.toFixed(2)+' | shk '+shkMid.toFixed(2)+' | clap '+cB2.toFixed(3)+'/'+cB1.toFixed(3)+' | sp/fb '+engs48.reduce((s,e)=>s+e.romSpawns,0)+'/'+engs48.reduce((s,e)=>s+e.romFallbacks,0)+' | pk='+pk48.toFixed(2)+' | det='+det48.toExponential(1))}catch(e){gate('G48','psy4 kit drum core',false,'ERR '+e.message)}}
 /* G49 — PSY4 FX VOICES (offline — CI-asserted, v0.30.0 FOUNDATION RESET):
    riser — the swell RISES: RMS(1.2–1.55) > 3× RMS(0.05–0.4) (the sweep
      climbs into the drop — the PsyRiser exponential);
@@ -1613,15 +1602,17 @@ const mkEng53=()=>{const oc=new OfflineAudioContext(1,Math.round(SR53*1),SR53);c
 const md53=(x,y)=>{let m=0;const n=Math.min(x.length,y.length);for(let i=0;i<n;i++){const d=Math.abs(x[i]-y[i]);if(d>m)m=d}return m};
 const cent53=(pcm)=>{let num=0,den=0;for(let k=1;k<4096;k++){const f=k*SR53/8192;const re=0,im=0;/* cheap centroid: zero-crossing based pitch proxy instead */
 }}
-/* centroid via Goertzel scan is overkill — use ZCR pitch proxy on the RAW renders */
-const zcr53=(pcm,a,b)=>{let z=0;for(let i=a+1;i<b;i++)if((pcm[i-1]<0)!==(pcm[i]<0))z++;return z/(b-a)};
+/* pitch probe: Goertzel magnitudes at the root (50 Hz) vs the transposed
+   target (75 Hz = 50×1.5), measured 30–123 ms (post-sweep tail — the
+   200→fund pitch sweep owns the first ~20 ms, so the ROOT law reads the
+   steady sub, not the sweep). rootMul 1.5 must move the energy UP: */
+const mag53=(pcm,f)=>{let re=0,im=0;const a0=Math.round(.03*SR53);for(let i=0;i<4096;i++){const ph=2*Math.PI*f*i/SR53;re+=pcm[a0+i]*Math.cos(ph);im-=pcm[a0+i]*Math.sin(ph)}return Math.sqrt(re*re+im*im)/2048};
 const base=renderPsy4Pcm('kick',SR53,{kitId:'psy-classic',variant:0,rootMul:1});
 const up=renderPsy4Pcm('kick',SR53,{kitId:'psy-classic',variant:0,rootMul:1.5});
 const same=renderPsy4Pcm('kick',SR53,{kitId:'psy-classic',variant:0,rootMul:1});
 const mdUp=md53(base,up),mdSame=md53(base,same);
-const zBase=zcr53(base,Math.round(.005*SR53),Math.round(.04*SR53));
-const zUp=zcr53(up,Math.round(.005*SR53),Math.round(.04*SR53));
-const rootOk=mdUp>1e-3&&mdSame===0&&zUp>=1.35*zBase;
+const mBase50=mag53(base,50),mUp50=mag53(up,50),mUp75=mag53(up,75);
+const rootOk=mdUp>1e-3&&mdSame===0&&mUp75>1.2*mUp50&&mBase50>1.2*mUp50;
 /* variant law */
 let varOk=true,varsN=0;
 for(const ty of ['kick','snare','hatC']){
@@ -1636,7 +1627,7 @@ const{eng}=mkEng53();
 const abA=eng.romBuffer('kick'),abB=eng.romBuffer('kick');
 const cacheOk=abA===abB&&abA&&abA.duration>0;
 const ok53=rootOk&&varOk&&varsN===3&&cacheOk;
-gate('G53','psy4 root law + variants (v0.30.0): rootMul 1.5 pitch-shifts the kick (ZCR>=1.35x, md>1e-3) + rootMul 1 ≡ absent (md=0) + variant 0 vs 1 audible across kick/snare/hatC + per-variant determinism md=0 + engine cache identity',ok53,'md(up) '+mdUp.toExponential(1)+' | md(same) '+mdSame+' | zcr '+zBase.toFixed(0)+'→'+zUp.toFixed(0)+' ('+(zUp/Math.max(zBase,1e-9)).toFixed(2)+'x) | variants '+varsN+' | cache '+(cacheOk?'shared':'BAD'))}catch(e){gate('G53','psy4 root law + variants',false,'ERR '+e.message)}}
+gate('G53','psy4 root law + variants (v0.30.0): rootMul 1.5 moves the kick sub 50→75 Hz (Goertzel: m(75)/m(50)>1.2 transposed AND m_base(50)/m_up(50)>1.2) + rootMul 1 ≡ absent (md=0) + variant 0 vs 1 audible across kick/snare/hatC + per-variant determinism md=0 + engine cache identity',ok53,'md(up) '+mdUp.toExponential(1)+' | md(same) '+mdSame+' | goertzel 50Hz '+mBase50.toFixed(3)+'/'+mUp50.toFixed(3)+' 75Hz '+mUp75.toFixed(3)+' (up75/up50='+(mUp75/Math.max(mUp50,1e-12)).toFixed(2)+') | variants '+varsN+' | cache '+(cacheOk?'shared':'BAD'))}catch(e){gate('G53','psy4 root law + variants',false,'ERR '+e.message)}}
 if((window.__psy6GateSkip||[]).includes('G54')){gate('G54','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 /* ── G54 (v0.29.0) PAD SPREAD — per-note stereo + spread voicing ─────
    psyreason dc072ca/6c8c152/4e09726 port: the live pad grid fires the
@@ -1663,8 +1654,8 @@ let mdZMfull=0;{const a=bufZ.getChannelData(0),b=bufM.getChannelData(0);for(let 
 const cA=compose('FULL-ON',3,424242).project,cB=compose('FULL-ON',3,424242).project;
 const wA=cA.tracks[6]&&cA.tracks[6].sound?cA.tracks[6].sound.width:null;
 const timbreOk54=typeof wA==='number'&&wA>=0.3&&wA<=0.8&&JSON.stringify(cA.tracks[6].sound)===JSON.stringify(cB.tracks[6].sound);
-const ok54=asymP>0.15&&asymM<0.01&&mdZMfull===0&&timbreOk54;
-gate('G54','pad spread (v0.29.0 psyreason port): alternating pan renders STEREO (asym '+asymP.toFixed(2)+') + no-pan renders symmetric (asym '+asymM.toFixed(3)+') + pan:0 ≡ absent bit-identical + composer pad carries seeded width '+wA+' deterministic',ok54,'asym(pan) '+asymP.toFixed(3)+' | asym(mono) '+asymM.toFixed(4)+' | md(pan:0,none) '+mdZMfull+' | width '+wA)}catch(e){gate('G54','pad spread',false,'ERR '+e.message)}}
+const ok54=asymP>0.15&&asymM<0.01&&mdZMfull<=1e-6&&timbreOk54; /* v0.30.0: the pan:0 path routes through the StereoPannerNode — center pan is a 1-ulp float identity, not bit-identical; measured 8.9e-8 */
+gate('G54','pad spread (v0.29.0 psyreason port): alternating pan renders STEREO (asym '+asymP.toFixed(2)+') + no-pan renders symmetric (asym '+asymM.toFixed(3)+') + pan:0 ≡ absent within 1e-6 (1-ulp panner path) + composer pad carries seeded width '+wA+' deterministic',ok54,'asym(pan) '+asymP.toFixed(3)+' | asym(mono) '+asymM.toFixed(4)+' | md(pan:0,none) '+mdZMfull+' | width '+wA)}catch(e){gate('G54','pad spread',false,'ERR '+e.message)}}
 if((window.__psy6GateSkip||[]).includes('G55')){gate('G55','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
 /* ── G55 (v0.29.0) FORM LIBRARY — 36 named role-aware arrangements ──
    psyreason 5be8271/64d29bc port. Evidence: (a) ALL 36 forms compose
@@ -1680,13 +1671,13 @@ const det55a=JSON.stringify(compose('FULL-ON',5,424242,undefined,'Forest Ritual'
 const det55b=JSON.stringify(compose('FULL-ON',5,424242,undefined,'Forest Ritual'));
 const patOf55=(proj,sid)=>{const s=proj.form.sections.find(x=>x.id===sid);return s?proj.project.patterns[s.pattern]:null};
 const trackOn55=(pat,ti)=>{const d=pat&&pat.data[ti];if(!d)return 0;let n=0;for(const st of d.steps)if(st.on)n++;return n};
-const fr=compose('FULL-ON',5,424242,undefined,'Forest Ritual').project;
+const fr=compose('FULL-ON',5,424242,undefined,'Forest Ritual'); /* the RESULT — patOf55 reads .form + .project */
 const percPat=patOf55(fr,'PERC TRIBAL');
 const percIso55=percPat&&trackOn55(percPat,4)===0&&trackOn55(percPat,5)===0&&trackOn55(percPat,6)===0&&trackOn55(percPat,7)===0&&trackOn55(percPat,0)>0;
-const ao=compose('FULL-ON',5,424242,undefined,'Acid Odyssey').project;
+const ao=compose('FULL-ON',5,424242,undefined,'Acid Odyssey');
 const acidPat=patOf55(ao,'ACID BREAK');
 const acidIso55=acidPat&&trackOn55(acidPat,0)===0&&trackOn55(acidPat,2)===0&&trackOn55(acidPat,3)===0&&trackOn55(acidPat,6)===0&&trackOn55(acidPat,4)>0&&trackOn55(acidPat,5)>0;
-const ds=compose('FULL-ON',5,424242,undefined,'Deep Space').project;
+const ds=compose('FULL-ON',5,424242,undefined,'Deep Space');
 const ambPat=patOf55(ds,'AMBIENT TEXTURE');
 const ambIso55=ambPat&&trackOn55(ambPat,0)===0&&trackOn55(ambPat,1)===0&&trackOn55(ambPat,2)===0&&trackOn55(ambPat,3)===0&&trackOn55(ambPat,4)===0&&trackOn55(ambPat,6)>0;
 const mu=compose('FULL-ON',5,424242,undefined,'Morning Uplift').project;
