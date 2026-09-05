@@ -182,7 +182,7 @@ function padHit(i){
     if(!(I.p.tracks[ti]&&I.p.tracks[ti].kind==='synth'))ti=I.p.tracks.findIndex(t=>t&&t.kind==='synth');
     if(ti<0){toast('NO SYNTH VOICE in this set — add one: + TRACK');return}
     const tr=I.p.tracks[ti];
-    if(m.mode==='chord'){m.notes.forEach((n,j)=>I.eng.trigger(tr,I.ctx.currentTime,{vel:j===0?vel:vel*.75,note:n,lock:{}},0));recHit(ti,m.notes[0],vel)}
+    if(m.mode==='chord'){/* v0.28.0: 4-voice 7th stacks (model.js [0,2,4,6]) — non-root velocity .75→.62 keeps the summed pad level within ~14% of the 3-voice era instead of +33% (psyreason 15c334c "rebalance pad level for 4-note chords" intent) */m.notes.forEach((n,j)=>I.eng.trigger(tr,I.ctx.currentTime,{vel:j===0?vel:vel*.62,note:n,lock:{}},0));recHit(ti,m.notes[0],vel)}
     else{I.eng.trigger(tr,I.ctx.currentTime,{vel,note:m.note,lock:{}},0);recHit(ti,m.note,vel)}
   }
 }

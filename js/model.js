@@ -131,7 +131,9 @@ return out}
    lock — the exact mechanism step locks use. Every one of the 16 pads
    resolves to a playable drum voice. ZERO dead pads, ever.
    SCALE mode — 16 pads = two octaves of the project scale, real note names.
-   CHORD mode — diatonic triads with correct quality symbols (m ° + maj).
+   CHORD mode — diatonic 7th-chord voicings, root+3+5+7 (v0.28.0, ported
+   from psyreason 47ec8a0 "richer pad harmony") with correct quality
+   symbols (m ° + maj + 7/maj7 from the 5th→7th interval).
    A set with NO drum voices answers honestly (mode 'empty' → the UI toasts
    the Sound-tab fix — the established dj() convention).
 
@@ -182,7 +184,7 @@ function padChordQuality(n1,n2,n3){const a=n2-n1,b=n3-n2;return (a===3&&b===3)?'
 /* padKit(p, mode) — the ONE pad-grid builder. Returns exactly 16 entries:
    DRUM   {mode:'voice'|'variant'|'empty', track, label, sub, lock, glyph}
    SCALE  {mode:'scale', note, label, sub}          sub = roman degree
-   CHORD  {mode:'chord', notes:[n1,n2,n3], label, sub}  label = Cm/F/…  */
+   CHORD  {mode:'chord', notes:[n1,n2,n3,n4], label, sub}  label = Cm7/Fmaj7/…  */
 function padKit(p,mode){
   const out=[];
   if(mode==='SCALE'||mode==='CHORD'){
@@ -192,8 +194,14 @@ function padKit(p,mode){
       const n=root+24+sc[idx]+12*oct;
       if(mode==='SCALE')out.push({mode:'scale',note:n,label:padNoteName(n),sub:ROMAN[i]});
       else{
-        const ns=[0,2,4].map(k=>root+24+sc[(idx+k)%L]+12*(oct+Math.floor((idx+k)/L)));
-        out.push({mode:'chord',notes:ns,label:padChordName(ns[0],ns[1],ns[2]),sub:ROMAN[i]});
+        /* v0.28.0 SEVENTH VOICINGS (psyreason 47ec8a0): [0,2,4] triads →
+           [0,2,4,6] root+3+5+7 — deeper, lusher pads. The label keeps the
+           triad quality and appends the seventh type from the actual
+           5th→7th semitone gap (3 = flat-7 '7', 4 = major-7th 'maj7'),
+           so pentatonic/odd scales degrade honestly to the triad name. */
+        const ns=[0,2,4,6].map(k=>root+24+sc[(idx+k)%L]+12*(oct+Math.floor((idx+k)/L)));
+        const c7=ns[3]-ns[2],tri=padChordName(ns[0],ns[1],ns[2]);
+        out.push({mode:'chord',notes:ns,label:tri+(c7===3?'7':c7===4?'maj7':''),sub:ROMAN[i]});
       }
     }
     return out;

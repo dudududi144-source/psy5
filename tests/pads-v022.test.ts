@@ -132,8 +132,22 @@ describe('v0.22.0 PADS v3 — SCALE/CHORD modes', () => {
     expect(qual(kit[4].notes)).toBe('m')  // v
     expect(qual(kit[5].notes)).toBe('')   // VI
     expect(qual(kit[6].notes)).toBe('')   // VII
-    expect(kit[0].label).toBe('Am')
-    expect(kit[2].label).toBe('C')
+    /* v0.28.0 SEVENTH VOICINGS (psyreason 47ec8a0): every pad is a 4-note
+       root+3+5+7 stack; the label appends the seventh type from the actual
+       5th→7th semitone gap. A natural minor: i7/ii°7/IIImaj7/iv7/v7/VImaj7/VII7. */
+    expect(kit[0].notes.length).toBe(4)
+    expect(kit[0].notes[3]).toBe(67) // Am7: A3 C4 E4 G4 — the added 7th is G4
+    expect(kit[0].label).toBe('Am7')
+    expect(kit[2].label).toBe('Cmaj7') // III: C E G B — B is 4 semitones over G
+    expect(kit[6].label).toBe('G7')    // VII: G B D F — flat 7th, the real dominant
+    /* the 7th of every degree stays diatonic: it is a scale note built the
+       same way as the triad notes ((idx+6) wraps within the scale) */
+    const minor = SCALES.minor, L = minor.length
+    for (let i = 0; i < 7; i++) {
+      const idx = i % L, oct = Math.floor(i / L)
+      const d7 = 33 + 24 + minor[(idx + 6) % L] + 12 * (oct + Math.floor((idx + 6) / L))
+      expect(kit[i].notes[3]).toBe(d7)
+    }
   })
 })
 

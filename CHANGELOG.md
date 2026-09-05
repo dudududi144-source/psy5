@@ -3,6 +3,59 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.28.0] — Run 27: HARMONY UPGRADE — psyreason re-review (it keeps improving), page finally LIVE
+
+> Owner: "צירפתי טוקן שוב חשוב לדחוף בסוף מסודר ולעדכן את הדף" — push
+> everything, organized, and UPDATE THE PAGE.
+
+- **THE PAGE IS NOW ACTUALLY LIVE — root cause of "I still haven't SEEN
+  the design change" found and fixed.** The repo was PRIVATE and Pages
+  was never provisioned (`has_pages:false`): the deploy workflow ran,
+  uploaded artifacts and reported "success" for six runs while the site
+  served GitHub's own 404 — a hollow green. Fixes, in order: repo made
+  public (no secrets — `grep -rI 'github_pat_|ghp_'` over the tree =
+  clean), Pages provisioned via API (`build_type:"workflow"`, HTTP 201),
+  deploy re-dispatched. https://dudududi144-source.github.io/psy5/ now
+  serves the PRODUCTION SKIN. (The workflow trigger `branches: ain]`
+  reported by an earlier session was a terminal-render artifact of
+  grepping `[main]` — raw bytes are correct, no fix needed.)
+- **SEVENTH-CHORD PADS** (`js/model.js` padKit CHORD mode) — ported from
+  psyreason 47ec8a0 "richer pad harmony": pad-grid chord voicings expand
+  `[0,2,4]` (root+3+5) → `[0,2,4,6]` (root+3+5+7) — deeper, lusher
+  stacks. The label keeps the triad quality and appends the seventh type
+  from the actual 5th→7th semitone gap (3 → '7', 4 → 'maj7'), so natural
+  minor reads i7/ii°7/IIImaj7/iv7/v7/VImaj7/VII7 and odd scales degrade
+  honestly to the triad name. The play path (perform.js) already
+  iterated every note — no playback change needed beyond the balance.
+- **4-VOICE PAD BALANCE** (`js/ui/perform.js`) — with the stack growing
+  3→4 voices, the non-root velocity tier drops .75 → .62: the summed
+  level lands ~+14% over the 3-voice era instead of +33% (the
+  psyreason 15c334c "rebalance pad level for 4-note chords" intent).
+- **ANTI-GARBAGE EVOLUTION CEILINGS** (`js/evolution.js` op 5) — ported
+  from psyreason 1457c48: the per-bar cutoff creep can never push a
+  family past its musical ceiling — bass/pad ≤ 2400 Hz (mud/whistle
+  guard), lead ≤ 6500 Hz (scream guard); other families keep the
+  registry ceiling (60..14000). `tr.sound.cat` ships inside the copied
+  preset object, so the boundary needs no new imports and replay
+  equality (deterministic per bar seed) is preserved.
+- **Re-reviewed psyreason @ 15c334c (it evolves; cloned fresh, read-only)** —
+  adopted: 7th voicings, 4-voice rebalance, family ceilings. Verified
+  already-covered or better: per-track xfade transitions (psy5 v0.16.0
+  syncMix TC), lead steadiness (psy5 per-note deterministic thermal
+  drift, no free-running random walk), drop focus (psy5 FX fires only
+  in RISER), break cleanup (psy5 has no heartbeat kick/shaker).
+  Considered and REJECTED: intro master-level ramp (0.76+0.28×prog) —
+  it would smear psy5's G36 section-loudness-ratio evidence contract
+  for marginal motion; psy5's per-section mix snapshots already stage
+  the intro. Same honest-rejection tradition as the v0.27.0 limiter.
+- **Version pins re-pinned** — sw.js CACHE_VERSION psy6-v0.28.0, footer
+  fVer, css banner, pads-v022 CHORD contract extended to the 4-note
+  law (7th diatonic per degree + label suffixes), reason-wiring release
+  pin bumped. Evolution OFF_PIN untouched (4325 events — padKit is a
+  UI surface, not pattern events).
+- **Verification** — `bun test` 669/669 · `tools/verify.mjs` GREEN ·
+  live Pages URL serving the new skin (curl + in-browser walk).
+
 ## [0.27.0] — Run 26: PRODUCTION SKIN + SOUND ENGINE v3 — the roast, executed
 
 > Owner: "I still haven't SEEN the design change on the page. Deliver the

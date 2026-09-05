@@ -155,17 +155,25 @@ function evolveStep(p, base, bar, stepInBar, ops, patternBar) {
     add({ track: 3, off: 0, vel: clamp(0.15 + rng() * 0.15, 0.05, 1), note: 48, lock: {} });
   }
   /* 5. cutoff/sendA creep — per-bar decision, event-level locks, lane-free
-     pairs only (lane-covered pairs win per-step), registry ranges */
+     pairs only (lane-covered pairs win per-step), registry ranges.
+     v0.28.0 ANTI-GARBAGE FAMILY CEILINGS (ported from psyreason 1457c48):
+     the mutation may never push a family past its musical ceiling —
+     bass/pad ≤ 2400 Hz (mud/whistle guard), lead ≤ 6500 Hz (scream guard);
+     other families keep the registry ceiling. tr.sound.cat ships with the
+     copied preset object (assignPresetToTrack), so no new imports. */
   if (barRng() < 0.45 * q) {
     const cutMul = 1 + (barRng() - 0.5) * 0.5 * q;
     const sendAdd = (barRng() - 0.5) * 0.16 * q;
     const cutRange = paramById('cutoff'); /* registry bounds (60..14000) */
+    const FAMILY_CEIL = { bass: 2400, pad: 2400, lead: 6500 };
     for (const e of list) {
       const tr = p.tracks[e.track];
       if (!tr) continue;
       const lock = e.lock || (e.lock = {});
       if (lock.cutoff === undefined && tr.sound && typeof tr.sound.cutoff === 'number') {
-        lock.cutoff = clamp(Math.round(tr.sound.cutoff * cutMul), cutRange ? cutRange.min : 60, cutRange ? cutRange.max : 14000);
+        const famCeil = FAMILY_CEIL[tr.sound.cat];
+        const hi = Math.min(cutRange ? cutRange.max : 14000, famCeil != null ? famCeil : Infinity);
+        lock.cutoff = clamp(Math.round(tr.sound.cutoff * cutMul), cutRange ? cutRange.min : 60, hi);
         changed = true;
       }
       if (lock['mix.sendA'] === undefined && tr.mix && typeof tr.mix.sendA === 'number') {
