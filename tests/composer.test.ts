@@ -371,7 +371,7 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
     const dPerc = dark.patterns['C3']!.data[3]!.steps.filter(s => s.on).length
     expect(hPerc).toBeGreaterThan(dPerc)          /* glitch density recipe audible */
   })
-  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical per-build (v0.13.0 kit-swap values)', () => {
+  test('PINNED: FULL-ON/DARK-PSY/PROGRESSIVE outputs byte-identical per-build (v0.30.0 FOUNDATION RESET values)', () => {
     /* any intentional change to the recipes (or shared code paths they
        consume) must consciously update these pins — documented contract.
        v0.9.0 REBUILD VALUES: the chord progression engine (P1) re-tones
@@ -415,9 +415,19 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
          9b0a969099d911b9, PROGRESSIVE 632df9863e6c9f2f/734caf4e8a5743d0/
          3666798ae4faeec0) recorded here. Determinism re-proven (double run
          byte-identical); harmony invariant re-proven (0 viol). */
-      'FULL-ON': ['ad7dc8a9503a278f', '66091ab6725c8754', 'ae4c8d748850fc44'],
-      'DARK-PSY': ['bdef2fe82836af78', 'e813b31df033a923', '6ac89d47741323fb'],
-      'PROGRESSIVE': ['b6ec451238c2075f', '7cd07faa68d3a2d3', '6ac64acf61b8d3cc'],
+      /* v0.30.0 RE-PIN: FOUNDATION RESET — the preset library changed under
+         the composer (130 junk presets deleted, 11 psy4 presets added, the
+         v0.29.0 kickDims seeding removed from DP(), PROGRESSIVE buildStyle
+         snare slot re-pointed PR-PERC→PR-SNARE2-BRUSH), so composed projects
+         reference different presets/params and whole-project hashes moved.
+         v0.29.0-phase-2 values (FULL-ON ad7dc8a9503a278f/66091ab6725c8754/
+         ae4c8d748850fc44, DARK-PSY bdef2fe82836af78/e813b31df033a923/
+         6ac89d47741323fb, PROGRESSIVE b6ec451238c2075f/7cd07faa68d3a2d3/
+         6ac64acf61b8d3cc) recorded here. Determinism re-proven (double run
+         byte-identical); harmony invariant re-proven (0 viol). */
+      'FULL-ON': ['ea9772ac23a6a1f2', '56f834df4d50d533', 'eb34336a965b9762'],
+      'DARK-PSY': ['cde7e57a425527dd', 'aee938755533bf4b', '7d6b76631be8fccc'],
+      'PROGRESSIVE': ['c7b7a1d01b85283b', '8255a76a377edf28', 'e1c4d33ee92fa721'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {

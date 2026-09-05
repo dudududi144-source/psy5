@@ -1,15 +1,19 @@
 /* ══════════════════════════════════════════════════════════════════════
-   PSY6 — PRODUCTION SKIN v0.29.0
+   PSY6 — PRODUCTION SKIN v0.30.0 (FOUNDATION RESET)
    One source of truth. Every color, radius, shadow and spacing step in
    this file derives from the token block below. (ROAST_v0.27 §1.4/§1.5:
    the fossil dig of 30× hard-coded #171c25 and 5/6/7/8/9/10px dice-roll
    paddings is over.)
 
-   Design language: deep-space dark · single teal accent (#4fd6c0, kept
-   from the v0.26 identity so the JS-built strips stay coherent) · amber
-   reserved for record/warm states · 4px spacing grid · two radii · two
-   shadows · uppercase letter-spaced labels for data, sentence case for
-   reading.
+   Design language v0.30: deep-space dark · teal primary accent (#4fd6c0,
+   JS-strip coherence) · VIOLET foundation identity (#c58cff — the badge,
+   the kit strip, the foundation-authored surfaces) · amber reserved for
+   record/warm states · 4px spacing grid · two radii · two shadows.
+
+   v0.30.0 FOUNDATION RESET — the landing states the truth: a foundation
+   badge, the ten-voice kit strip with its level law, and genre cards that
+   resolve to six kits. The app shell gets the pill nav and the filled
+   primary CTA. NOT a background swap — a new information layer.
    ══════════════════════════════════════════════════════════════════════ */
 
 :root{
@@ -62,8 +66,9 @@ button:hover{background:var(--p3);border-color:var(--line2)}
 button:active{transform:translateY(1px)}
 button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
 button.rec.on{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 0 14px #ff5d5d55}
-button.cta{border-color:var(--acc);color:var(--acc);font-weight:700}
-button.cta:hover{box-shadow:var(--glow)}
+/* v0.30.0: the primary action is FILLED — it should read as THE button */
+button.cta{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:800;letter-spacing:.06em}
+button.cta:hover{box-shadow:var(--glow);filter:brightness(1.08)}
 
 select,input[type=number],input[type=text],input[type=file]{background:var(--inset);border:1px solid var(--line);color:var(--txt);border-radius:var(--r1);padding:4px 6px;font-family:var(--mono);font-size:12px}
 select:hover,input:hover{border-color:var(--line2)}
@@ -116,6 +121,18 @@ th{background:var(--p1);color:var(--dim);text-transform:uppercase;font-size:8px;
 #power .styles{display:flex;gap:var(--s3);flex-wrap:wrap;justify-content:center}
 #power .styles button{padding:10px 16px;font-size:11px;letter-spacing:.04em}
 #power .note{font-size:10px;max-width:540px}
+/* ── v0.30.0 FOUNDATION IDENTITY ── */
+.fdnBadge{display:inline-flex;align-items:center;gap:8px;font-size:9px;letter-spacing:.2em;color:var(--pur);border:1px solid #c58cff44;background:#c58cff0f;border-radius:20px;padding:5px 14px;position:relative}
+.fdnDot{width:6px;height:6px;border-radius:50%;background:var(--pur);box-shadow:0 0 10px #c58cffaa;animation:fdnPulse 2.4s ease-in-out infinite}
+@keyframes fdnPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.powKit{max-width:860px;width:100%;display:flex;flex-direction:column;gap:var(--s2);align-items:center;position:relative}
+.kitStrip{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--s2);width:100%}
+@media(max-width:820px){.kitStrip{grid-template-columns:repeat(2,1fr)}}
+.kitVoice{display:flex;flex-direction:column;gap:5px;padding:10px 12px 11px;border:1px solid var(--line);border-radius:var(--r2);background:linear-gradient(168deg,#151322,#0e0c16);border-color:#c58cff2e;position:relative;overflow:hidden;transition:border-color .15s,transform .15s}
+.kitVoice:hover{border-color:#c58cff88;transform:translateY(-2px)}
+.kitVoice b{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--txt)}
+.kitVoice small{font-size:8px;color:var(--faint);letter-spacing:.05em}
+.kitVoice i{display:block;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--pur),#4fd6c0);box-shadow:0 0 8px #c58cff44}
 /* genre cards — injected by boot(): one card per style, per-style accent */
 .genreCard{display:flex;flex-direction:column;gap:3px;min-width:150px;text-align:left;padding:12px 14px!important;border-radius:var(--r2);background:linear-gradient(165deg,var(--p2),var(--p1));position:relative;overflow:hidden}
 .genreCard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--gc,var(--acc));opacity:.85}
@@ -147,12 +164,13 @@ header{display:flex;align-items:center;gap:var(--s2);padding:var(--s2) var(--s3)
 .chip.st{color:var(--acc);border-color:#2a4a44;min-width:52px;text-align:center}
 #meter{background:var(--inset);border:1px solid var(--line);border-radius:var(--r1)}
 
-nav{display:flex;gap:2px;background:var(--p1);border-bottom:1px solid var(--line);padding:0 var(--s2);flex-wrap:wrap}
-nav button{border:none;border-radius:0;background:transparent;color:var(--dim);padding:10px 14px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-bottom:2px solid transparent;min-height:40px}
-nav button:hover{background:var(--p2);color:var(--txt)}
+/* v0.30.0 pill nav — a segmented control, not tabs-on-a-line */
+nav{display:flex;gap:var(--s1);background:var(--p1);border-bottom:1px solid var(--line);padding:6px var(--s2);flex-wrap:wrap;align-items:center}
+nav button{border:1px solid transparent;border-radius:20px;background:transparent;color:var(--dim);padding:8px 16px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;min-height:36px}
+nav button:hover{background:var(--p2);color:var(--txt);border-color:var(--line)}
 /* v0.16.1 history: the global .on used to paint orange-on-orange here.
    The token system keeps the nav override explicit. */
-nav button.on{background:transparent;color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
+nav button.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:700;box-shadow:var(--glow)}
 
 main{padding:var(--s3);flex:1}
 .tab{display:none}
@@ -167,7 +185,8 @@ main{padding:var(--s3);flex:1}
 #statusBar .fKeys b{color:var(--acc)}
 
 /* ── panels ───────────────────────────────────────────────────────── */
-.panel{background:var(--p1);border:1px solid var(--line);border-radius:var(--r2);padding:var(--s3);margin-bottom:var(--s3);box-shadow:var(--sh1)}
+.panel{background:var(--p1);border:1px solid var(--line);border-radius:var(--r2);padding:var(--s3);margin-bottom:var(--s3);box-shadow:var(--sh1);position:relative;overflow:hidden}
+.panel::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#4fd6c033 30%,#c58cff22 70%,transparent);pointer-events:none}
 .pHead{display:flex;justify-content:space-between;align-items:center;gap:var(--s2)}
 .hBtns{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
 .cols{display:grid;grid-template-columns:minmax(430px,1.4fr) 380px;gap:var(--s3)}

@@ -4,15 +4,19 @@
  * The owner's field report: transitions between built sections "don't go
  * smoothly from one to the next". js/transition.js adds the optional
  * scene.trans vocabulary (riser bars / revcym / impact / bass-cut / xfade
- * beats). These tests verify the PURE layer without Web Audio:
+ * beats). v0.30.0 (FOUNDATION RESET): the revcym TYPE is deleted from the
+ * psy4 kit — the CONFIG KEY survives (saved projects) but the swell role
+ * now fires a 'riser' hit one bar before the boundary. These tests verify
+ * the PURE layer without Web Audio:
  *
  *   - normalizeTrans: clamping, canonical stability, empty → null (legacy)
  *   - sceneSetTrans round-trip through the real scene primitive
  *   - xfadeTc: legacy-neutral default (0.02), N-beat span = N·sd/3
  *   - cutSpan: the last-2-steps window, clamped at 0
- *   - transEvents: step math (impact at S, revcym at S-16, riser sweep
- *     ends ON the boundary, 2-bar stack), missing voice type → element
- *     skipped, clamped at song start
+ *   - transEvents: step math (impact at S, the swell (revcym config →
+ *     riser type since v0.30.0) at S-16, riser sweep ends ON the boundary,
+ *     2-bar stack), missing voice type → element skipped, clamped at song
+ *     start
  *   - planTransLive: lookahead gates (0 → impact only), cut window in
  *     seconds, sorted output
  *   - songSchedule integration: trans events appear on the schedule at the
@@ -72,17 +76,25 @@ describe('xfade + cut primitives', () => {
 
 describe('transEvents (offline full-knowledge path)', () => {
   const sd = 60 / 140 / 4
-  const find = (type: string) => ({ riser: 9, revcym: 10, impact: 11 } as any)[type] ?? -1
-  test('impact at S, revcym one bar before, riser sweep ENDS on the boundary', () => {
+  const find = (type: string) => ({ riser: 9, impact: 11 } as any)[type] ?? -1
+  test('impact at S, the swell (revcym config → riser since v0.30.0) one bar before, main sweep ENDS on the boundary', () => {
     const evs = transEvents({ riser: 1, revcym: 1, impact: 1, cut: 0, xfade: 0 }, 64, sd, find)
-    const byKind: any = {}
-    for (const e of evs) byKind[e.kind] = e
-    expect(byKind.impact.absStep).toBe(64)
-    expect(byKind.impact.track).toBe(11)
-    expect(byKind.revcym.absStep).toBe(48)
+    const byKind: Record<string, any[]> = {}
+    for (const e of evs) (byKind[e.kind] = byKind[e.kind] || []).push(e)
+    expect(byKind.impact[0].absStep).toBe(64)
+    expect(byKind.impact[0].track).toBe(11)
+    /* the revcym CONFIG KEY survives (saved projects); the element fires the
+       RISER type one bar before the boundary — v0.30.0 vocabulary law */
+    const swell = byKind.riser.find((e: any) => e.absStep === 48)
+    expect(swell).toBeTruthy()
+    expect(swell.track).toBe(9) /* resolved by TYPE 'riser' — a revcym track no longer exists */
+    expect(swell.vel).toBeCloseTo(.85, 12)
+    /* main sweep lands ON the boundary (the under-swell sits one bar earlier) */
     const sweep = Math.round(1.6 / sd)
-    expect(byKind.riser.absStep).toBe(64 - sweep)
-    expect(byKind.riser.absStep + sweep).toBe(64) /* lands ON the boundary */
+    const main = byKind.riser.find((e: any) => e.absStep === 64 - sweep)
+    expect(main).toBeTruthy()
+    expect(main.absStep + sweep).toBe(64)
+    expect(main.vel).toBeLessThan(swell.vel) /* the stacked under-swell is LOUDER — the main sweep carries the release */
   })
   test('riser:2 stacks an earlier under-sweep (no silent gap on the main sweep)', () => {
     const evs = transEvents({ riser: 2, revcym: 0, impact: 0, cut: 0, xfade: 0 }, 64, sd, find)
@@ -107,20 +119,22 @@ describe('transEvents (offline full-knowledge path)', () => {
 
 describe('planTransLive (scheduler arm path)', () => {
   const sd = 60 / 140 / 4
-  const find = (type: string) => ({ riser: 9, revcym: 10, impact: 11 } as any)[type] ?? -1
+  const find = (type: string) => ({ riser: 9, impact: 11 } as any)[type] ?? -1
   test('lookahead 0 (manual quantized launch) → impact only', () => {
     const plan = planTransLive({ riser: 1, revcym: 1, impact: 1, cut: 1, xfade: 0 }, 10, sd, 0, find)
     expect(plan.events.length).toBe(1)
     expect(plan.events[0].kind).toBe('impact')
     expect(plan.cut).toBe(null)
   })
-  test('lookahead 1 → revcym spans the bar, cut window = [bT-2sd, bT)', () => {
+  test('lookahead 1 → the swell (revcym config → riser) spans the bar, cut window = [bT-2sd, bT)', () => {
     const bT = 10
     const plan = planTransLive({ riser: 1, revcym: 1, impact: 1, cut: 1, xfade: 0 }, bT, sd, 1, find)
-    const byKind: any = {}
-    for (const e of plan.events) byKind[e.kind] = e
-    expect(byKind.revcym.at).toBeCloseTo(bT - 16 * sd, 12)
-    expect(byKind.riser.at).toBeGreaterThanOrEqual(bT - 1.6) /* sweep ends on the boundary */
+    const risers = plan.events.filter(e => e.kind === 'riser')
+    expect(risers.length).toBe(2)
+    expect(risers[0].at).toBeCloseTo(bT - 16 * sd, 12) /* the one-bar swell */
+    expect(risers[0].vel).toBeCloseTo(.85, 12)
+    expect(risers[1].at).toBeGreaterThanOrEqual(bT - 1.6) /* main sweep ends on the boundary */
+    expect(risers[1].vel).toBeCloseTo(.8, 12)
     expect(plan.cut).toEqual([bT - 2 * sd, bT])
     /* sorted by time */
     for (let i = 1; i < plan.events.length; i++) expect(plan.events[i].at).toBeGreaterThanOrEqual(plan.events[i - 1].at)
@@ -134,7 +148,8 @@ describe('planTransLive (scheduler arm path)', () => {
 
 describe('songSchedule integration (the oracle reflects what renders)', () => {
   /* silent FX carrier tracks (no pattern data → stepEvents skips them; they
-     exist so findTransTrack can map the transition elements) */
+     exist so findTransTrack can map the transition elements). v0.30.0: the
+     revcym carrier is gone with the type — the swell rides the RISER track. */
   function addFxCarriers(p: any) {
     const mk = (name: string, type: string) => ({
       idx: p.tracks.length, name, kind: 'drum', presetId: 'fx-' + type,
@@ -142,7 +157,7 @@ describe('songSchedule integration (the oracle reflects what renders)', () => {
       mix: { vol: 1, pan: 0, mute: false, solo: false, sendA: 0, sendB: 0 },
       scAmount: 0, voiceMode: 'synth',
     })
-    p.tracks.push(mk('FX RISER', 'riser'), mk('FX REVCYM', 'revcym'), mk('FX IMPACT', 'impact'))
+    p.tracks.push(mk('FX RISER', 'riser'), mk('FX IMPACT', 'impact'))
   }
   test('trans events land at the right absolute steps + bass vanishes in the cut window', () => {
     const p: any = compose('PSYTRANCE', 1, 42).project
@@ -155,19 +170,19 @@ describe('songSchedule integration (the oracle reflects what renders)', () => {
     const sch = songSchedule(p)
     const transEvs = sch.evs.filter((e: any) => e.trans)
     expect(transEvs.length).toBeGreaterThanOrEqual(3)
-    /* impact exactly on the boundary, revcym one bar before it — carriers are
-       resolved by TYPE (composed projects may already carry a riser-type
-       track; findTransTrack picks the lowest index) */
+    /* impact exactly on the boundary; the swell (revcym config) and the main
+       sweep both ride the riser carrier — resolved by TYPE (composed projects
+       may already carry a riser-type track; findTransTrack picks the lowest) */
     const imp = transEvs.find((e: any) => e.track === findTransTrack(p, 'impact'))
-    const rev = transEvs.find((e: any) => e.track === findTransTrack(p, 'revcym'))
+    const risTrack = findTransTrack(p, 'riser')
+    const risers = transEvs.filter((e: any) => e.track === risTrack)
     expect(imp.s).toBe(S1)
     expect(imp.t).toBeCloseTo(0.05 + S1 * sd, 6)
-    expect(rev.s).toBe(S1 - 16)
-    /* riser sweep ends ON the boundary */
+    expect(risers.find((e: any) => e.s === S1 - 16)).toBeTruthy() /* the one-bar swell */
+    /* main riser sweep ends ON the boundary */
     const sweep = Math.round(1.6 / sd)
-    const ris = transEvs.find((e: any) => e.track === findTransTrack(p, 'riser'))
-    expect(ris).toBeDefined()
-    expect(ris.s + sweep).toBe(S1)
+    const ris = risers.find((e: any) => e.s + sweep === S1)
+    expect(ris).toBeTruthy()
     /* bass (track 4) silent in the cut window */
     const bassInWindow = sch.evs.filter((e: any) => e.track === 4 && e.s >= S1 - 2 && e.s < S1)
     expect(bassInWindow.length).toBe(0)

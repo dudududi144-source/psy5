@@ -14,7 +14,9 @@
  *   3. CHORD: diatonic 7th chords (v0.28.0, root+3+5+7 — psyreason 47ec8a0)
  *      with correct quality symbols — natural minor degrees give
  *      i ii° III iv v VI VII triads plus the diatonic seventh.
- *   4. GLYPHS: every engine drum type (drumDurEst switch) has a silhouette.
+ *   4. GLYPHS: every engine drum type (drumDurEst switch — the 10-type psy4
+ *      kit vocabulary since v0.30.0) has a silhouette, and the DELETED junk
+ *      types render none (the vocabulary is closed).
  *   5. HONESTY: a set with no drum voices yields 16 'empty' markers (the UI
  *      toasts the Sound-tab fix — never a silent pad).
  * Determinism is sacred: pure functions, zero DOM.
@@ -68,7 +70,7 @@ describe('v0.22.0 PADS v3 — DRUM mode', () => {
   test('16-voice kit → all voice pads; 4-drum kit → 12 variants; 0 drums → 16 honest empties', () => {
     // 16 drum tracks (12 from the 8-track build's 4 drums + 12 pushed)
     const big = buildStyle('TRANCE', 5)
-    while (big.tracks.length < 16) big.tracks.push({ idx: big.tracks.length, kind: 'drum', name: 'PERC ' + big.tracks.length, sound: { type: 'conga', tune: 1, decay: 1 }, type: 'conga', mix: { vol: .8, pan: 0, mute: false, solo: false, sendA: 0, sendB: 0 } })
+    while (big.tracks.length < 16) big.tracks.push({ idx: big.tracks.length, kind: 'drum', name: 'PERC ' + big.tracks.length, sound: { type: 'shaker', tune: 1, decay: 1 }, type: 'shaker', mix: { vol: .8, pan: 0, mute: false, solo: false, sendA: 0, sendB: 0 } }) /* v0.30.0: the fixture rides a SURVIVING kit type (conga died with the junk family) */
     const kBig = padKit(big, 'DRUM')
     expect(kBig.filter((e: any) => e.mode === 'voice').length).toBe(12) // 4 native drums + 12 pushed
     expect(kBig.filter((e: any) => e.mode === 'variant').length).toBe(4)
@@ -157,9 +159,9 @@ describe('v0.22.0 PADS v3 — SCALE/CHORD modes', () => {
 })
 
 describe('v0.22.0 PADS v3 — glyphs + helpers', () => {
-  test('every engine drum type has an envelope silhouette', () => {
+  test('every engine drum type has an envelope silhouette (the 10-type psy4 vocabulary)', () => {
     const types = allTypes()
-    expect(types.length).toBeGreaterThanOrEqual(24)
+    expect(types.length).toBe(10) /* v0.30.0: the kit vocabulary is closed — exactly the psy4 kit types */
     for (const t of types) {
       const g = padGlyph(t)
       expect(g).toBeTruthy()
@@ -172,7 +174,14 @@ describe('v0.22.0 PADS v3 — glyphs + helpers', () => {
         expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThanOrEqual(60)
       }
     }
-    expect(padGlyph('nonexistent-type')).toBe(PAD_GLYPHS.tom) // honest fallback
+    /* v0.30.0 RE-PIN (the honest-fallback anchor died with the type): the
+       fallback target was PAD_GLYPHS.tom — `tom` is DELETED, so an unknown
+       type yields NO silhouette at all. Same rigor, new law: the vocabulary
+       is closed (the ui/tests TYPES40 schema gate refuses anything else),
+       and a resurrected junk type must not render a recycled shape. */
+    expect(padGlyph('nonexistent-type')).toBeUndefined()
+    expect(padGlyph('tom')).toBeUndefined()
+    expect(padGlyph(null)).toBeUndefined()
   })
 
   test('padLabel strips genre words, caps at 18, handles garbage', () => {
@@ -186,7 +195,7 @@ describe('v0.22.0 PADS v3 — glyphs + helpers', () => {
   })
 
   test('padType reads sound.type first, falls back to tr.type', () => {
-    expect(padType({ sound: { type: 'conga' }, type: 'kick' })).toBe('conga')
+    expect(padType({ sound: { type: 'shaker' }, type: 'kick' })).toBe('shaker')
     expect(padType({ sound: {}, type: 'snare' })).toBe('snare')
     expect(padType({})).toBe('kick')
   })

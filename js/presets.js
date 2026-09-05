@@ -529,7 +529,7 @@ put(pat,5,6,.55,root+24);
 put(B,6,0,.5,root+15);B.data[6].steps[0].lock={cutoff:2600};put(B,6,8,.45,root+12);
 }else if(style==='PROGRESSIVE'){
 p.bpm=122;p.scale='dorian';
-assignPresetToTrack(p,0,libFind('PR-KICK'));assignPresetToTrack(p,1,libFind('PR-PERC'));
+assignPresetToTrack(p,0,libFind('PR-KICK'));assignPresetToTrack(p,1,libFind('PR-SNARE2-BRUSH'));/* v0.30.0: PR-PERC (rim junk family) died with the FOUNDATION RESET — the progressive snare role resolves to the KITS snare id */
 assignPresetToTrack(p,2,libFind('PR-HAT'));assignPresetToTrack(p,3,libFind('PR-SHAKER'));
 assignPresetToTrack(p,4,libFind('PR-BASS-WARM'));assignPresetToTrack(p,5,libFind('PR-LEAD-MELODIC'));
 assignPresetToTrack(p,6,libFind('PR-PAD-EVOLVE'));assignPresetToTrack(p,7,libFind('PR-ARP-MELODIC'));

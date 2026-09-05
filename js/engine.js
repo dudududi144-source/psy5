@@ -224,10 +224,7 @@ src.start(when);src.stop(when+endSec+.016);v.busyUntil=when+winSec;v.lastTrigger
 v.lastType=type;v.lastTrack=tr.idx;v.amp=Math.max(amp,.001);this._rrType.set(type,((this._rrType.get(type)||0)+1)%2);/* per-type 2-variant round-robin, SUCCESS only */
 /* v0.24.0 KIT CHOKE — the kit's own rules, time-anchored like every
    envelope here (cancel ≥ `when`, re-anchor from the hit's stored sustain
-   level, exponential ramp — value-continuous, click-free, offline-correct):
-   hatC + hatExclusive → every OTHER busy hatO voice ramps to silence over
-   25 ms (the classic closed-hat chokes the open one); crash/ride → at the
-   kit's maxPoly the OLDEST same-type voice fades over 60 ms. */
+   level, exponential ramp — value-continuous, click-free, offline-correct). */
 /* v0.30.0 KIT CHOKE — the fixed psy4 kit law: hatC chokes hatO (the classic
    closed-hat chokes the ringing open one, 25 ms exponential). The crash/ride
    poly choke died with the cymbal types (vocabulary discipline). */

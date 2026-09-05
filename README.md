@@ -18,7 +18,7 @@ LOCAL · DETERMINISTIC · NO SERVER · NO TELEMETRY · NO BUILD STEP
 | `index.html` | **The PSY6 device** — standalone groovebox (power-on screen, Perform/Sequencer/Sound/Mixer/Self-Gate tabs, CO-PILOT panel, section arranger). Self-contained by design. |
 | `worklets/psy-engine.js` | PSY6 real-time audio engine — single `AudioWorkletProcessor` (transport, ring-buffer event queue, preallocated voice pool, master chain). |
 | `worklets/psy-dsp.js` | PSY6 DSP primitives — Moog ladder, polyBLEP saw/square, saturation, phaser, bus EQ (`AudioWorkletProcessor`s). |
-| `soundBank.ts` | Engine type-surface documentation (pinned by synth-v2.test.ts). `js/presets.js` is the live runtime library. |
+| `js/presets.js` | The live runtime library (337 factory presets). The unrouted `soundBank.ts` TS catalog was deleted in v0.30.0 (FOUNDATION RESET). |
 | `foundation/` | **psy-foundation** — shared packages (music, material, learning, dsp, scheduler, transport, protocol, device-sdk, analysis, fixtures, composition). Single source of truth for musical primitives. The device consumes `foundation/learning/bandit.mjs` (contextual bandit with abstention) for the CO-PILOT. See `FOUNDATION_API.md`. |
 | `tests/` | Bun test suite for foundation packages. |
 | `playground/` | The PSY6 browser playground (deployed to Cloudflare Pages as project `psy6`). |

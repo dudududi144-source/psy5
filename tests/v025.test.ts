@@ -1,14 +1,16 @@
 /**
  * v0.25.0 P1 — STRATIFICATION II tests.
  * Pins the batch that fills the owner's thin-cell report:
- *   - texture: a category with ZERO factory presets before v0.25.0 → now one
+ *   - texture: a category with ZERO factory presets before v0.25.0 → one
  *     evolving bed per genre (9/9)
  *   - synth: exactly 1 preset before → 6 (5 new utility voices)
- *   - FOREST: 21 presets (thinnest genre) → 30
+ *   - FOREST: every category cell non-zero
  *   - BANDPASS dimension: the library was 75× lowpass vs 2× bandpass →
  *     6 bandpass acid basses across 6 genres (psyreason 8e97cd6 dimension,
  *     exceeded: per-genre res/fenv laws, not one template)
  *   - WIDE pads: detune 24-30 (the stereo-width dimension) × 4 genres
+ * v0.30.0: absolute counts re-pinned to the FOUNDATION RESET library
+ * (130 junk presets deleted, 11 psy4 presets added → 337 total).
  * Every claim reproducible: bun test tests/v025.test.ts
  */
 import { describe, expect, test } from 'bun:test'
@@ -17,9 +19,9 @@ import { libCount, libFilter, libFind } from '../js/presets.js'
 const ALL = libFilter('all', 'ALL')
 const NINE = ['FULL-ON', 'DARK-PSY', 'FOREST', 'HI-TECH', 'PSYTRANCE', 'GOA', 'TECHNO', 'TRANCE', 'PROGRESSIVE']
 
-describe('v0.25.0 stratification II', () => {
-  test('library 423 → 456 (+33, all ids unique)', () => {
-    expect(libCount()).toBe(456)
+describe('v0.25.0 stratification II (counts re-pinned to the v0.30.0 FOUNDATION RESET)', () => {
+  test('library = 337 presets (the reset deleted 130 junk presets, added 11 psy4), all ids unique', () => {
+    expect(libCount()).toBe(337)
     const ids = new Set(ALL.map(p => p.id))
     expect(ids.size).toBe(ALL.length)
   })
@@ -39,9 +41,9 @@ describe('v0.25.0 stratification II', () => {
     expect(libFilter('synth', 'ALL').length).toBe(6)
   })
 
-  test('FOREST deepened 22 → 32, every cell non-zero', () => {
-    expect(libFilter('all', 'FOREST').length).toBe(32)
-    for (const cat of ['drum', 'bass', 'lead', 'pad', 'pluck', 'fx']) {
+  test('FOREST: 28 presets — every cell non-zero after the junk purge (was 32 pre-reset)', () => {
+    expect(libFilter('all', 'FOREST').length).toBe(28)
+    for (const cat of ['drum', 'bass', 'lead', 'pad', 'pluck', 'arp', 'fx', 'synth', 'texture']) {
       expect(libFilter(cat, 'FOREST').length).toBeGreaterThan(0)
     }
   })
@@ -69,11 +71,11 @@ describe('v0.25.0 stratification II', () => {
     }
   })
 
-  test('new ids resolve through libFind + AUDITION path (cat/engine contract)', () => {
-    for (const id of ['TX-PS-NIGHT', 'SN-PS-ZAPPER', 'FS-BASS-MYCELIUM', 'PSB-ACIDBP-V25', 'TR-PAD-WIDESAW', 'PL-FS-DEWDROP', 'FX-FS-DOWN', 'FX-FS-AIR']) {
+  test('v0.25 ids + the v0.30.0 psy4 additions resolve through libFind + AUDITION path (cat/engine contract)', () => {
+    for (const id of ['TX-PS-NIGHT', 'SN-PS-ZAPPER', 'FS-BASS-MYCELIUM', 'PSB-ACIDBP-V25', 'TR-PAD-WIDESAW', 'PL-FS-DEWDROP', 'FX-FS-DOWN', 'DR-SHAKER-GRAVE', 'HT-SHAKER-CIRCUIT', 'TXD-PS-VEIL', 'TXD-FS-MOSS']) {
       const p = libFind(id)
       expect(p).toBeTruthy()
-      expect(p.engine === 'DRUM' ? p.cat === 'drum' : p.cat !== 'drum').toBe(true)
+      expect(p!.engine === 'DRUM' ? p!.cat === 'drum' : p!.cat !== 'drum').toBe(true)
     }
   })
 })

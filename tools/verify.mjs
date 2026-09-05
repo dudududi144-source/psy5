@@ -4,7 +4,7 @@
  * Usage: node tools/verify.mjs   (exit 0 = green, 1 = red)
  *
  * Checks:
- *   1. Standalone JS files parse (node --check): worklets, soundBank, factory-presets.
+ *   1. Standalone JS files parse (node --check): worklets.
  *   2. Every inline <script> block of index.html and playground/index.html parses.
  *   3. Document structure: doctype present, exactly one <html>/<head>/<body>,
  *      balanced <script>/<style> tags.

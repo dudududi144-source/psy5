@@ -4,12 +4,14 @@
  *
  * Owner driver: "תמלא עוד דברים שיהיה מבחר עשיר" (fill more, rich variety)
  * and the standing playability ask. This suite pins:
- *  1. the +36 batch: exact library total, zero id collisions, FOREST's
- *     first own presets, per-category deltas
+ *  1. the v0.18 batch ids (SURVIVING 30 — the 6 drum junk presets of the
+ *     batch died in the v0.30.0 FOUNDATION RESET with their family),
+ *     zero id collisions, FOREST's own presets, per-category totals
  *  2. fillEvents: three deterministic layouts (CLASSIC/ROLL/TOMLINE),
  *     clamped velocities, tune climb via parameter locks, wrap-around
  *  3. findTransTrack: which DJ tool each composed kit can carry (riser
- *     everywhere, impact on TRANCE, revcym honestly absent)
+ *     everywhere, impact on TRANCE, the SWELL carrier is a texture track
+ *     since v0.30.0 — the revcym type is deleted)
  */
 import { describe, expect, test } from 'bun:test'
 import { libFind, libCount, libFilter, KITS } from '../js/presets.js'
@@ -18,9 +20,9 @@ import { findTransTrack } from '../js/transition.js'
 import { compose } from '../js/composer.js'
 
 const NEW_IDS = [
-  /* drums (9) */
-  'FO-KICK-CAMO', 'FO-PERC-TWIG', 'DH-SNARE-CRUSH', 'GO-CLAP-DUNE', 'FU-CONGA-HEAT',
-  'PR-BONGO-SOFT', 'TR-DARBUKA-SILK', 'TE-COWBELL-STEEL', 'DH-CRASH-BLACK',
+  /* drums (9 in v0.18; 6 SURVIVE — the conga/bongo/darbuka/cowbell/crash/
+     perc-twig entries died with the junk family in v0.30.0) */
+  'FO-KICK-CAMO', 'DH-SNARE-CRUSH', 'GO-CLAP-DUNE',
   /* bass (6) */
   'FO-BASS-GATE', 'DH-BASS-SCREAM', 'GO-BASS-SQUARE', 'FU-BASS-SUBPUMP', 'DH-BASS-WOBBLE', 'FU-BASS-ROLLOCT',
   /* lead (6) */
@@ -32,12 +34,14 @@ const NEW_IDS = [
   /* arp (5) */
   'DH-ARP-NEEDLE', 'GO-ARP-TEMPLE', 'FU-ARP-HELIX', 'PR-ARP-GENTLE', 'TR-ARP-CRYSTAL',
 ]
+/* the batch's deleted members — the reset deleted them WITH their type family */
+const BATCH_DEAD_IDS = ['FO-PERC-TWIG', 'FU-CONGA-HEAT', 'PR-BONGO-SOFT', 'TR-DARBUKA-SILK', 'TE-COWBELL-STEEL', 'DH-CRASH-BLACK']
 
-describe('preset batch v0.18 — richer variety, purely additive', () => {
-  test('library total is exactly 456 (381 + 42 in v0.19.0 + 33 in v0.25.0)', () => {
-    expect(libCount()).toBe(456)
+describe('preset batch v0.18 — richer variety (counts re-pinned to the v0.30.0 reset)', () => {
+  test('library total is exactly 337 (v0.30.0 FOUNDATION RESET: 130 junk deleted, 11 psy4 added)', () => {
+    expect(libCount()).toBe(337)
   })
-  test('all 36 new ids resolve with the right category', () => {
+  test('the 30 surviving v0.18 ids resolve with the right category', () => {
     for (const id of NEW_IDS) {
       const pr = libFind(id)
       expect(pr).not.toBeNull()
@@ -50,6 +54,9 @@ describe('preset batch v0.18 — richer variety, purely additive', () => {
     expect(libFind('FO-KICK-CAMO')!.cat).toBe('drum')
     expect(libFind('FO-KICK-CAMO')!.type).toBe('kick')
   })
+  test("the batch's junk members are DELETED with their family (vocabulary discipline)", () => {
+    for (const id of BATCH_DEAD_IDS) expect(libFind(id)).toBeNull()
+  })
   test('zero id collisions across the whole library', () => {
     const ids = new Set()
     let dups = 0
@@ -58,8 +65,8 @@ describe('preset batch v0.18 — richer variety, purely additive', () => {
     }
     expect(dups).toBe(0)
   })
-  test('per-category deltas: drum 259, bass 55, lead 35, pad 31, pluck 24, arp 22, fx 15', () => {
-    const want: Record<string, number> = { drum: 259, bass: 55, lead: 35, pad: 31, pluck: 24, arp: 22, fx: 15 }
+  test('per-category totals after the reset: drum 140, bass 55, lead 35, pad 31, pluck 24, arp 22, fx 15, synth 6, texture 9', () => {
+    const want: Record<string, number> = { drum: 140, bass: 55, lead: 35, pad: 31, pluck: 24, arp: 22, fx: 15, synth: 6, texture: 9 }
     for (const [c, n] of Object.entries(want)) expect(libFilter(c, 'ALL').length).toBe(n)
   })
   test('FOREST carries its own kit now (was 2 presets — it rode DARK-PSY)', () => {
@@ -156,16 +163,20 @@ describe('DJ tools — carrier logic per composed kit', () => {
       expect(findTransTrack(p, 'revcym')).toBe(-1)
     }
   })
-  test('a project with an assigned revcym track becomes SWELL-capable', () => {
+  test('a project with an assigned texture track is SWELL-capable (the DJ “w” tool fires texture since v0.30.0 — the revcym type is deleted)', () => {
     const p = compose('FULL-ON', 3, 424242).project
-    const pr = libFind('DH-CRASH-BLACK') /* any new drum; use a revcym preset */
-    const rev = libFind('FX-PS-RISE') ? null : null /* sanity: legacy ids still resolve */
-    /* assign a real revcym preset onto track 8 (over the riser) */
-    const revcym = libFilter('drum', 'ALL').find(x => x.type === 'revcym')!
+    /* sanity: the legacy fx id still resolves; the batch's crash id does NOT */
+    expect(libFind('FX-PS-RISE')).toBeTruthy()
+    expect(libFind('DH-CRASH-BLACK')).toBeNull()
+    /* no factory preset carries the dead type and a composed set has no revcym carrier */
+    expect(libFilter('drum', 'ALL').some(x => x.type === 'revcym')).toBe(false)
+    expect(findTransTrack(p, 'revcym')).toBe(-1)
+    /* assign a real texture preset onto track 8 (over the FX lane) — the SWELL carrier */
+    const texture = libFilter('drum', 'ALL').find(x => x.type === 'texture')!
+    expect(texture).toBeTruthy()
     p.tracks[8].kind = 'drum'
-    p.tracks[8].sound = Object.assign({}, revcym)
-    p.tracks[8].type = 'revcym'
-    expect(findTransTrack(p, 'revcym')).toBe(8)
-    expect(pr && rev === null).toBe(true)
+    p.tracks[8].sound = Object.assign({}, texture)
+    p.tracks[8].type = 'texture'
+    expect(findTransTrack(p, 'texture')).toBe(8)
   })
 })

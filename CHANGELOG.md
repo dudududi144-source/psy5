@@ -3,6 +3,58 @@
 All notable changes to the PSY6 device repository. Every claim below is
 reproducible with the command shown next to it.
 
+## [0.30.0] — FOUNDATION RESET: psy-foundation v2.0.0 is the only sound system
+
+> Owner instruction 20: "throw away ALL your sounds — connect ONLY with
+> psy-foundation." The kit vocabulary, the presets and the engine trigger
+> path are rebuilt on the psy4 voice core ported in phase 3-a
+> (foundation/psy4/, byte-identical port of psy-foundation v2.0.0 @ edd1e5f).
+
+- **THE KIT IS THE PSY4 KIT** (`js/psy4kit.mjs`): 6 kits (psy-classic,
+  dark-forest, progressive, hi-tech, forest-organic, tribal-raw — the same
+  ids save files already persist), 10 types (kick snare clap hatC hatO
+  shaker riser impact texture downlifter). `renderPsy4Pcm` renders the
+  foundation voices (PsyKick/PsySnare/PsyHat/PsyShaker/PsyRiser/PsyImpact/
+  PsyTexture) with per-(kit,type,variant) seeded determinism, a per-type
+  peak-target LEVEL LAW and a kit-root transposition law. The membrane/
+  metal junk family (conga bongo cowbell clave rim tom zap boom glitch
+  darbuka tambourine triangle agogo timbale crash revcym) is DELETED —
+  not deprecated, DELETED. Verify: `bun test tests/psy4kit.test.ts`.
+- **ENGINE**: `romBuffer` renders psy4 PCM into `PSY4_SHARED`
+  (keys `P4:<type>:<kitId>:<variant>:<rootMul%@<sr>`), the hatC→hatO choke
+  is the fixed kit law (25 ms exponential), DrumVoice is reduced to the
+  6-core legacy synth fallback (v0.14 dist/glide/bursts/bright params and
+  the v0.15 recipes intact), drumDurEst trimmed to the 10 kit types.
+  Verify: `bun test tests/psy4-wiring.test.ts`.
+- **PRESETS**: 130 junk presets deleted, 11 psy4 presets added
+  (DR-SHAKER-GRAVE, HT-SHAKER-CIRCUIT, the TXD-* texture family), KITS
+  perc roles resolve to shaker ids, kickDims deleted. Library total is
+  exactly 337 (140 drum + 197 synth). Verify:
+  `bun -e "import{libCount}from'./js/presets.js';console.log(libCount())"`.
+- **DEAD CODE REMOVED**: foundation/dsp/kit-reason.mjs, perc-rom.mjs,
+  reason-engines.mjs (no runtime importer since the reset), the ROM audit
+  tool that audited the dead renderer, soundBank.ts (an unrouted TS
+  catalog) and the samples/ bundled wavs. `sw.js` CACHE_VERSION bumped to
+  psy6-v0.30.0.
+
+- **UI — THE VISIBLE RESET** (the owner: "a black background is not a
+  change"): the landing now STATES the truth — a pulsing
+  `POWERED BY PSY-FOUNDATION v2 · PSY4 VOICE ENGINE` badge, a ten-voice
+  KIT STRIP (each voice card carries its level-law bar and its recipe
+  line), and per-style genre cards resolving to the six kits. New violet
+  foundation identity (#c58cff) layered over the teal system accent. The
+  app shell gets the pill nav (filled active state), the FILLED primary
+  CTA, the panel top-rule gradient, and a live KIT DNA line in the Sound
+  tab (the kit's name + foundation blurb under the kit select).
+- **TESTS**: suite realigned to the reset — 617 pass / 0 fail / 0 skip
+  (bun) + `tools/verify.mjs` GREEN. Dead-contract tests deleted
+  (perc-rom/reason-port/kick-dims/kit-reason/drum-v15/soundbank), new
+  `psy4kit.test.ts` (render laws) + `psy4-wiring.test.ts` (35 wiring
+  pins) land the replacement coverage at equal rigor.
+- **DOCS**: FOUNDATION_STATUS.md / FOUNDATION_API.md carry the v0.30.0
+  reset banner + the psy4 core API table; the v1 reconciliation record
+  is preserved below the banner for provenance.
+
 ## [0.29.0] — Run 28: SOUND PORTS #2 — expressive kicks, stereo pads, 36 FORMS
 
 > Owner: "תמשיך צירפתי לך את הטוקן שוב חשוב לדחוף בסוף כי הסביבה שלך

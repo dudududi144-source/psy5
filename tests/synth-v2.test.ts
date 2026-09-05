@@ -8,17 +8,17 @@
  *      not define the new fields — absence is what makes the v0.13.0 engine
  *      render legacy presets exactly like v0.12.0. Marked (gen:'v13') presets
  *      MAY opt in, but every present field must sit inside the engine clamps.
- *   2. soundBank.ts declares the five engine-consumed optional fields.
- *   3. The runtime library stays healthy: unique ids, 178+ presets, all
+ *   2. The runtime library stays healthy: unique ids, 178+ presets, all
  *      categories present (the v0.12.0 floor).
+ *
+ * v0.30.0: the soundBank.ts source pin was REMOVED with the file itself —
+ * the unrouted TS catalog died in the FOUNDATION RESET and js/presets.js is
+ * the one preset surface the engine consumes. The neutrality + clamp guards
+ * (the real v2-lite contract) keep the same rigor on the live library.
  */
 import { describe, test, expect } from 'bun:test'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
 import { libFilter, libCount } from '../js/presets.js'
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const NEW_FIELDS = ['fenv', 'fdec', 'penv', 'pdec', 'sub'] as const
 /** engine clamps (SynthVoice.noteOn, js/engine.js — keep in sync) */
 const CLAMPS: Record<string, [number, number]> = {
@@ -55,15 +55,6 @@ describe('synth v2-lite data layer (v0.13.0 P1; v0.18.0 adds the gen opt-in)', (
         }
       }
     }
-  })
-
-  test('soundBank.ts declares the five engine-consumed optional fields', () => {
-    const src = readFileSync(join(ROOT, 'soundBank.ts'), 'utf8')
-    for (const f of NEW_FIELDS) {
-      expect(src).toContain(`${f}?: number`)
-    }
-    // the old declaration-only fields stay marked as never-consumed
-    expect(src).toContain('DECLARATION ONLY')
   })
 
   test('runtime lib shape intact: unique ids, 178+ presets, categories present', () => {

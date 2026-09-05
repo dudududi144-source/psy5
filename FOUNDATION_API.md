@@ -244,3 +244,27 @@ psy-foundation (bottom layer)
 Foundation NEVER imports from a device. Devices import from foundation.
 Foundation has zero dependency on React, Next.js, psyLive, or any specific
 audio graph implementation.
+
+## v0.30.0 — the PSY4 sound core (the surface PSY6 actually consumes)
+
+Vendored at `foundation/psy4/` from psy-foundation **v2.0.0 @ edd1e5f**
+(apps/web/src/lib/psy4 + packages/dsp/filters-zdf). Plain-JS ESM ports,
+byte-identical math (bun-vs-node render parity proven per voice).
+
+| Module | Exports |
+| --- | --- |
+| `zdf-svf.mjs` | `ZDFSVF` |
+| `dsp-primitives.mjs` | `fastTanh, polyBlep, MoogLadder, OnePoleLP, OnePoleHP, LR4Highpass, PinkNoise, ADSR, DecayEnv, BLSaw, BLSquare, BLTriangle, SineOsc, OversampledSaturation` |
+| `prng.mjs` | `Rng` |
+| `constants.mjs` | `DEFAULT_SR, SR_48K, SR_96K, SR_192K` |
+| `granular.mjs` | `GrainCloud` |
+| `voice-specs.mjs` | `KICK_SPEC, BASS_SPEC, LEAD_SPEC, PAD_SPEC, ACID_SPEC, HAT_SPEC, SNARE_SPEC, BUS_GAINS, MASTER_SPEC, ARRANGEMENT_SPEC` |
+| `psy-voices.mjs` | `PsyKick, PsyBass, PsyLead, PsyHat, PsySample, PsySnare, PsySubBass, PsyPad, PsyShaker, PsyAcid, PsyTexture, PsyRiser, PsyImpact` |
+| `channel-presets.mjs` | `CHANNEL_PRESETS, VOICE_TYPES` |
+
+Kit adapter: `js/psy4kit.mjs` — `PSY4_KIT_TYPES, renderPsy4Pcm, KIT_IDS,
+DEFAULT_KIT, styleKit, kitMeta, isPsy4KitId, kitRootHzOf, kitWarmTypes,
+kitLevelTarget, kitTiltBias`.
+
+Documented deviation: PsyPad chorus read `(x % d + d) % d` (upstream
+`(x - δ + D) % D` goes negative and poisons the filter with NaN).

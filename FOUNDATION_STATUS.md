@@ -1,5 +1,19 @@
 # FOUNDATION STATUS
 
+> ══════════════════════════════════════════════════════════════════
+> **v0.30.0 FOUNDATION RESET (current truth).** PSY6's sound system was
+> REBUILT on psy-foundation **v2.0.0 @ `edd1e5f`** (957 tests / 28 verify
+> claims green upstream). The vendored sound core lives in
+> `foundation/psy4/` (psy4 voice classes + voice-specs + channel presets,
+> byte-identical math, one documented deviation: the PsyPad chorus
+> circular-read NaN fix) and is wired through `js/psy4kit.mjs` (six kits,
+> level law, root law). The v1 kit stack (`kit-reason` / `perc-rom` /
+> `reason-engines` — the conga/bongo/cowbell ROM family) was DELETED per
+> the owner's foundation-only mandate. Everything below the reset banner
+> is the HISTORICAL v1 reconciliation record, kept for provenance.
+> ══════════════════════════════════════════════════════════════════
+
+
 > **Device-lineage note.** This repository is the home of the **PSY6** device.
 > The PSY4 references in this gate report are historical (PSY4 was the proven
 > reference runtime at reconciliation time; the device line is PSY4 → PSY5 →

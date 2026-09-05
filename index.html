@@ -15,11 +15,31 @@
 
   <header class="powHead">
     <div class="powBrand" aria-label="PSY6">PSY<span>6</span></div>
+    <div class="fdnBadge mono" role="note" title="Every drum and FX voice renders through the psy-foundation v2.0.0 psy4 voice system — one sound source of truth.">
+      <span class="fdnDot" aria-hidden="true"></span>POWERED BY PSY-FOUNDATION v2 · PSY4 VOICE ENGINE
+    </div>
     <p class="powTag mono">PSYTRANCE GROOVEBOX · DETERMINISTIC ENGINE · RUNS ENTIRELY IN YOUR BROWSER</p>
   </header>
 
   <p class="powLead">Nine genres. One press. A complete arranged set —<br>
   scenes, transitions, arranger, album — playing in seconds. Never empty.</p>
+
+  <section class="powSec powKit" aria-label="The sound kit">
+    <div class="powLabel mono">THE KIT — 10 FOUNDATION VOICES · LEVEL-LAW COHERENT · SIX GENRE KITS</div>
+    <div class="kitStrip" id="kitStrip">
+      <div class="kitVoice" data-v="kick"><b>KICK</b><i style="width:100%"></i><small>sub 3-layer · spec 50 Hz</small></div>
+      <div class="kitVoice" data-v="snare"><b>SNARE</b><i style="width:85%"></i><small>tone + BP noise</small></div>
+      <div class="kitVoice" data-v="clap"><b>CLAP</b><i style="width:80%"></i><small>4-burst composite</small></div>
+      <div class="kitVoice" data-v="hatC"><b>HAT ·</b><i style="width:55%"></i><small>6-osc metallic</small></div>
+      <div class="kitVoice" data-v="hatO"><b>HAT —open</b><i style="width:58%"></i><small>choked by ·</small></div>
+      <div class="kitVoice" data-v="shaker"><b>SHAKER</b><i style="width:45%"></i><small>dual envelope</small></div>
+      <div class="kitVoice" data-v="riser"><b>RISER</b><i style="width:70%"></i><small>1.6 s sweep</small></div>
+      <div class="kitVoice" data-v="impact"><b>IMPACT</b><i style="width:90%"></i><small>cinematic sub</small></div>
+      <div class="kitVoice" data-v="texture"><b>TEXTURE</b><i style="width:45%"></i><small>atmosphere bed</small></div>
+      <div class="kitVoice" data-v="downlifter"><b>DOWNLIFT</b><i style="width:70%"></i><small>riser reversed</small></div>
+    </div>
+    <div class="note" style="text-align:center;max-width:640px;margin:0 auto">Every kit voice renders through the foundation's psy-foundation v2.0.0 psy4 voices (PsyKick · PsySnare · PsyHat · PsyShaker · PsyRiser · PsyImpact · PsyTexture) — peak-normalized to a per-type level law so the kit is one instrument, not ten strangers.</div>
+  </section>
 
   <div class="styles powGenres" id="stylePicker"></div>
 
@@ -54,7 +74,7 @@
   <button id="resumeBtn" style="display:none;border-color:var(--acc);color:var(--acc);padding:12px 20px">RESUME LAST SESSION</button>
 
   <footer class="powFoot mono" role="contentinfo" aria-label="landing status">
-    <span class="pfBrand">PSY6 <b>v0.29.0</b></span>
+    <span class="pfBrand">PSY6 <b>v0.30.0</b></span>
     <span class="pfSep" aria-hidden="true"></span>
     <span class="pfNote">RUNS ENTIRELY IN YOUR BROWSER — NO ACCOUNTS · NO TELEMETRY · YOUR MUSIC STAYS YOURS</span>
   </footer>
@@ -292,7 +312,7 @@
   </main>
 
   <footer id="statusBar" role="contentinfo">
-    <span class="mono fBrand">PSY6 <span class="fVer">v0.29.0</span></span>
+    <span class="mono fBrand">PSY6 <span class="fVer">v0.30.0</span></span>
     <span class="fSep" aria-hidden="true"></span>
     <span class="fNote">everything runs locally — no accounts · no telemetry · your music stays yours</span>
     <span class="fKeys mono">SPACE play/stop · <b>?</b> shortcuts</span>
