@@ -23,13 +23,14 @@ export const MAIN_GATE_IDS = [
   'G15', 'G16', 'G18', 'G19', 'G21', 'G22', 'G23', 'G24', 'G26', 'G27',
   'G28', 'G29', 'G30', 'G31', 'G32', 'G33', 'G34', 'G35', 'G36', 'G37',
   'G38', 'G39', 'G40', 'G41', 'G42', 'G43', 'G44', 'G45', 'G46', 'G47',
-  'G48', 'G49', 'G50', 'G51', 'G52', 'G53',
+  'G48', 'G49', 'G50', 'G51', 'G52', 'G53', 'G54',
 ];
 
-/* 50 ids — v0.29.0 added G53 (kick dims, psyreason re-review #2 port).
-   Earlier: v0.26.0 added G52 (reason liveness, v0.23.0): it was registered
-   in js/ui/tests.js but silently missing from the hand-typed e2e list — the
-   roast's own #9 found its live specimen three releases in. */
+/* 51 ids — v0.29.0 added G53 (kick dims) + G54 (pad spread), the
+   psyreason re-review #2 ports. Earlier: v0.26.0 added G52 (reason
+   liveness, v0.23.0): it was registered in js/ui/tests.js but silently
+   missing from the hand-typed e2e list — the roast's own #9 found its
+   live specimen three releases in. */
 export const MAIN_GATE_COUNT = MAIN_GATE_IDS.length;
 
 export const REALTIME_EVIDENCE_IDS = ['G17', 'G25'];

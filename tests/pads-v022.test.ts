@@ -133,11 +133,15 @@ describe('v0.22.0 PADS v3 — SCALE/CHORD modes', () => {
     expect(qual(kit[4].notes)).toBe('m')  // v
     expect(qual(kit[5].notes)).toBe('')   // VI
     expect(qual(kit[6].notes)).toBe('')   // VII
-    /* v0.28.0 SEVENTH VOICINGS (psyreason 47ec8a0): every pad is a 4-note
+    /* v0.28.0 SEVENTH VOICINGS (psyreason 47ec8a0): every pad carries the
        root+3+5+7 stack; the label appends the seventh type from the actual
-       5th→7th semitone gap. A natural minor: i7/ii°7/IIImaj7/iv7/v7/VImaj7/VII7. */
-    expect(kit[0].notes.length).toBe(4)
+       5th→7th semitone gap. A natural minor: i7/ii°7/IIImaj7/iv7/v7/VImaj7/VII7.
+       v0.29.0 SPREAD VOICING (psyreason dc072ca): a FIFTH note — the 3rd
+       one octave UP — opens the stack; notes[0..3] and the label laws are
+       UNCHANGED (the sparkle rides as notes[4]). */
+    expect(kit[0].notes.length).toBe(5)
     expect(kit[0].notes[3]).toBe(67) // Am7: A3 C4 E4 G4 — the added 7th is G4
+    expect(kit[0].notes[4]).toBe(72) // the spread sparkle: C5 — the 3rd one octave up
     expect(kit[0].label).toBe('Am7')
     expect(kit[2].label).toBe('Cmaj7') // III: C E G B — B is 4 semitones over G
     expect(kit[6].label).toBe('G7')    // VII: G B D F — flat 7th, the real dominant

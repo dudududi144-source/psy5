@@ -327,6 +327,11 @@ function fillSection(p, pat, section, bars, energy, ctx) {
       if (cd === prevCd) continue;
       put(pat, 6, b * 16, 0.35, root + 12 + degreeToSemitone(scaleIv, cd));
       if (len >= 64) put(pat, 6, b * 16 + 8, 0.3, root + 12 + degreeToSemitone(scaleIv, cd + 4));
+      /* v0.29.0 SPREAD VOICING (psyreason dc072ca): the chord's 3rd one
+         octave UP — the composer bed now carries the same openness the
+         live pad grid got (5-voice stacks). Chord-tone safe: cd+2 IS the
+         diatonic third of the active triad. */
+      if (len >= 32) put(pat, 6, b * 16 + 4, 0.22, root + 12 + degreeToSemitone(scaleIv, cd + 2) + 12);
       prevCd = cd;
     }
   }
@@ -598,6 +603,22 @@ export function compose(styleId, targetMinutes, seed, seedLabel) {
      and release past it (noteOn: dur = stepDur*gate*2): the pad rings UNDER
      the next chord's attack → continuous crossfade bed (psyreason f766049). */
   if (p.tracks[6] && p.tracks[6].sound && p.tracks[6].sound.gate != null) p.tracks[6].sound.gate = Math.max(p.tracks[6].sound.gate, 9);
+  /* v0.29.0 PAD TIMBRE (psyreason dc4f68c/6c8c152/4e09726 — per-substyle pad
+     timbre + wider ranges): the pad VOICE is tinted per style+seed — detune
+     and cutoff stay inside the preset's designed envelope (multiplied, not
+     replaced); `width` (new, 0.3–0.8) drives the live pad-grid per-note
+     stereo spread (perform.js padHit). Deterministic: pure function of
+     (styleId, seed) — same seed = same tint, forever. Runs BEFORE the macro
+     base snapshot so ENERGY/FILTER resolve from the tinted base. */
+  {
+    const pt = p.tracks[6] && p.tracks[6].sound;
+    if (pt) {
+      const ptR = rngFor(seedInt, 'padtimbre');
+      if (pt.detune != null) pt.detune = Math.round(Math.min(30, Math.max(4, pt.detune * (0.75 + 0.7 * ptR()))) * 10) / 10;
+      if (pt.cutoff != null) pt.cutoff = Math.round(Math.min(16000, Math.max(200, pt.cutoff * (0.85 + 0.35 * ptR()))));
+      pt.width = +(0.3 + 0.5 * ptR()).toFixed(2);
+    }
+  }
   /* 2b. TRANZ carrier (v0.19.0) — a 10th drum track whose TYPE is the one
      the kit's FX lane does NOT carry (fx=riser → TRANZ=impact; fx=impact
      [TRANCE] → TRANZ=riser), so EVERY composed project can fire both build

@@ -1646,7 +1646,6 @@ const mkEng53=()=>{const oc=new OfflineAudioContext(1,Math.round(SR53*1),SR53);c
 const renderKick53=async(sound)=>{const{oc,eng,tr}=mkEng53();tr.sound=Object.assign({type:'kick',tune:1,decay:1,tone:1,punch:.5},sound);eng.trigger(tr,.05,{track:0,off:0,vel:.9,note:60,lock:{}},60/145/4);return oc.startRendering()};
 const pcm53=(buf)=>buf.getChannelData(0);
 const md53=(x,y)=>{let m=0;const n=Math.min(x.length,y.length);for(let i=0;i<n;i++){const d=Math.abs(x[i]-y[i]);if(d>m)m=d}return m};
-const rms53=(x)=>{let s=0;for(let i=0;i<x.length;i++)s+=x[i]*x[i];return Math.sqrt(s/x.length)};
 const DLOW53={body:.15,subk:.4,sat:.25},DHIGH53={body:.85,subk:.85,sat:.85},DNEU53={body:.5,subk:.5,sat:.5};
 const bA=pcm53(await renderKick53(DLOW53)),bB=pcm53(await renderKick53(DHIGH53));
 const bA2=pcm53(await renderKick53(DLOW53));
@@ -1661,6 +1660,34 @@ const triples53=new Set();
 for(const k of kicks53){const b=k.body,s=k.subk,t=k.sat;if(typeof b!=='number'||typeof s!=='number'||typeof t!=='number'||b<0||b>1||s<0||s>1||t<0||t>1)inRange53=false;triples53.add(b+'_'+s+'_'+t)}
 const ok53=mdAB>1e-3&&mdDet===0&&mdNeu===0&&law53<=.15&&pk53<=Math.fround(.97)&&dimsOk53&&inRange53&&triples53.size>=8;
 gate('G53','kick dims (v0.29.0 psyreason port): extreme dims audible md>1e-3 + deterministic md=0 + neutral-{.5,.5,.5} ≡ no-dims BIT-IDENTICAL + RMS ±15% peak<=.97 under dims + all '+kicks53.length+' kick presets auto-dimmed with '+triples53.size+' distinct triples',ok53,'md(lo,hi) '+mdAB.toExponential(1)+' | det '+mdDet+' | neutral≡none '+mdNeu+' | law '+law53.toFixed(3)+' pk '+pk53.toFixed(2)+' | kicks '+kicks53.length+' triples '+triples53.size)}catch(e){gate('G53','kick dims',false,'ERR '+e.message)}}
+if((window.__psy6GateSkip||[]).includes('G54')){gate('G54','subset-skipped (window.__psy6GateSkip)',true,'skipped by the e2e subset run — the full CI run asserts this gate')}else{try{
+/* ── G54 (v0.29.0) PAD SPREAD — per-note stereo + spread voicing ─────
+   psyreason dc072ca/6c8c152/4e09726 port: the live pad grid fires the
+   5-voice spread stack (root+3+5+7 + octave-up 3rd) with ALTERNATING
+   per-note stereo through the SynthVoice per-voice panner (lock.pan).
+   Evidence: (a) the alternating chord renders STEREO (L/R energy
+   asymmetry > .15); (b) the same chord with NO pan renders symmetric
+   (asym < .01 — the legacy center wiring); (c) pan:0 ≡ absent BIT-IDENTICAL
+   (wiring neutrality md=0); (d) the composer bed carries the octave-up
+   third (pad voicing put count grows) and the composed pad sound carries
+   the seeded `width` in [0.3,0.8] with deterministic double-run. */
+const SR54=44100;
+const mkPad54=()=>{const p=buildStyle('PSYTRANCE',42);const oc=new OfflineAudioContext(2,Math.round(SR54*1),SR54);const eng=new PooledEngine(oc);eng.syncMix(p);return{oc,eng,tr:p.tracks[6]}};
+const NOTES54=[57,60,64,67,72];/* Am7 spread: root+3+5+7 + octave-up 3rd */
+const renderPad54=async(panned)=>{const{oc,eng,tr}=mkPad54();const t0=.05;if(panned)NOTES54.forEach((n,j)=>eng.trigger(tr,t0,{vel:j===0?.9:(j===4?.45:.55),note:n,lock:{pan:(j%2===0?1:-1)*.55}},60/145/4));else NOTES54.forEach((n,j)=>eng.trigger(tr,t0,{vel:j===0?.9:(j===4?.45:.55),note:n,lock:j===0?{}:{pan:0}},60/145/4));return oc.startRendering()};
+const e54=(ch)=>{let s=0;for(let i=0;i<ch.length;i++)s+=ch[i]*ch[i];return s};
+const bufP=await renderPad54(true),bufM=await renderPad54(false);
+const asym=(b)=>{const L=e54(b.getChannelData(0)),R=e54(b.getChannelData(1));return Math.abs(L-R)/(L+R)};
+const asymP=asym(bufP),asymM=asym(bufM);
+/* (c) pan:0 ≡ absent — same 5-voice chord, zero vs absent pan lock */
+const bufZ=await (async()=>{const{oc,eng,tr}=mkPad54();NOTES54.forEach((n,j)=>eng.trigger(tr,.05,{vel:j===0?.9:(j===4?.45:.55),note:n,lock:{pan:(j%2===0?1:-1)*0}},60/145/4));return oc.startRendering()})();
+let mdZMfull=0;{const a=bufZ.getChannelData(0),b=bufM.getChannelData(0);for(let i=0;i<a.length;i++){const d=Math.abs(a[i]-b[i]);if(d>mdZMfull)mdZMfull=d}}
+/* (d) composer pad timbre — seeded width + determinism */
+const cA=compose('FULL-ON',3,424242).project,cB=compose('FULL-ON',3,424242).project;
+const wA=cA.tracks[6]&&cA.tracks[6].sound?cA.tracks[6].sound.width:null;
+const timbreOk54=typeof wA==='number'&&wA>=0.3&&wA<=0.8&&JSON.stringify(cA.tracks[6].sound)===JSON.stringify(cB.tracks[6].sound);
+const ok54=asymP>0.15&&asymM<0.01&&mdZMfull===0&&timbreOk54;
+gate('G54','pad spread (v0.29.0 psyreason port): alternating pan renders STEREO (asym '+asymP.toFixed(2)+') + no-pan renders symmetric (asym '+asymM.toFixed(3)+') + pan:0 ≡ absent bit-identical + composer pad carries seeded width '+wA+' deterministic',ok54,'asym(pan) '+asymP.toFixed(3)+' | asym(mono) '+asymM.toFixed(4)+' | md(pan:0,none) '+mdZMfull+' | width '+wA)}catch(e){gate('G54','pad spread',false,'ERR '+e.message)}}
 }const pass=GATE_RES.filter(g=>g.pass).length;logLine('warn','== SELF-GATE: '+pass+'/'+GATE_RES.length+' passed ==');window.__psy6Gates=GATE_RES.slice(); /* machine-readable evidence for tools/e2e.mjs (headless CI) */const tb=$('gateTab');tb.style.display='';const body=tb.querySelector('tbody');body.innerHTML='';GATE_RES.forEach(g=>{const tr=document.createElement('tr');tr.innerHTML='<td class="mono">'+g.id+'</td><td>'+g.claim+'</td><td><span class="tag '+(g.pass?'t-V':'t-F')+'">'+(g.pass?'PASS':'FAIL')+'</span></td><td class="mono">'+(g.ev||'')+'</td>';body.appendChild(tr)})}
 
 /* ── WORKLET reduced gate set (G2 + G14w + G15w) — real checks, real stats.

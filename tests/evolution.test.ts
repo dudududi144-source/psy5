@@ -18,7 +18,7 @@ import { SCALES, stepEvents } from '../js/model.js'
 import { evolutionState, evolutionSeedOf, evolvedSongEvents, evolvedLiveEvents, absBarOf } from '../js/evolution.js'
 
 const SEED = 424242
-const OFF_PIN = 'b904778b234b387c' /* post-v0.27.0 OFF baseline (escalating build fills re-shaped the BUILD/RISER snare track → fewer, escalating events; v0.27.0: 4325 events; v0.19.0 value b8de08b276873400 / 4389 events recorded in CHANGELOG) */
+const OFF_PIN = 'c245905f6e918e8' /* post-v0.29.0 OFF baseline (pad bed spread-voicing third, psyreason dc072ca port → more pad events; v0.27.0 value b904778b234b387c / 4325 events recorded here) */
 const GATE_SEED = 777
 const GATE_MIN_DIFF = 200
 
@@ -49,7 +49,7 @@ describe('evolution OFF contract (strict determinism)', () => {
     const p = compose('FULL-ON', 3, SEED).project
     expect(p.evolution).toBeUndefined() /* untouched projects gain NO field */
     const sch = songSchedule(clone(p), 0.05)
-    expect(sch.evs.length).toBe(4325)
+    expect(sch.evs.length).toBe(4357)
     expect(evHash(sch.evs)).toBe(OFF_PIN)
   })
   test('evolution field present but OFF → identical hash; lazy state is canonical', () => {

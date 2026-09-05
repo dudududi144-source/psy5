@@ -234,9 +234,11 @@ describe('section variants (v0.7.0 — no identical repeats)', () => {
     expect(c.form.sections.map(s => s.id)).toEqual(SECTION_CHAIN.map(s => s.id))
     /* v0.27.0 REBUILD VALUE: pad legato scheduling + gate bump and the
        ear-candy pops moved the fingerprint from bb16ce280ff48f88 (v0.9.0).
-       The snapshot pass itself still touches NO pattern data — the pin's
-       purpose (snapshots don't mutate patterns) is unchanged. */
-    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('4eaab7523d9195e8')
+       v0.29.0 REBUILD VALUE: the pad bed's spread-voicing third (psyreason
+       dc072ca port) moved it again from 4eaab7523d9195e8. The snapshot
+       pass itself still touches NO pattern data — the pin's purpose
+       (snapshots don't mutate patterns) is unchanged. */
+    expect(createHash('sha256').update(c.stats.fingerprint).digest('hex').slice(0, 16)).toBe('c8d0e57236f6373d')
   })
   test('pairwise step-difference within EVERY family ≥ VARIANT_DIFF_MIN (0.15), base included', () => {
     for (const styleId of Object.keys(COMPOSER_STYLES)) {
@@ -405,9 +407,17 @@ describe('FOREST + HI-TECH styles (v0.7.0)', () => {
          dcdee5361a94aab3, PROGRESSIVE 379c4af5155af77c/fbbd3d7ae927c1f1/
          887afecad1e4e719) recorded here. Determinism re-proven (double run
          byte-identical); harmony invariant re-proven (0 viol). */
-      'FULL-ON': ['3e7cf22db15cb096', 'af9c375fd3e34ed1', 'e3a4ad78f43ddfa8'],
-      'DARK-PSY': ['cd1456cd06e7ab4d', '8769a2f74414975f', '9b0a969099d911b9'],
-      'PROGRESSIVE': ['632df9863e6c9f2f', '734caf4e8a5743d0', '3666798ae4faeec0'],
+      /* v0.29.0 RE-PIN #2: PAD SPREAD VOICING (composer bed third, psyreason
+         dc072ca) + PAD TIMBRE (per-style+seed detune/cutoff tint + `width`,
+         psyreason dc4f68c/6c8c152/4e09726) — whole-project hashes moved
+         again. Phase-1 values (FULL-ON 3e7cf22db15cb096/af9c375fd3e34ed1/
+         e3a4ad78f43ddfa8, DARK-PSY cd1456cd06e7ab4d/8769a2f74414975f/
+         9b0a969099d911b9, PROGRESSIVE 632df9863e6c9f2f/734caf4e8a5743d0/
+         3666798ae4faeec0) recorded here. Determinism re-proven (double run
+         byte-identical); harmony invariant re-proven (0 viol). */
+      'FULL-ON': ['ad7dc8a9503a278f', '66091ab6725c8754', 'ae4c8d748850fc44'],
+      'DARK-PSY': ['bdef2fe82836af78', 'e813b31df033a923', '6ac89d47741323fb'],
+      'PROGRESSIVE': ['b6ec451238c2075f', '7cd07faa68d3a2d3', '6ac64acf61b8d3cc'],
     }
     for (const [styleId, hashes] of Object.entries(pins)) {
       ;[3, 5, 8].forEach((minutes, i) => {

@@ -198,8 +198,12 @@ function padKit(p,mode){
            [0,2,4,6] root+3+5+7 — deeper, lusher pads. The label keeps the
            triad quality and appends the seventh type from the actual
            5th→7th semitone gap (3 = flat-7 '7', 4 = major-7th 'maj7'),
-           so pentatonic/odd scales degrade honestly to the triad name. */
+           so pentatonic/odd scales degrade honestly to the triad name.
+           v0.29.0 SPREAD VOICING (psyreason dc072ca): a FIFTH note — the
+           3rd one octave UP — opens the stack (openness/width); the label
+           and quality laws are unchanged (notes[0..3] stay root+3+5+7). */
         const ns=[0,2,4,6].map(k=>root+24+sc[(idx+k)%L]+12*(oct+Math.floor((idx+k)/L)));
+        ns.push(ns[1]+12);
         const c7=ns[3]-ns[2],tri=padChordName(ns[0],ns[1],ns[2]);
         out.push({mode:'chord',notes:ns,label:tri+(c7===3?'7':c7===4?'maj7':''),sub:ROMAN[i]});
       }
